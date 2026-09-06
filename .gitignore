@@ -1,0 +1,7 @@
+node_modules/
+web-app/web-app
+npm-debug.log*
+*.log
+s_err.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,2416 @@
+// 清框影 App 控制器 —— 依据 Java 版 MainController 交互逻辑重写
+// 核心:onSettingChanged(高频防抖)/onSettingCommit(提交压栈)/scheduleRender(防抖渲染)/refreshUI(回显)
+// 撤销/重做栈 + 每图独立模板(imageTemplates) + 画布元素(logo/贴纸/文字)管理
+window.App = {
+    image: null,          // 当前图片 {el, name, w, h, exif, customSettings}
+    images: [],
+    selectedIdx: [],
+    currentIdx: 0,
+    template: null,       // 当前模板 JSON
+    imageTemplates: new Map(), // 每图独立模板(深拷贝快照)
+    presets: [],
+    zoom: 1,
+    panX: 0, panY: 0,
+    _pan: null,
+    renderToken: 0,
+    _renderTimer: null,
+    undoStack: [],
+    redoStack: [],
+    _gesture: false,
+    isUpdating: false,
+    draggingCompare: false,
+    logos: [],
+    logoImgCache: {},
+    textures: [],
+    curatedFonts: ['Microsoft YaHei', 'SimSun', 'SimHei', 'KaiTi', 'FangSong', 'Arial', 'Arial Black', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Segoe UI', 'PingFang SC'],
+    _lastTplName: '',
+    _firstRenderDone: false,
+    selectedEls: [],      // 画布元素选中集(引用自模板数组)
+    _elClip: null,        // 复制的元素快照 {kind, el}
+    _draftPending: false,
+    _puzzleSlot: 0,       // 拼图当前编辑槽位(切换下拉前保持旧值)
+    _skipPuzzleCapture: false,
+
+    init() {
+        this.cacheDom();
+        this.bind();
+        this.loadPresets();
+        this.loadLogos();
+        this.loadTextures();
+        this.populateFonts();
+        this.setupShortcuts();
+        this.setupPanelInteractions();
+        this.updateHistoryButtons();
+    },
+
+    cacheDom() {
+        const $ = id => document.getElementById(id);
+        this.dom = {
+            btnOpen: $('btnOpen'), btnSave: $('btnSave'), selFormat: $('selFormat'),
+            btnSyncSel: $('btnSyncSel'), btnUndo: $('btnUndo'), btnRedo: $('btnRedo'),
+            btnReset: $('btnReset'), btnRandom: $('btnRandom'), btnFit: $('btnFit'),
+            zoomInput: $('zoomInput'), zoomRange: $('zoomRange'), btnTheme: $('btnTheme'),
+            presetTree: $('presetTree'), presetSearch: $('presetSearch'),
+            canvas: $('previewCanvas'), canvasPane: $('canvasPane'), placeholder: $('placeholder'),
+            stage: document.querySelector('.stage'),
+            thumbStrip: $('thumbStrip'), dropOverlay: $('dropOverlay'),
+            tabs: $('inspTabs'), panels: Array.from(document.querySelectorAll('.tab-panel')),
+            stRes: $('stRes'), stInfo: $('stInfo'), stCanvas: $('stCanvas'),
+            btnCompare: $('btnCompare'),
+        };
+    },
+
+    $(id) { return document.getElementById(id); },
+
+    bind() {
+        const d = this.dom;
+        d.btnOpen.addEventListener('click', () => this.openImage());
+        d.btnSave.addEventListener('click', () => this.exportImage());
+        d.btnSyncSel.addEventListener('click', () => this.syncToSelected());
+        d.btnUndo.addEventListener('click', () => this.undo());
+        d.btnRedo.addEventListener('click', () => this.redo());
+        d.btnReset.addEventListener('click', () => this.resetParams());
+        d.btnRandom.addEventListener('click', () => this.randomBorder());
+        d.btnFit.addEventListener('click', () => this.fitZoom());
+        d.btnTheme.addEventListener('click', () => this.toggleTheme());
+        d.zoomRange.addEventListener('input', e => this.setZoom(parseInt(e.target.value, 10) / 100));
+        d.zoomInput.addEventListener('change', e => {
+            const v = parseFloat(String(e.target.value).replace('%', ''));
+            if (!isNaN(v)) this.setZoom(Math.min(3, Math.max(0.1, v / 100)));
+        });
+        d.presetSearch.addEventListener('input', () => this.filterTree(d.presetSearch.value.trim()));
+        d.tabs.addEventListener('click', e => {
+            const btn = e.target.closest('.tab');
+            if (btn) this.switchTab(btn.dataset.tab);
+        });
+        d.btnCompare.addEventListener('mousedown', () => this.setCompare(true));
+        d.btnCompare.addEventListener('mouseup', () => this.setCompare(false));
+        d.btnCompare.addEventListener('mouseleave', () => this.setCompare(false));
+        this.setupDragDrop();
+        this.bindInteractive();
+    },
+
+    /* ══ 画布元素 / 缩放平移交互 ══ */
+    bindInteractive() {
+        const pane = this.dom.canvasPane, stage = this.dom.stage, canvas = this.dom.canvas;
+        pane.addEventListener('wheel', e => {
+            if (!this.image || !stage.classList.contains('has-img')) return;
+            e.preventDefault();
+            const sel = this.selectedEls[0];
+            if (sel && sel.kind) {
+                // 元素操作:Ctrl+滚轮 旋转,普通滚轮 缩放
+                const rot = e.ctrlKey || e.shiftKey;
+                this.nudgeElement(sel, rot ? 'rot' : 'scale', e.deltaY < 0 ? 1 : -1);
+                return;
+            }
+            this.zoomAt(e, stage, e.deltaY < 0 ? 1.1 : 1 / 1.1);
+        }, { passive: false });
+        canvas.addEventListener('mousedown', e => {
+            if (!this.image || e.button !== 0) return;
+            const pt = this.screenToCanvas(e);
+            const el = this.pickElement(pt);
+            if (el) {
+                e.preventDefault();
+                this.selectedEls = this.hasEl(this.selectedEls, el) ? this.selectedEls : [el];
+                this._dragEl = { kind: el.kind, ref: el.obj, sx: e.screenX, sy: e.screenY, x: el.x0, y: el.y0, moved: false };
+                this.refreshElList();
+                canvas.style.cursor = 'pointer';
+                this.requestRender();
+                return;
+            }
+            this.selectedEls = [];
+            this.refreshElList();
+            this._pan = { sx: e.screenX, sy: e.screenY, px: this.panX, py: this.panY };
+            canvas.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', e => {
+            if (this._dragEl) {
+                const dx = e.screenX - this._dragEl.sx, dy = e.screenY - this._dragEl.sy;
+                if (Math.abs(dx) + Math.abs(dy) > 2) {
+                    if (!this._dragEl.moved) { this._dragEl.moved = true; this.pushUndo(); }
+                    const rect = canvas.getBoundingClientRect();
+                    const kx = canvas.width / rect.width, ky = canvas.height / rect.height;
+                    this.moveElement(this._dragEl, this._dragEl.x + dx * kx, this._dragEl.y + dy * ky);
+                }
+                return;
+            }
+            if (!this._pan) return;
+            this.panX = this._pan.px + (e.screenX - this._pan.sx);
+            this.panY = this._pan.py + (e.screenY - this._pan.sy);
+            this.applyZoomStyle();
+        });
+        window.addEventListener('mouseup', () => {
+            if (this._dragEl) {
+                const moved = this._dragEl.moved;
+                this._dragEl = null;
+                if (moved) this.commitNoPush();
+            }
+            if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
+        });
+        document.addEventListener('click', e => {
+            if (e.target === canvas) return;
+            if (e.target.closest('#inspector') || e.target.closest('.tabs')) return;
+            if (this.selectedEls.length && this._dragElMoved !== true) {
+                // 画布外点击取消选中
+            }
+        });
+    },
+
+    screenToCanvas(e) {
+        const canvas = this.dom.canvas;
+        const rect = canvas.getBoundingClientRect();
+        const cx = (e.clientX - rect.left) / this.zoom;
+        const cy = (e.clientY - rect.top) / this.zoom;
+        return { x: cx, y: cy, cw: canvas.width, ch: canvas.height };
+    },
+
+    hasEl(list, el) { return list.some(x => x.kind === el.kind && x.obj === el.obj); },
+
+    // 命中检测:logo/贴纸/自由文字
+    pickElement(pt) {
+        const hitLogo = this.hitTestLogos(pt);
+        const hitStk = this.hitTestStickers(pt);
+        const hitTxt = this.hitTestTexts(pt);
+        const cands = [hitLogo, hitStk, hitTxt].filter(Boolean);
+        if (!cands.length) return null;
+        cands.sort((a, b) => (b.z || 0) - (a.z || 0));
+        return cands[0];
+    },
+
+    hitTestLogos(pt) {
+        const els = (this.template && this.template.logoElements) || [];
+        for (let i = els.length - 1; i >= 0; i--) {
+            const el = els[i];
+            const size = el.size || 60;
+            const pos = this.logoPos(el, pt.cw, pt.ch, size);
+            if (Math.abs(pt.x - pos.cx) <= size / 2 && Math.abs(pt.y - pos.cy) <= size / 2) {
+                return { kind: 'logo', obj: el, x0: pos.cx, y0: pos.cy, z: el.z || 0 };
+            }
+        }
+        return null;
+    },
+
+    hitTestStickers(pt) {
+        const stickers = (this.template && this.template.decorConfig && this.template.decorConfig.stickers) || [];
+        for (let i = stickers.length - 1; i >= 0; i--) {
+            const el = stickers[i];
+            const tex = this.textureEl(el.src);
+            if (!tex) continue;
+            const sw = tex.naturalWidth * (el.scale || 1), sh = tex.naturalHeight * (el.scale || 1);
+            if (Math.abs(pt.x - el.x) <= sw / 2 && Math.abs(pt.y - el.y) <= sh / 2) {
+                return { kind: 'sticker', obj: el, x0: el.x, y0: el.y, z: (el.z || 0) + 5 };
+            }
+        }
+        return null;
+    },
+
+    hitTestTexts(pt) {
+        const lines = (this.template && this.template.decorConfig && this.template.decorConfig.textLines) || [];
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const el = lines[i];
+            if (!el.text || el.align !== 'free') continue;
+            const fs = el.autoSize ? 24 : (el.fontSize || 18);
+            const w = Math.max(60, String(el.text).length * fs * 0.7), h = fs * 1.8;
+            if (Math.abs(pt.x - el.x) <= w / 2 && Math.abs(pt.y - el.y) <= h / 2) {
+                return { kind: 'text', obj: el, x0: el.x, y0: el.y, z: (el.z || 0) + 3 };
+            }
+        }
+        return null;
+    },
+
+    logoPos(el, cw, ch, size) {
+        if (typeof el.x === 'number' && typeof el.y === 'number') {
+            return { cx: el.x, cy: el.y };
+        }
+        const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
+        const ox = el.offsetX || 20, oy = el.offsetY || 20;
+        const tx = hAlign === 'left' ? ox + size / 2 : hAlign === 'center' ? cw / 2 : cw - ox - size / 2;
+        const ty = vAlign === 'top' ? oy + size / 2 : vAlign === 'center' ? ch / 2 : ch - oy - size / 2;
+        return { cx: tx, cy: ty };
+    },
+
+    nudgeElement(el, mode, dir) {
+        const e = el.obj;
+        if (el.kind === 'logo') {
+            if (typeof e.x !== 'number') { e.x = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cx; e.y = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cy; }
+            if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
+            else e.size = clampNum((e.size || 60) + dir * 6, 8, 400);
+        } else if (el.kind === 'sticker') {
+            if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
+            else e.scale = clampNum((e.scale || 1) * (dir > 0 ? 1.1 : 0.9), 0.02, 3);
+        } else if (el.kind === 'text') {
+            if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
+            else { e.fontSize = clampNum((e.fontSize || 18) + dir * 2, 6, 300); if (e.autoSize) e.autoSize = 0; }
+        }
+        this.syncSliderFromEl(el);
+        this.onSettingChanged();
+    },
+
+    moveElement(drag, x, y) {
+        const e = drag.ref;
+        if (drag.kind === 'logo') { e.x = x; e.y = y; e.offsetX = 0; e.offsetY = 0; }
+        else if (drag.kind === 'sticker') { e.x = x; e.y = y; }
+        else if (drag.kind === 'text') { e.x = x; e.y = y; }
+        this.onSettingChanged();
+    },
+
+    textureEl(src) {
+        if (!src) return null;
+        if (this.logoImgCache[src]) return this.logoImgCache[src];
+        if (this.textures) {
+            const t = this.textures.find(x => x.name === src);
+            if (t) { const im = new Image(); im.src = t.dataUrl; this.logoImgCache[src] = im; return im; }
+        }
+        const im = new Image(); im.src = src; this.logoImgCache[src] = im; return im;
+    },
+
+    syncSliderFromEl(el) {
+        if (!el || !el.kind) return;
+        const e = el.obj;
+        const $ = this.$;
+        const rot = $('slElementRotation'), op = $('slActiveIconOpacity');
+        if (rot) rot.value = Math.round(e.rotation || 0);
+        if (op) op.value = Math.round(e.opacity != null ? e.opacity : 100);
+        this.updateLabel('lblElementRotation', Math.round(e.rotation || 0) + '°');
+        this.updateLabel('lblActiveIconOpacity', Math.round(e.opacity != null ? e.opacity : 100) + '%');
+    },
+
+    /* ══ 默认模板 ══ */
+    defaultTemplate() {
+        return {
+            templateName: '', templateTag: '', photoFrameStyle: '', canvasRatio: 'original',
+            baseMargin: {
+                marginLock: 1, marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
+                imgScale: 1, imgOffsetX: 0, imgOffsetY: 0,
+                refTop: 0, refBottom: 0, refLeft: 0, refRight: 0, globalMargin: 1,
+            },
+            exportDpi: 300,
+            layerList: [{
+                visible: 1, marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
+                fillConfig: {
+                    fillType: 'transparent', fillHex: 'eeeeee', fillOpacity: 100,
+                    gradientType: 'linear', gradientAngle: 45,
+                    gradientStops: [{ position: 0, color: 'eeeeee' }, { position: 1, color: 'bbbbbb' }],
+                    gradientOpacity: 100,
+                    textureSrc: '', textureScale: 1, textureOffsetX: 0, textureOffsetY: 0,
+                    textureOpacity: 100, textureBlend: 'normal',
+                },
+                strokeConfig: {
+                    strokeWidth: 0, strokePos: 'inside', strokeColorHex: '000000', strokeOpacity: 100,
+                    strokeDashArray: [], strokeDashOffset: 0,
+                },
+                cornerConfig: {
+                    cornerLock: 0, cornerRadiusAll: 0, cornerRadiusTL: 0, cornerRadiusTR: 0,
+                    cornerRadiusBL: 0, cornerRadiusBR: 0,
+                },
+                shadowGlowConfig: {
+                    shadowEnable: 0, shadowOffsetX: 0, shadowOffsetY: 8, shadowBlur: 20, shadowSpread: 0,
+                    shadowColorHex: '000000', shadowOpacity: 35,
+                    glowEnable: 0, glowColorHex: 'ffffff', glowBlur: 30, glowSpread: 0, glowOpacity: 60, glowType: 'center',
+                },
+            }],
+            cornerConfig: {
+                cornerLock: 0, cornerRadiusAll: 0, cornerRadiusTL: 0, cornerRadiusTR: 0,
+                cornerRadiusBL: 0, cornerRadiusBR: 0, shapeType: 'rounded', customShapeSvg: '',
+            },
+            filmTearConfig: {
+                tearEnable: 0, tearStrength: 50, tearDensity: 8,
+                filmPerforationEnable: 0, filmPerforationType: 'square', filmPerforationSize: 20, filmPerforationSpacing: 20,
+                dustScratchEnable: 0, dustScratchIntensity: 0, yellowingEnable: 0, yellowingStrength: 0,
+            },
+            lightEffect: {
+                vignetteEnable: 0, vignetteStrength: 0, vignetteFeather: 50,
+                lightLeakEnable: 0, lightLeakType: 'warm', lightLeakOpacity: 40, lightLeakAngle: 225,
+                filmGrainEnable: 0, filmGrainIntensity: 0,
+            },
+            decorConfig: {
+                exifAutoText: 0, textLines: [], stickers: [],
+                cornerDecorEnable: 0, cornerDecorType: 'line', cornerDecorSize: 30,
+            },
+            logoElements: [],
+            paramFontSize: 100, paramType: 0, paramPosition: 'CENTER',
+            puzzle: {
+                enabled: 0, layout: 'single', gap: 6, slotFill: 'cover', bgMode: 0,
+                canvasRatio: 'auto', borderColor: 'ffffff', offsetX: 0, offsetY: 0, zoom: 100,
+                captions: {},
+            },
+        };
+    },
+
+    /* ══ 四方法核心 ══ */
+    // 高频修改(拖滑块/输入文字):仅同步 + 防抖渲染,不压撤销栈
+    onSettingChanged() {
+        this.syncModelFromUI();
+        this.saveCurrentTemplate();
+        this.scheduleRender();
+    },
+
+    // 一次性提交(切换/勾选/按钮/change):压撤销栈 -> 清重做 -> 同步 -> 立即渲染
+    // 若处于手势中(滑块下按/文本框聚焦时已压过快照),则不重复压栈
+    onSettingCommit() {
+        if (!this._gesture) this.pushUndo();
+        this._commit();
+    },
+
+    // 手势开始:滑块 pointerdown / 文本框 focus 时压入手势前快照
+    beginGesture() {
+        if (this._gesture || !this.template || !this.image) return;
+        this._gesture = true;
+        this.pushUndo();
+    },
+    // 手势结束:pointerup / blur
+    endGesture() { this._gesture = false; },
+    // 提交但不压栈(手势快照已在上一步压入)
+    commitNoPush() { this._commit(); },
+    _commit() {
+        this.syncModelFromUI();
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+    },
+
+    syncModelFromUI() {
+        if (this.isUpdating || !this.template || !this.image) return;
+        const $ = this.$;
+        const m = this.template.baseMargin || (this.template.baseMargin = {});
+        const layer = this.currentLayer() || {};
+        const fill = layer.fillConfig || (layer.fillConfig = {});
+        const stroke = layer.strokeConfig || (layer.strokeConfig = {});
+        const sg = layer.shadowGlowConfig || (layer.shadowGlowConfig = {});
+        const cc = this.template.cornerConfig || (this.template.cornerConfig = {});
+        const ft = this.template.filmTearConfig || (this.template.filmTearConfig = {});
+        const le = this.template.lightEffect || (this.template.lightEffect = {});
+        const decor = this.template.decorConfig || (this.template.decorConfig = {});
+
+        this.template.canvasRatio = $('cbCanvasRatio') ? $('cbCanvasRatio').value : 'original';
+        m.marginLock = $('cbMarginLock') && $('cbMarginLock').checked ? 1 : 0;
+        m.marginTop = num($('tfMarginTop'), m.refTop != null ? m.refTop : m.marginTop);
+        m.marginBottom = num($('tfMarginBottom'), m.refBottom != null ? m.refBottom : m.marginBottom);
+        m.marginLeft = num($('tfMarginLeft'), m.refLeft != null ? m.refLeft : m.marginLeft);
+        m.marginRight = num($('tfMarginRight'), m.refRight != null ? m.refRight : m.marginRight);
+        const gm = $('slGlobalMargin') ? parseInt($('slGlobalMargin').value, 10) / 100 : 1;
+        m.globalMargin = gm;
+        this.applyGlobalMargin(gm, false);
+
+        m.imgScale = $('slImgScale') ? parseInt($('slImgScale').value, 10) / 100 : (m.imgScale || 1);
+        m.imgOffsetX = num($('tfImgOffsetX'), m.imgOffsetX);
+        m.imgOffsetY = num($('tfImgOffsetY'), m.imgOffsetY);
+
+        cc.cornerLock = $('cbCornerLock') && $('cbCornerLock').checked ? 1 : 0;
+        const r = $('slCornerRadius') ? parseInt($('slCornerRadius').value, 10) : (cc.cornerRadiusAll || 0);
+        cc.cornerRadiusAll = r;
+        cc.cornerRadiusTL = num($('slCornerTL'), r);
+        cc.cornerRadiusTR = num($('slCornerTR'), r);
+        cc.cornerRadiusBL = num($('slCornerBL'), r);
+        cc.cornerRadiusBR = num($('slCornerBR'), r);
+
+        this.template.paramPosition = $('cbParamPosition') ? $('cbParamPosition').value : 'CENTER';
+        this.template.paramFontSize = $('slParamFontSize') ? parseInt($('slParamFontSize').value, 10) : 100;
+        this.template.paramType = $('cbParamType') ? parseInt($('cbParamType').value, 10) : 0;
+        this.syncManualExif();
+
+        layer.visible = $('cbLayerVisible') && $('cbLayerVisible').checked ? 1 : 0;
+        layer.marginTop = num($('tfLayerMarginTop'), layer.marginTop);
+        layer.marginRight = num($('tfLayerMarginRight'), layer.marginRight);
+        layer.marginBottom = num($('tfLayerMarginBottom'), layer.marginBottom);
+        layer.marginLeft = num($('tfLayerMarginLeft'), layer.marginLeft);
+
+        fill.fillType = $('cbFillType') ? $('cbFillType').value : 'solid';
+        fill.fillHex = $('cpFillColor') ? $('cpFillColor').value.replace('#', '') : 'eeeeee';
+        fill.fillOpacity = $('slFillOpacity') ? parseInt($('slFillOpacity').value, 10) : 100;
+        fill.gradientType = $('cbGradientType') ? $('cbGradientType').value : 'linear';
+        fill.gradientAngle = $('slGradientAngle') ? parseInt($('slGradientAngle').value, 10) : 45;
+        fill.textureSrc = fill.textureSrc || '';
+        fill.textureScale = $('slTextureScale') ? parseInt($('slTextureScale').value, 10) / 100 : 1;
+        fill.textureBlend = $('cbTextureBlend') ? $('cbTextureBlend').value : 'normal';
+
+        stroke.strokeWidth = $('slStrokeWidth') ? parseInt($('slStrokeWidth').value, 10) : 0;
+        stroke.strokePos = $('cbStrokePos') ? $('cbStrokePos').value : 'inside';
+        stroke.strokeColorHex = $('cpStrokeColor') ? $('cpStrokeColor').value.replace('#', '') : '000000';
+        stroke.strokeOpacity = $('slStrokeOpacity') ? parseInt($('slStrokeOpacity').value, 10) : 100;
+        stroke.strokeDashArray = $('tfStrokeDash') ? dashToArray($('tfStrokeDash').value) : [];
+
+        const lcc = layer.cornerConfig || (layer.cornerConfig = {});
+        lcc.cornerLock = ($('cbLayerCornerLock') && $('cbLayerCornerLock').checked) ? 1 : 0;
+        const lr = $('slLayerCornerRadius') ? parseInt($('slLayerCornerRadius').value, 10) : (lcc.cornerRadiusAll || 0);
+        lcc.cornerRadiusAll = lr;
+        lcc.cornerRadiusTL = num($('slLayerCornerTL'), lr);
+        lcc.cornerRadiusTR = num($('slLayerCornerTR'), lr);
+        lcc.cornerRadiusBL = num($('slLayerCornerBL'), lr);
+        lcc.cornerRadiusBR = num($('slLayerCornerBR'), lr);
+
+        sg.shadowEnable = ($('cbShadow') && $('cbShadow').checked) ? 1 : 0;
+        sg.shadowOffsetX = $('slShadowX') ? parseInt($('slShadowX').value, 10) : 0;
+        sg.shadowOffsetY = $('slShadowY') ? parseInt($('slShadowY').value, 10) : 8;
+        sg.shadowBlur = $('slShadowBlur') ? parseInt($('slShadowBlur').value, 10) : 20;
+        sg.shadowSpread = $('slShadowSpread') ? parseInt($('slShadowSpread').value, 10) : 0;
+        sg.shadowColorHex = $('cpShadowColor') ? $('cpShadowColor').value.replace('#', '') : '000000';
+        sg.shadowOpacity = $('slShadowOpacity') ? parseInt($('slShadowOpacity').value, 10) : 35;
+        sg.glowEnable = ($('cbGlow') && $('cbGlow').checked) ? 1 : 0;
+        sg.glowColorHex = $('cpGlowColor') ? $('cpGlowColor').value.replace('#', '') : 'ffffff';
+        sg.glowBlur = $('slGlowBlur') ? parseInt($('slGlowBlur').value, 10) : 30;
+        sg.glowOpacity = $('slGlowOpacity') ? parseInt($('slGlowOpacity').value, 10) : 60;
+
+        ft.tearEnable = ($('cbTearEnable') && $('cbTearEnable').checked) ? 1 : 0;
+        ft.tearStrength = $('slTearStrength') ? parseInt($('slTearStrength').value, 10) : 50;
+        ft.tearDensity = $('slTearDensity') ? parseInt($('slTearDensity').value, 10) : 8;
+
+        le.vignetteEnable = ($('cbVignette') && $('cbVignette').checked) ? 1 : 0;
+        le.vignetteStrength = $('slVignetteStrength') ? parseInt($('slVignetteStrength').value, 10) : 0;
+        le.vignetteFeather = $('slVignetteFeather') ? parseInt($('slVignetteFeather').value, 10) : 50;
+        le.lightLeakEnable = ($('cbLightLeak') && $('cbLightLeak').checked) ? 1 : 0;
+        le.lightLeakType = $('cbLeakType') ? $('cbLeakType').value : 'warm';
+        le.lightLeakOpacity = $('slLeakOpacity') ? parseInt($('slLeakOpacity').value, 10) : 40;
+        le.lightLeakAngle = $('slLeakAngle') ? parseInt($('slLeakAngle').value, 10) : 225;
+
+        decor.exifAutoText = ($('cbExifText') && $('cbExifText').checked) ? 1 : 0;
+        decor.cornerDecorEnable = ($('cbCornerDecor') && $('cbCornerDecor').checked) ? 1 : 0;
+        decor.cornerDecorType = $('cbCornerDecorType') ? $('cbCornerDecorType').value : 'line';
+        decor.cornerDecorSize = $('slCornerDecorSize') ? parseInt($('slCornerDecorSize').value, 10) : 30;
+
+        this.syncPuzzleFromUI();
+    },
+
+    syncManualExif() {
+        const $ = this.$;
+        const efs = ['tfExifBrand', 'tfExifModel', 'tfExifFocal', 'tfExifAperture', 'tfExifIso', 'tfExifShutter'];
+        const v = ['brand', 'model', 'focal', 'aperture', 'iso', 'shutter'].map((k, i) => {
+            const inp = $(efs[i]);
+            return [k, inp ? String(inp.value).trim() : ''];
+        });
+        const manual = {};
+        v.forEach(([k, val]) => { if (val) manual[k] = val; });
+        this.template.manualExif = Object.keys(manual).length ? manual : null;
+        this.updateExifLine();
+    },
+
+    updateExifLine() {
+        const $ = this.$;
+        const m = this.template && this.template.manualExif;
+        const el = $('exifLine'), txt = $('exifLineText');
+        if (el && txt) {
+            if (m && (m.brand || m.model || m.focal || m.aperture || m.iso || m.shutter)) {
+                const parts = [m.brand && m.model ? `${m.brand} ${m.model}` : (m.brand || m.model), m.focal, m.aperture, m.iso, m.shutter].filter(Boolean);
+                txt.textContent = parts.join(' · ');
+                el.style.display = '';
+            } else { el.style.display = 'none'; }
+        }
+        const de = $('decorExifLine'), dt = $('decorExifLineText');
+        if (de && dt) {
+            const e = this.image && this.image.exif ? this.image.exif : {};
+            const parts = [e.make && e.model ? `${e.make} ${e.model}` : (e.make || e.model), e.shutter, e.aperture, e.iso, e.focal].filter(Boolean);
+            if (parts.length) { dt.textContent = parts.join(' · '); de.style.display = ''; }
+            else de.style.display = 'none';
+        }
+    },
+
+    // 全局边距:按参考值等比缩放四边
+    applyGlobalMargin(scale, setSlider) {
+        const m = this.template.baseMargin || {};
+        if (m.refTop == null) { m.refTop = m.marginTop != null ? m.marginTop : 80; m.refBottom = m.marginBottom != null ? m.marginBottom : 120; m.refLeft = m.marginLeft != null ? m.marginLeft : 80; m.refRight = m.marginRight != null ? m.marginRight : 80; }
+        m.marginTop = Math.round((m.refTop || 0) * scale);
+        m.marginBottom = Math.round((m.refBottom || 0) * scale);
+        m.marginLeft = Math.round((m.refLeft || 0) * scale);
+        m.marginRight = Math.round((m.refRight || 0) * scale);
+        m.globalMargin = scale;
+        const $ = this.$;
+        if (setSlider && $('slGlobalMargin')) $('slGlobalMargin').value = Math.round(scale * 100);
+        if (this.image) this.refreshMarginFields();
+        this.updateLabel('lblGlobalMargin', Math.round(scale * 100) + '%');
+    },
+
+    refreshMarginFields() {
+        const $ = this.$;
+        const m = this.template.baseMargin || {};
+        const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = Math.round(v || 0); };
+        set('tfMarginTop', m.marginTop); set('tfMarginBottom', m.marginBottom);
+        set('tfMarginLeft', m.marginLeft); set('tfMarginRight', m.marginRight);
+        if ($('slGlobalMargin')) { const g = m.globalMargin != null ? m.globalMargin : 1; $('slGlobalMargin').value = Math.round(g * 100); this.updateLabel('lblGlobalMargin', Math.round(g * 100) + '%'); }
+    },
+
+    // 回显:模板 -> 控件
+    refreshUI() {
+        if (!this.template) return;
+        this.isUpdating = true;
+        try {
+            const $ = this.$;
+            const m = this.template.baseMargin || {};
+            const layer = this.currentLayer() || {};
+            const fill = layer.fillConfig || {};
+            const stroke = layer.strokeConfig || {};
+            const sg = layer.shadowGlowConfig || {};
+            const cc = this.template.cornerConfig || {};
+            const decor = this.template.decorConfig || {};
+
+            if ($('cbCanvasRatio')) $('cbCanvasRatio').value = this.template.canvasRatio || 'original';
+            if ($('cbMarginLock')) $('cbMarginLock').checked = (m.marginLock || 0) === 1;
+            this.refreshMarginFields();
+            if ($('slImgScale')) $('slImgScale').value = Math.round((m.imgScale || 1) * 100);
+            this.updateLabel('lblImgScale', Math.round((m.imgScale || 1) * 100) + '%');
+            if ($('tfImgOffsetX')) $('tfImgOffsetX').value = m.imgOffsetX || 0;
+            if ($('tfImgOffsetY')) $('tfImgOffsetY').value = m.imgOffsetY || 0;
+
+            if ($('cbCornerLock')) $('cbCornerLock').checked = (cc.cornerLock || 0) === 1;
+            const r = cc.cornerRadiusAll != null ? cc.cornerRadiusAll : 0;
+            if ($('slCornerRadius')) $('slCornerRadius').value = r;
+            if ($('tfCornerRadius')) $('tfCornerRadius').value = r;
+            if ($('slCornerTL')) $('slCornerTL').value = cc.cornerRadiusTL || 0;
+            if ($('slCornerTR')) $('slCornerTR').value = cc.cornerRadiusTR || 0;
+            if ($('slCornerBL')) $('slCornerBL').value = cc.cornerRadiusBL || 0;
+            if ($('slCornerBR')) $('slCornerBR').value = cc.cornerRadiusBR || 0;
+            this.updateLabel('lblCornerTL', cc.cornerRadiusTL || 0); this.updateLabel('lblCornerTR', cc.cornerRadiusTR || 0);
+            this.updateLabel('lblCornerBL', cc.cornerRadiusBL || 0); this.updateLabel('lblCornerBR', cc.cornerRadiusBR || 0);
+
+            if ($('cbParamPosition')) $('cbParamPosition').value = this.template.paramPosition || 'CENTER';
+            if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 100;
+            this.updateParamFontLabel();
+            if ($('cbParamType')) $('cbParamType').value = String(this.template.paramType != null ? this.template.paramType : 0);
+
+            // EXIF 输入框回填:手动(manualExif)优先,自动识别(image.exif)兜底
+            const manExif = (this.template.manualExif && typeof this.template.manualExif === 'object') ? this.template.manualExif : {};
+            const autoExif = (this.image && this.image.exif) || {};
+            const exifMap = [
+                ['tfExifBrand', 'brand', 'make'], ['tfExifModel', 'model', 'model'],
+                ['tfExifFocal', 'focal', 'focal'], ['tfExifAperture', 'aperture', 'aperture'],
+                ['tfExifIso', 'iso', 'iso'], ['tfExifShutter', 'shutter', 'shutter'],
+            ];
+            exifMap.forEach(([id, mk, ek]) => {
+                const el = $(id);
+                if (el) el.value = (manExif[mk] || '').trim() || (autoExif[ek] || '');
+            });
+            if ($('cbLayerVisible')) $('cbLayerVisible').checked = (layer.visible || 1) === 1;
+            if ($('tfLayerMarginTop')) $('tfLayerMarginTop').value = layer.marginTop || 0;
+            if ($('tfLayerMarginRight')) $('tfLayerMarginRight').value = layer.marginRight || 0;
+            if ($('tfLayerMarginBottom')) $('tfLayerMarginBottom').value = layer.marginBottom || 0;
+            if ($('tfLayerMarginLeft')) $('tfLayerMarginLeft').value = layer.marginLeft || 0;
+
+            if ($('cbFillType')) $('cbFillType').value = fill.fillType || 'solid';
+            if ($('cpFillColor')) $('cpFillColor').value = '#' + (fill.fillHex || 'eeeeee');
+            if ($('slFillOpacity')) $('slFillOpacity').value = fill.fillOpacity != null ? fill.fillOpacity : 100;
+            this.updateLabel('lblFillOpacity', (fill.fillOpacity != null ? fill.fillOpacity : 100) + '%');
+            if ($('cbGradientType')) $('cbGradientType').value = fill.gradientType || 'linear';
+            if ($('slGradientAngle')) $('slGradientAngle').value = fill.gradientAngle || 45;
+            this.updateLabel('lblGradientAngle', fill.gradientAngle || 45);
+            if ($('slTextureScale')) $('slTextureScale').value = Math.round((fill.textureScale || 1) * 100);
+            this.updateLabel('lblTextureScale', Math.round((fill.textureScale || 1) * 100) + '%');
+            if ($('cbTextureBlend')) $('cbTextureBlend').value = fill.textureBlend || 'normal';
+
+            if ($('slStrokeWidth')) $('slStrokeWidth').value = stroke.strokeWidth || 0;
+            this.updateLabel('lblStrokeWidth', stroke.strokeWidth || 0);
+            if ($('cbStrokePos')) $('cbStrokePos').value = stroke.strokePos || 'inside';
+            if ($('cpStrokeColor')) $('cpStrokeColor').value = '#' + (stroke.strokeColorHex || '000000');
+            if ($('slStrokeOpacity')) $('slStrokeOpacity').value = stroke.strokeOpacity != null ? stroke.strokeOpacity : 100;
+            this.updateLabel('lblStrokeOpacity', (stroke.strokeOpacity != null ? stroke.strokeOpacity : 100) + '%');
+            if ($('tfStrokeDash')) $('tfStrokeDash').value = (stroke.strokeDashArray || []).join(',');
+
+            const lcc = layer.cornerConfig || {};
+            if ($('cbLayerCornerLock')) $('cbLayerCornerLock').checked = (lcc.cornerLock || 0) === 1;
+            const lr = lcc.cornerRadiusAll != null ? lcc.cornerRadiusAll : 0;
+            if ($('slLayerCornerRadius')) $('slLayerCornerRadius').value = lr;
+            if ($('tfLayerCornerRadius')) $('tfLayerCornerRadius').value = lr;
+            if ($('slLayerCornerTL')) $('slLayerCornerTL').value = lcc.cornerRadiusTL || 0;
+            if ($('slLayerCornerTR')) $('slLayerCornerTR').value = lcc.cornerRadiusTR || 0;
+            if ($('slLayerCornerBL')) $('slLayerCornerBL').value = lcc.cornerRadiusBL || 0;
+            if ($('slLayerCornerBR')) $('slLayerCornerBR').value = lcc.cornerRadiusBR || 0;
+            this.updateLabel('lblLayerCornerTL', lcc.cornerRadiusTL || 0); this.updateLabel('lblLayerCornerTR', lcc.cornerRadiusTR || 0);
+            this.updateLabel('lblLayerCornerBL', lcc.cornerRadiusBL || 0); this.updateLabel('lblLayerCornerBR', lcc.cornerRadiusBR || 0);
+            this.updateLabel('lblLayerCornerRadius', lr);
+
+            if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
+            if ($('cbShadowL')) $('cbShadowL').checked = (sg.shadowEnable || 0) === 1;
+            this.syncShadowL();
+            if ($('cbGlow')) $('cbGlow').checked = (sg.glowEnable || 0) === 1;
+            if ($('cbGlowL')) $('cbGlowL').checked = (sg.glowEnable || 0) === 1;
+
+            const ft = this.template.filmTearConfig || {};
+            if ($('cbTearEnable')) $('cbTearEnable').checked = (ft.tearEnable || 0) === 1;
+            if ($('slTearStrength')) $('slTearStrength').value = ft.tearStrength || 0;
+            if ($('slTearDensity')) $('slTearDensity').value = ft.tearDensity || 8;
+            this.updateLabel('lblTearStrength', ft.tearStrength || 0);
+            this.updateLabel('lblTearDensity', ft.tearDensity || 8);
+
+            const le = this.template.lightEffect || {};
+            if ($('cbVignette')) $('cbVignette').checked = (le.vignetteEnable || 0) === 1;
+            if ($('slVignetteStrength')) $('slVignetteStrength').value = le.vignetteStrength || 0;
+            if ($('slVignetteFeather')) $('slVignetteFeather').value = le.vignetteFeather != null ? le.vignetteFeather : 50;
+            this.updateLabel('lblVignetteStrength', (le.vignetteStrength || 0) + '%');
+            this.updateLabel('lblVignetteFeather', le.vignetteFeather != null ? le.vignetteFeather : 50);
+            if ($('cbLightLeak')) $('cbLightLeak').checked = (le.lightLeakEnable || 0) === 1;
+            if ($('cbLeakType')) $('cbLeakType').value = le.lightLeakType || 'warm';
+            if ($('slLeakOpacity')) $('slLeakOpacity').value = le.lightLeakOpacity != null ? le.lightLeakOpacity : 40;
+            if ($('slLeakAngle')) $('slLeakAngle').value = le.lightLeakAngle != null ? le.lightLeakAngle : 225;
+            this.updateLabel('lblLeakOpacity', (le.lightLeakOpacity != null ? le.lightLeakOpacity : 40) + '%');
+            this.updateLabel('lblLeakAngle', (le.lightLeakAngle != null ? le.lightLeakAngle : 225) + '°');
+
+            if ($('cbExifText')) $('cbExifText').checked = (decor.exifAutoText || 0) === 1;
+            if ($('cbCornerDecor')) $('cbCornerDecor').checked = (decor.cornerDecorEnable || 0) === 1;
+            if ($('cbCornerDecorType')) $('cbCornerDecorType').value = decor.cornerDecorType || 'line';
+            if ($('slCornerDecorSize')) $('slCornerDecorSize').value = decor.cornerDecorSize || 30;
+            this.updateLabel('lblCornerDecorSize', decor.cornerDecorSize || 30);
+
+            this.refreshElList();
+            this.syncLayerSelect();
+            this.refreshTemplateFields();
+            this.refreshPuzzleUI();
+            this.updateHistoryButtons();
+        } finally {
+            this.isUpdating = false;
+        }
+    },
+
+    syncShadowL() {
+        const $ = this.$;
+        const layer = this.currentLayer() || {};
+        const sg = layer.shadowGlowConfig || {};
+        const map = [
+            ['slShadowX', 'slShadowXL', 'lblShadowX', 'lblShadowXL', 'shadowOffsetX'],
+            ['slShadowY', 'slShadowYL', 'lblShadowY', 'lblShadowYL', 'shadowOffsetY'],
+            ['slShadowBlur', 'slShadowBlurL', 'lblShadowBlur', 'lblShadowBlurL', 'shadowBlur'],
+            ['slShadowSpread', 'slShadowSpreadL', 'lblShadowSpread', 'lblShadowSpreadL', 'shadowSpread'],
+        ];
+        map.forEach(([a, b, la, lb, key]) => {
+            const v = sg[key] != null ? sg[key] : 0;
+            if ($(a)) $(a).value = v;
+            if ($(b)) $(b).value = v;
+            this.updateLabel(la, v);
+            this.updateLabel(lb, v);
+        });
+        const c = sg.shadowColorHex || '000000', o = sg.shadowOpacity != null ? sg.shadowOpacity : 35;
+        if ($('cpShadowColor')) $('cpShadowColor').value = '#' + c;
+        if ($('cpShadowColorL')) $('cpShadowColorL').value = '#' + c;
+        this.updateLabel('lblShadowOpacity', o + '%');
+        this.updateLabel('lblShadowOpacityL', o + '%');
+        const g = sg.glowBlur || 30, go = sg.glowOpacity != null ? sg.glowOpacity : 60;
+        if ($('slGlowBlur')) $('slGlowBlur').value = g; if ($('slGlowBlurL')) $('slGlowBlurL').value = g;
+        if ($('slGlowOpacity')) $('slGlowOpacity').value = go; if ($('slGlowOpacityL')) $('slGlowOpacityL').value = go;
+        this.updateLabel('lblGlowBlur', g); this.updateLabel('lblGlowBlurL', g);
+        this.updateLabel('lblGlowOpacity', go + '%'); this.updateLabel('lblGlowOpacityL', go + '%');
+        if ($('cpGlowColor')) $('cpGlowColor').value = '#' + (sg.glowColorHex || 'ffffff');
+        if ($('cpGlowColorL')) $('cpGlowColorL').value = '#' + (sg.glowColorHex || 'ffffff');
+    },
+
+    updateLabel(id, text) {
+        const el = this.$(id);
+        if (el) el.textContent = String(text);
+    },
+
+    updateParamFontLabel() {
+        const v = this.template.paramFontSize != null ? this.template.paramFontSize : 100;
+        if (v <= 0) {
+            const s = this.image ? Math.min(Math.max(Math.round(Math.min(this.image.w, this.image.h) / 45), 20), 64) : 24;
+            this.updateLabel('lblParamFontSize', `自适应(≈${s}px)`);
+        } else this.updateLabel('lblParamFontSize', v + 'px');
+    },
+
+    currentLayer() {
+        if (!this.template || !this.template.layerList || !this.template.layerList.length) {
+            if (this.template) this.template.layerList = [this.defaultTemplate().layerList[0]];
+            return this.template.layerList[0];
+        }
+        const idx = clampNum(this.selectedLayer || 0, 0, this.template.layerList.length - 1);
+        return this.template.layerList[idx];
+    },
+
+    /* ══ 渲染调度 ══ */
+    scheduleRender(immediate) {
+        if (!this.image) return;
+        if (this._renderTimer) { clearTimeout(this._renderTimer); this._renderTimer = null; }
+        // 手势拖动中(滑块/文本框聚焦)延迟更长,减少连续渲染压力
+        const dly = immediate ? 0 : (this._gesture ? 120 : 50);
+        this._renderTimer = setTimeout(() => { this._renderTimer = null; this.renderPreview(); }, dly);
+    },
+
+    // 照片切换时清空 AWT 样式缓存(模糊底/取色/高斯核)
+    invalidateStyleCaches() {
+        const es = window.EngineStyles;
+        if (!es || typeof es.clearCaches !== 'function') return;
+        try { es.clearCaches(); } catch (e) {}
+    },
+
+    renderPreview() {
+        if (!this.image) return;
+        const token = ++this.renderToken;
+        this.draggingCompare = false;
+        requestAnimationFrame(() => {
+            if (token !== this.renderToken) return;
+            if (this.image && this.image.customSettings) this.template = this.image.customSettings;
+            this.normalizeTemplate();
+            this.dom.stage.classList.toggle('has-img', !!this.image);
+            const puzzle = this.template && this.template.puzzle && this.template.puzzle.enabled;
+            if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
+            else window.__render(this, false);
+            if (this.autoFit) {
+                this.autoFit = false;
+                requestAnimationFrame(() => this.fitZoom());
+            }
+            this.updateStatusBar();
+        });
+    },
+
+    normalizeTemplate() {
+        if (!this.template) this.template = this.defaultTemplate();
+        const t = this.template;
+        if (!t.baseMargin) t.baseMargin = {};
+        if (!t.cornerConfig) t.cornerConfig = {};
+        if (!t.filmTearConfig) t.filmTearConfig = {};
+        if (!t.lightEffect) t.lightEffect = {};
+        if (!t.decorConfig) t.decorConfig = {};
+        if (!t.layerList || !t.layerList.length) t.layerList = [this.defaultTemplate().layerList[0]];
+        if (!t.logoElements) t.logoElements = [];
+        if (!t.puzzle) t.puzzle = this.defaultTemplate().puzzle;
+        if (t.baseMargin.refTop == null) {
+            t.baseMargin.refTop = t.baseMargin.marginTop != null ? t.baseMargin.marginTop : 80;
+            t.baseMargin.refBottom = t.baseMargin.marginBottom != null ? t.baseMargin.marginBottom : 120;
+            t.baseMargin.refLeft = t.baseMargin.marginLeft != null ? t.baseMargin.marginLeft : 80;
+            t.baseMargin.refRight = t.baseMargin.marginRight != null ? t.baseMargin.marginRight : 80;
+        }
+    },
+
+    requestRender() { this.scheduleRender(true); },
+
+    setCompare(on) {
+        if (!this.image) return;
+        this.draggingCompare = on;
+        if (this.image.customSettings) this.template = this.image.customSettings;
+        this.normalizeTemplate();
+        const token = ++this.renderToken;
+        requestAnimationFrame(() => {
+            if (token !== this.renderToken) return;
+            window.__render(this, on);
+            this.updateStatusBar();
+        });
+    },
+
+    /* ══ 撤销 / 重做 ══ */
+    // 无条件压栈(离散操作/手势开始调用);连续手势的快照由 beginGesture 去重
+    pushUndo() {
+        this.undoStack.push(this.cloneTemplate());
+        if (this.undoStack.length > 60) this.undoStack.shift();
+        this.redoStack = [];
+        this.updateHistoryButtons();
+    },
+
+    undo() {
+        if (!this.undoStack.length) { this.setStatus('没有可撤销的操作'); return; }
+        this.redoStack.push(this.cloneTemplate());
+        this.template = this.undoStack.pop();
+        this.normalizeTemplate();
+        this.selectedEls = [];
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已撤销');
+    },
+
+    redo() {
+        if (!this.redoStack.length) { this.setStatus('没有可重做的操作'); return; }
+        this.undoStack.push(this.cloneTemplate());
+        this.template = this.redoStack.pop();
+        this.normalizeTemplate();
+        this.selectedEls = [];
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已重做');
+    },
+
+    updateHistoryButtons() {
+        if (!this.dom.btnUndo) return;
+        this.dom.btnUndo.disabled = !this.undoStack.length;
+        this.dom.btnRedo.disabled = !this.redoStack.length;
+    },
+
+    cloneTemplate() { return JSON.parse(JSON.stringify(this.template || null)); },
+
+    saveCurrentTemplate() {
+        if (!this.image) return;
+        const snap = this.cloneTemplate();
+        this.imageTemplates.set(this.image, snap);
+        this.image.customSettings = snap;
+    },
+
+    /* ══ 图片选择 / 每图模板 ══ */
+    afterImageSelect() {
+        if (!this.image) return;
+        this.dom.placeholder.style.display = 'none';
+        this.dom.canvas.style.display = 'block';
+        const saved = this.imageTemplates.get(this.image);
+        if (saved) this.template = saved;
+        else this.normalizeTemplate();
+        this.selectedEls = [];
+        this.updateStatusBar();
+        this.refreshUI();
+        this.autoFit = true;
+        this.scheduleRender(true);
+    },
+
+    selectImage(idx) {
+        this.selectedIdx = [idx];
+        this.currentIdx = idx;
+        this.image = this.images[idx];
+        this.invalidateStyleCaches();
+        this.buildThumbnails();
+        this.afterImageSelect();
+    },
+
+    /* ══ 照片导入(与上一版一致) ══ */
+    async addImageFiles(files) {
+        const images = files.filter(f => /^image\//i.test(f.type) || /\.(jpe?g|png|webp|bmp)$/i.test(f.name));
+        if (!images.length) { this.setStatus('没有可用的图片文件'); return; }
+        const loaders = images.map(file => this.loadFile(file));
+        const results = await Promise.all(loaders);
+        for (let i = 0; i < images.length; i++) {
+            const r = results[i];
+            if (!r || !r.url) continue;
+            const img = new Image();
+            const loaded = await new Promise(res => { img.onload = () => res(true); img.onerror = () => res(false); img.src = r.url; });
+            if (!loaded || !img.naturalWidth) continue;
+            const rawExif = (r.buffer && window.__parseExif) ? window.__parseExif(r.buffer) : {};
+            const exif = window.__exifSummary ? window.__exifSummary(rawExif) : {};
+            const oriented = await this.applyOrientation(img, exif.orientation);
+            const useEl = oriented ? oriented.el : img;
+            const w = oriented ? oriented.w : img.naturalWidth;
+            const h = oriented ? oriented.h : img.naturalHeight;
+            this.images.push({ el: useEl, name: images[i].name, w, h, exif, customSettings: null });
+        }
+        if (this.images.length) {
+            this.buildThumbnails();
+            this.selectImage(this.images.length - 1);
+            this.setStatus(`已导入 ${results.filter(x => x && x.url).length} 张图片`);
+        }
+    },
+
+    async loadFile(file) {
+        const url = await new Promise(res => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.onerror = () => res(null);
+            r.readAsDataURL(file);
+        });
+        if (!url) return null;
+        const buf = await new Promise(res => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.onerror = () => res(null);
+            r.readAsArrayBuffer(file);
+        });
+        return { url, buffer: buf };
+    },
+
+    async applyOrientation(img, orientation) {
+        if (orientation !== 3 && orientation !== 6 && orientation !== 8) return null;
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const canvas = document.createElement('canvas');
+        const rotated = (orientation === 6 || orientation === 8);
+        canvas.width = rotated ? H : W;
+        canvas.height = rotated ? W : H;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(orientation === 6 ? Math.PI / 2 : orientation === 8 ? -Math.PI / 2 : Math.PI);
+        ctx.drawImage(img, -W / 2, -H / 2);
+        const out = new Image();
+        await new Promise(res => { out.onload = res; out.onerror = res; out.src = canvas.toDataURL('image/jpeg', 0.95); });
+        if (!out.naturalWidth) return null;
+        return { el: out, w: canvas.width, h: canvas.height };
+    },
+
+    async openImage() {
+        const res = await window.qingframe.openImage();
+        if (!res) return;
+        const img = new Image();
+        const dataUrl = 'data:image/jpeg;base64,' + res.data;
+        await new Promise(r => { img.onload = r; img.onerror = r; img.src = dataUrl; });
+        if (!img.naturalWidth) { this.setStatus('图片加载失败'); return; }
+        let exif = {};
+        if (window.__parseExif) {
+            try {
+                const bin = atob(res.data);
+                const buf = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+                const raw = window.__parseExif(buf.buffer);
+                exif = window.__exifSummary ? window.__exifSummary(raw) : {};
+            } catch (e) { /* EXIF 解析失败不影响加载 */ }
+        }
+        const oriented = await this.applyOrientation(img, exif.orientation);
+        const useEl = oriented ? oriented.el : img;
+        const w = oriented ? oriented.w : img.naturalWidth;
+        const h = oriented ? oriented.h : img.naturalHeight;
+        this.images.push({ el: useEl, name: res.name, w, h, exif, customSettings: null });
+        this.buildThumbnails();
+        this.selectImage(this.images.length - 1);
+    },
+
+    /* ── 缩略图 / 多选 ── */
+    buildThumbnails() {
+        const strip = this.dom.thumbStrip;
+        strip.innerHTML = '';
+        this.images.forEach((im, i) => {
+            const t = document.createElement('img');
+            const isSel = this.selectedIdx.includes(i);
+            t.className = 'thumb' + (isSel ? ' active' : '');
+            t.src = im.el.src;
+            t.dataset.idx = i;
+            t.addEventListener('click', e => {
+                if (e.shiftKey || e.ctrlKey) this.toggleSelect(i);
+                else { this.selectedIdx = [i]; this.currentIdx = i; this.image = this.images[i]; this.invalidateStyleCaches(); this.buildThumbnails(); this.afterImageSelect(); }
+            });
+            strip.appendChild(t);
+        });
+        strip.style.display = this.images.length > 1 ? 'flex' : 'none';
+    },
+
+    toggleSelect(i) {
+        if (this.selectedIdx.includes(i)) this.selectedIdx = this.selectedIdx.filter(x => x !== i);
+        else this.selectedIdx.push(i);
+        if (this.selectedIdx.length) this.currentIdx = i;
+        this.buildThumbnails();
+    },
+
+    /* ══ 字体下拉填充(装饰文字/拼图字幕共用 curatedFonts) ══ */
+    populateFonts() {
+        ['cbTextFont', 'cbCapFont1', 'cbCapFont2'].forEach(id => {
+            const sel = this.$(id);
+            if (!sel) return;
+            sel.innerHTML = '';
+            this.curatedFonts.forEach((f, i) => {
+                const o = document.createElement('option');
+                o.value = f;
+                o.textContent = f;
+                if (i === 0) o.selected = true;
+                sel.appendChild(o);
+            });
+        });
+    },
+
+    /* ══ 静态控件绑定 ══ */
+    setupPanelInteractions() {
+        const $ = this.$;
+
+        // 通用:range 拖拽时即时同步,change/pointerup 提交;select/checkbox 变更即提交
+        this.bindRanges([
+            'slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius',
+            'slParamFontSize', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
+            'slShadowX', 'slShadowY', 'slShadowBlur', 'slShadowSpread', 'slShadowOpacity', 'slGlowBlur', 'slGlowOpacity',
+            'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
+            'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap',
+            'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
+            'slShadowXL', 'slShadowYL', 'slShadowBlurL', 'slShadowSpreadL', 'slShadowOpacityL', 'slGlowBlurL', 'slGlowOpacityL',
+            'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
+        ]);
+        const onEdit = ['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
+            'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'];
+        (onEdit).forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('input', () => this.onSliderCustom(id, parseInt(el.value, 10)));
+        });
+
+        // 复选框 -> onSettingCommit
+        const chks = ['cbMarginLock', 'cbCornerLock', 'cbLayerVisible', 'cbShadow', 'cbGlow', 'cbTearEnable',
+            'cbVignette', 'cbLightLeak', 'cbExifText', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock'];
+        chks.forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('change', () => this.onSettingCommit());
+        });
+        // 光影页签复制的阴影/发光
+        ['cbShadowL', 'cbGlowL'].forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('change', () => {
+                const main = $(id === 'cbShadowL' ? 'cbShadow' : 'cbGlow');
+                if (main) main.checked = el.checked;
+                this.onSettingCommit();
+            });
+        });
+
+        // select 变更 -> commit
+        const sels = ['cbCanvasRatio', 'cbParamPosition', 'cbParamType', 'cbFillType', 'cbGradientType', 'cbTextureBlend',
+            'cbStrokePos', 'cbLeakType', 'cbCornerDecorType', 'cbTextFont', 'cbLayerSelect', 'cbPuzzleBg', 'cbPuzzleCanvas',
+            'cbSlotFill', 'cbCapFont1', 'cbCapFont2', 'cbRecipeFilter'];
+        sels.forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('change', () => this.onSelectCustom(id));
+        });
+
+        // 数字/文本输入:input 即时同步(防抖),change 提交
+        const nums = ['tfMarginTop', 'tfMarginBottom', 'tfMarginLeft', 'tfMarginRight', 'tfImgOffsetX', 'tfImgOffsetY',
+            'tfLayerMarginTop', 'tfLayerMarginRight', 'tfLayerMarginBottom', 'tfLayerMarginLeft'];
+        nums.forEach(id => {
+            const el = $(id);
+            if (!el) return;
+            el.addEventListener('focus', () => this.beginGesture());
+            el.addEventListener('blur', () => this.endGesture());
+            el.addEventListener('input', () => this.onSettingChanged());
+            el.addEventListener('change', () => this.onSettingCommit());
+        });
+        const texts = ['tfExifBrand', 'tfExifModel', 'tfExifFocal', 'tfExifAperture', 'tfExifIso', 'tfExifShutter',
+            'tfStrokeDash', 'tfCustomText', 'tfTemplateName', 'tfTemplateTag', 'tfCapLine1', 'tfCapLine2'];
+        texts.forEach(id => {
+            const el = $(id);
+            if (!el) return;
+            el.addEventListener('focus', () => this.beginGesture());
+            el.addEventListener('blur', () => this.endGesture());
+            el.addEventListener('input', () => this.onTextCustom(id));
+            el.addEventListener('change', () => this.onSettingCommit());
+        });
+        const cr = $('tfCornerRadius');
+        if (cr) {
+            cr.addEventListener('focus', () => this.beginGesture());
+            cr.addEventListener('blur', () => this.endGesture());
+            cr.addEventListener('input', () => {
+                const v = clampNum(parseInt(cr.value, 10) || 0, 0, 500);
+                const cc = this.template.cornerConfig || {};
+                cc.cornerRadiusAll = v;
+                ['slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR'].forEach(id => {
+                    if ($(id)) $(id).value = v;
+                });
+                this.onSettingChanged();
+            });
+            cr.addEventListener('change', () => this.onSettingCommit());
+        }
+        const lcr = $('tfLayerCornerRadius');
+        if (lcr) {
+            lcr.addEventListener('focus', () => this.beginGesture());
+            lcr.addEventListener('blur', () => this.endGesture());
+            lcr.addEventListener('input', () => {
+                const v = clampNum(parseInt(lcr.value, 10) || 0, 0, 500);
+                const layer = this.currentLayer ? this.currentLayer() : null;
+                if (!layer) return;
+                const lcc = layer.cornerConfig || (layer.cornerConfig = {});
+                lcc.cornerRadiusAll = v;
+                ['slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR'].forEach(id => {
+                    if ($(id)) $(id).value = v;
+                });
+                this.onSettingChanged();
+            });
+            lcr.addEventListener('change', () => this.onSettingCommit());
+        }
+
+        // 图层按钮
+        const bindBtn = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => fn()); };
+        bindBtn('btnAddLayer', () => this.addLayer());
+        bindBtn('btnRemoveLayer', () => this.removeLayer());
+        bindBtn('btnResetLayer', () => this.resetLayer());
+        bindBtn('btnBuiltinTexture', () => this.pickBuiltinTexture());
+        bindBtn('btnSelectTexture', () => this.pickTexture());
+        bindBtn('btnAddTextLine', () => this.addTextLine());
+        bindBtn('btnDeleteSelectedTextLine', () => this.deleteSelectedTextLine());
+        bindBtn('btnAddSticker', () => this.addSticker());
+        bindBtn('btnAddCustomIcon', () => this.addCustomIcon());
+        bindBtn('btnCopySelectedElement', () => this.copyElement());
+        bindBtn('btnPasteClipboardElement', () => this.pasteElement());
+        bindBtn('btnDeleteActiveIcon', () => this.deleteElement());
+        bindBtn('btnClearAllIcons', () => this.clearElements());
+        bindBtn('btnZOrderTop', () => this.moveZOrder(2));
+        bindBtn('btnZOrderBottom', () => this.moveZOrder(-2));
+        bindBtn('btnZOrderUp', () => this.moveZOrder(1));
+        bindBtn('btnZOrderDown', () => this.moveZOrder(-1));
+        bindBtn('btnSaveTemplate', () => this.saveTemplate());
+        bindBtn('btnLoadTemplate', () => this.loadTemplate());
+        bindBtn('btnExportTemplate', () => this.exportTemplate());
+        bindBtn('btnImportTemplate', () => this.importTemplate());
+        bindBtn('btnQuickFilm', () => this.applyQuickPreset('film'));
+        bindBtn('btnQuickIdCard', () => this.applyQuickPreset('idcard'));
+        bindBtn('btnAutoColorBorder', () => this.autoColorBorder());
+        bindBtn('btnOpenMarket', () => this.setStatus('云市场：WEB 版未接入(可导出/导入 .qfs)'));
+        bindBtn('btnLoadPreset', () => this.loadPresetFromList());
+        bindBtn('btnEditGapCaption', () => this.toggleCaptionEditor(true));
+        bindBtn('btnDeleteGapCaption', () => this.deleteCaption());
+        bindBtn('btnClearCapSlot', () => this.clearCaption());
+        bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
+        bindBtn('btnExportPuzzle', () => this.exportPuzzle());
+
+        // 元素管理
+        if ($('slActiveIconOpacity')) $('slActiveIconOpacity').addEventListener('input', () => {
+            const v = parseInt($('slActiveIconOpacity').value, 10);
+            this.updateLabel('lblActiveIconOpacity', v + '%');
+            this.applyToSelectedEls(el => { el.opacity = v; });
+            this.batchElOps();
+        });
+        if ($('slElementRotation')) $('slElementRotation').addEventListener('input', () => {
+            const v = parseInt($('slElementRotation').value, 10);
+            this.updateLabel('lblElementRotation', v + '°');
+            this.applyToSelectedEls(el => { el.rotation = v; });
+            this.batchElOps();
+        });
+
+        // 拼图布局
+        this.buildPuzzleLayoutBtns();
+
+        // 槽位下拉:切换前先把当前编辑的字幕写入旧槽位,再加载新槽位
+        if ($('cbPuzzleGapPick')) $('cbPuzzleGapPick').addEventListener('change', () => this.onPuzzleSlotChange());
+
+        // 每个页签滚轮加速 x4(防冒泡影响画布)
+        this.dom.panels.forEach(p => {
+            p.addEventListener('wheel', e => {
+                if (e.target && e.target.classList && e.target.classList.contains('ctl-rng')) return;
+                const d = e.deltaY;
+                if (p.scrollHeight > p.clientHeight) { p.scrollTop += d * 3; e.preventDefault(); }
+            }, { passive: false });
+        });
+    },
+
+    onSliderCustom(id, v) {
+        switch (id) {
+            case 'slGlobalMargin': this.applyGlobalMargin(v / 100, false); this.onSettingChanged(); break;
+            case 'slImgScale': this.updateLabel('lblImgScale', v + '%'); this.onSettingChanged(); break;
+            case 'slCornerTL': case 'slCornerTR': case 'slCornerBL': case 'slCornerBR': {
+                const cc = this.template.cornerConfig || {};
+                const key = 'slCornerTL' === id ? 'cornerRadiusTL' : 'slCornerTR' === id ? 'cornerRadiusTR' : 'slCornerBL' === id ? 'cornerRadiusBL' : 'cornerRadiusBR';
+                cc[key] = v;
+                this.updateLabel('lbl' + id.slice(2), v);
+                const main = this.$(id === 'slCornerTL' ? 'lblCornerTL' : id === 'slCornerTR' ? 'lblCornerTR' : id === 'slCornerBL' ? 'lblCornerBL' : 'lblCornerBR');
+                if ((this.template.cornerConfig.cornerLock || 0) === 1) {
+                    cc.cornerRadiusTL = v; cc.cornerRadiusTR = v; cc.cornerRadiusBL = v; cc.cornerRadiusBR = v;
+                    ['slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
+                }
+                cc.cornerRadiusAll = v;
+                if (this.$('slCornerRadius')) this.$('slCornerRadius').value = v;
+                if (this.$('tfCornerRadius')) this.$('tfCornerRadius').value = v;
+                this.onSettingChanged();
+                break;
+            }
+            case 'slCornerRadius': {
+                const cc = this.template.cornerConfig || {};
+                cc.cornerRadiusAll = v;
+                cc.cornerRadiusTL = v; cc.cornerRadiusTR = v; cc.cornerRadiusBL = v; cc.cornerRadiusBR = v;
+                ['slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
+                if (this.$('tfCornerRadius')) this.$('tfCornerRadius').value = v;
+                if (this.$('lblCornerTL')) this.$('lblCornerTL').textContent = v;
+                if (this.$('lblCornerTR')) this.$('lblCornerTR').textContent = v;
+                if (this.$('lblCornerBL')) this.$('lblCornerBL').textContent = v;
+                if (this.$('lblCornerBR')) this.$('lblCornerBR').textContent = v;
+                this.onSettingChanged();
+                break;
+            }
+            case 'slParamFontSize': {
+                this.template.paramFontSize = v;
+                this.updateParamFontLabel();
+                this.onSettingChanged();
+                break;
+            }
+            case 'slLayerCornerTL': case 'slLayerCornerTR': case 'slLayerCornerBL': case 'slLayerCornerBR': {
+                const layer = this.currentLayer ? this.currentLayer() : null;
+                if (!layer) break;
+                const lcc = layer.cornerConfig || (layer.cornerConfig = {});
+                const key = 'slLayerCornerTL' === id ? 'cornerRadiusTL' : 'slLayerCornerTR' === id ? 'cornerRadiusTR' : 'slLayerCornerBL' === id ? 'cornerRadiusBL' : 'cornerRadiusBR';
+                lcc[key] = v;
+                const lbl = 'lbl' + id.slice(2);
+                this.updateLabel(lbl, v);
+                this.updateLabel('lblLayerCornerRadius', v);
+                if ((lcc.cornerLock || 0) === 1) {
+                    lcc.cornerRadiusTL = v; lcc.cornerRadiusTR = v; lcc.cornerRadiusBL = v; lcc.cornerRadiusBR = v;
+                    ['slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
+                }
+                lcc.cornerRadiusAll = v;
+                if (this.$('slLayerCornerRadius')) this.$('slLayerCornerRadius').value = v;
+                if (this.$('tfLayerCornerRadius')) this.$('tfLayerCornerRadius').value = v;
+                this.onSettingChanged();
+                break;
+            }
+            case 'slLayerCornerRadius': {
+                const layer = this.currentLayer ? this.currentLayer() : null;
+                if (!layer) break;
+                const lcc = layer.cornerConfig || (layer.cornerConfig = {});
+                lcc.cornerRadiusAll = v;
+                lcc.cornerRadiusTL = v; lcc.cornerRadiusTR = v; lcc.cornerRadiusBL = v; lcc.cornerRadiusBR = v;
+                ['slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
+                if (this.$('tfLayerCornerRadius')) this.$('tfLayerCornerRadius').value = v;
+                this.updateLabel('lblLayerCornerTL', v); this.updateLabel('lblLayerCornerTR', v);
+                this.updateLabel('lblLayerCornerBL', v); this.updateLabel('lblLayerCornerBR', v);
+                this.updateLabel('lblLayerCornerRadius', v);
+                this.onSettingChanged();
+                break;
+            }
+            default: break;
+        }
+    },
+
+    onSelectCustom(id) {
+        switch (id) {
+            case 'cbLayerSelect':
+                this.selectedLayer = parseInt(this.$('cbLayerSelect').value, 10) || 0;
+                this.refreshUI();
+                break;
+            case 'cbTextFont': this._draftPending = true; this.previewDraftText(); break;
+            default: break;
+        }
+        this.onSettingCommit();
+    },
+
+    onTextCustom(id) {
+        switch (id) {
+            case 'tfCustomText': case 'cbTextFont': this.previewDraftText(); break;
+            default: this.onSettingChanged(); break;
+        }
+    },
+
+    previewDraftText() {
+        if (!this.template) return;
+        const $ = this.$;
+        const t = this.$('tfCustomText') ? this.$('tfCustomText').value : '';
+        if (!t) { this._draftPending = false; this.onSettingChanged(); return; }
+        const fs = this.$('slTextSize') ? parseInt(this.$('slTextSize').value, 10) : 18;
+        this.template._draftText = {
+            text: t, align: 'live', fontSize: fs,
+            colorHex: (this.$('cpTextColor') ? this.$('cpTextColor').value.replace('#', '') : '000000'),
+            opacity: 85, fontFamily: this.$('cbTextFont') ? this.$('cbTextFont').value : 'Microsoft YaHei', fontWeight: 400,
+        };
+        // 写回滑块同步
+        if (this.$('slTextSize')) {
+            // 实时预览字号走草稿
+        }
+        this.onSettingChanged();
+    },
+
+    bindRanges(ids) {
+        const $ = this.$;
+        ids.forEach(id => {
+            const el = $(id);
+            if (!el) return;
+            let v = parseInt(el.value, 10);
+            el.addEventListener('pointerdown', () => this.beginGesture());
+            el.addEventListener('input', () => {
+                v = parseInt(el.value, 10);
+                this.sliderLiveLabel(id, v);
+                this.onSliderLive(id, v);
+            });
+            el.addEventListener('pointerup', () => {
+                this.endGesture();
+                this.commitNoPush();
+            });
+        });
+    },
+
+    sliderLiveLabel(id, v) {
+        const map = {
+            slFillOpacity: ['lblFillOpacity', v + '%'], slGradientAngle: ['lblGradientAngle', v], slTextureScale: ['lblTextureScale', v + '%'],
+            slStrokeWidth: ['lblStrokeWidth', v], slStrokeOpacity: ['lblStrokeOpacity', v + '%'],
+            slShadowBlur: ['lblShadowBlur', v], slShadowSpread: ['lblShadowSpread', v], slShadowOpacity: ['lblShadowOpacity', v + '%'],
+            slGlowBlur: ['lblGlowBlur', v], slGlowOpacity: ['lblGlowOpacity', v + '%'],
+            slTearStrength: ['lblTearStrength', v], slTearDensity: ['lblTearDensity', v],
+            slVignetteStrength: ['lblVignetteStrength', v + '%'], slVignetteFeather: ['lblVignetteFeather', v],
+            slLeakOpacity: ['lblLeakOpacity', v + '%'], slLeakAngle: ['lblLeakAngle', v + '°'],
+            slCornerDecorSize: ['lblCornerDecorSize', v], slTextSize: ['lblTextSize', v],
+            slPuzzleGap: ['lblPuzzleGap', v], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
+            slCapSpacing: ['lblCapSpacing', v + '%'], slSlotOffsetX: ['lblSlotOffsetX', v], slSlotOffsetY: ['lblSlotOffsetY', v],
+            slSlotZoom: ['lblSlotZoom', v + '%'],
+            slShadowXL: ['lblShadowXL', v], slShadowYL: ['lblShadowYL', v], slShadowBlurL: ['lblShadowBlurL', v],
+            slShadowSpreadL: ['lblShadowSpreadL', v], slShadowOpacityL: ['lblShadowOpacityL', v + '%'],
+            slGlowBlurL: ['lblGlowBlurL', v], slGlowOpacityL: ['lblGlowOpacityL', v + '%'],
+        };
+        const entry = map[id];
+        if (entry) this.updateLabel(entry[0], entry[1]);
+    },
+
+    onSliderLive(id, v) {
+        if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
+            'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
+        if (id === 'slTextSize') { this.previewDraftText(); return; }
+        if (id === 'slShadowXL' || id === 'slShadowYL' || id === 'slShadowBlurL' || id === 'slShadowSpreadL' || id === 'slShadowOpacityL') {
+            const map = { slShadowXL: 'slShadowX', slShadowYL: 'slShadowY', slShadowBlurL: 'slShadowBlur', slShadowSpreadL: 'slShadowSpread', slShadowOpacityL: 'slShadowOpacity' };
+            const main = this.$(map[id]); if (main) main.value = v;
+        } else if (id === 'slGlowBlurL' || id === 'slGlowOpacityL') {
+            const main = this.$(id === 'slGlowBlurL' ? 'slGlowBlur' : 'slGlowOpacity'); if (main) main.value = v;
+        }
+        if (id === 'slPuzzleGap' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
+            this.syncPuzzleFromUI(); this.onSettingChanged(); return;
+        }
+        this.onSettingChanged();
+    },
+
+    /* ══ 图层管理 ══ */
+    addLayer() {
+        this.onSettingCommit();
+        const def = this.defaultTemplate().layerList[0];
+        const layer = JSON.parse(JSON.stringify(def));
+        layer.fillConfig.fillHex = 'eeeeee';
+        this.template.layerList.unshift(layer);
+        this.selectedLayer = 0;
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已添加图层');
+    },
+
+    removeLayer() {
+        if (!this.template.layerList || this.template.layerList.length <= 1) { this.setStatus('至少保留一个图层'); return; }
+        this.onSettingCommit();
+        const i = clampNum(this.selectedLayer || 0, 0, this.template.layerList.length - 1);
+        this.template.layerList.splice(i, 1);
+        this.selectedLayer = Math.min(i, this.template.layerList.length - 1);
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已删除图层');
+    },
+
+    resetLayer() {
+        this.onSettingCommit();
+        const layer = this.currentLayer();
+        const def = this.defaultTemplate().layerList[0];
+        layer.fillConfig = JSON.parse(JSON.stringify(def.fillConfig));
+        layer.strokeConfig = JSON.parse(JSON.stringify(def.strokeConfig));
+        layer.shadowGlowConfig = JSON.parse(JSON.stringify(def.shadowGlowConfig));
+        layer.cornerConfig = JSON.parse(JSON.stringify(def.cornerConfig));
+        layer.marginTop = 0; layer.marginRight = 0; layer.marginBottom = 0; layer.marginLeft = 0;
+        layer.visible = 1;
+        this.refreshUI();
+        this.scheduleRender(true);
+    },
+
+    syncLayerSelect() {
+        const $ = this.$;
+        const sel = $('cbLayerSelect');
+        if (!sel || !this.template || !this.template.layerList) return;
+        const n = this.template.layerList.length;
+        sel.innerHTML = '';
+        for (let i = 0; i < n; i++) {
+            const o = document.createElement('option');
+            o.value = i;
+            o.textContent = `图层 ${n - i}${!this.template.layerList[i].visible ? ' (隐藏)' : ''}`;
+            if (i === (this.selectedLayer || 0)) o.selected = true;
+            sel.appendChild(o);
+        }
+    },
+
+    /* ══ 纹理 ══ */
+    pickBuiltinTexture() {
+        const builtin = ['denim', 'frost', 'grain', 'kraft', 'leather', 'linen', 'metal', 'paper', 'watercolor', 'wood'];
+        const opts = builtin.map(n => `${n} 内置`).join('\n');
+        const choice = window.prompt('选择内置纹理:\n' + opts + '\n(输入名称,留空取消)', 'denim');
+        if (!choice) return;
+        const name = choice.trim().split(' ')[0];
+        this.setLayerTexture(name);
+    },
+
+    pickTexture() {
+        if (!this.textures.length) { this.setStatus('纹理库未加载'); return; }
+        const opts = this.textures.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
+        const choice = window.prompt('选择纹理(输入序号或名称,留空取消):\n' + opts, '1');
+        if (!choice) return;
+        const idx = parseInt(choice, 10) - 1;
+        const t = this.textures[idx];
+        if (!t) { this.setStatus('未找到该纹理'); return; }
+        this.setLayerTexture(t.name);
+    },
+
+    setLayerTexture(name) {
+        this.onSettingCommit();
+        const layer = this.currentLayer();
+        layer.fillConfig.fillType = 'texture';
+        layer.fillConfig.textureSrc = name;
+        if (this.$('cbFillType')) this.$('cbFillType').value = 'texture';
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus(`已应用纹理 ${name}`);
+    },
+
+    /* ══ 文字 / 贴纸 ══ */
+    addTextLine() {
+        const $ = this.$;
+        const text = $('tfCustomText') ? $('tfCustomText').value.trim() : '';
+        if (!text) { this.setStatus('请先输入文字内容'); return; }
+        this.onSettingCommit();
+        const decor = this.template.decorConfig || (this.template.decorConfig = {});
+        if (!decor.textLines) decor.textLines = [];
+        const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
+        const line = {
+            text, align: 'free', x: cw / 2, y: ch / 2,
+            fontSize: $('slTextSize') ? parseInt($('slTextSize').value, 10) : 24,
+            colorHex: ($('cpTextColor') ? $('cpTextColor').value : '#000000').replace('#', ''),
+            opacity: 100, rotation: 0,
+            fontFamily: $('cbTextFont') ? $('cbTextFont').value : 'Microsoft YaHei', fontWeight: 400,
+        };
+        decor.textLines.push(line);
+        this.selectedEls = [{ kind: 'text', obj: line }];
+        this._draftPending = false;
+        if ($('tfCustomText')) $('tfCustomText').value = '';
+        delete this.template._draftText;
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已添加文字(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
+    },
+
+    deleteSelectedTextLine() {
+        const selected = this.selectedEls.filter(x => x.kind === 'text');
+        if (!selected.length) { this.setStatus('请先在画布选中文字'); return; }
+        this.onSettingCommit();
+        const decor = this.template.decorConfig || {};
+        const lines = decor.textLines || [];
+        selected.forEach(s => { const i = lines.indexOf(s.obj); if (i >= 0) lines.splice(i, 1); });
+        this.selectedEls = [];
+        this.refreshUI();
+        this.scheduleRender(true);
+    },
+
+    async addSticker() {
+        const res = await window.qingframe.openImage();
+        if (!res || !res.data) { this.setStatus('已取消添加贴纸'); return; }
+        const dataUrl = 'data:image/jpeg;base64,' + res.data;
+        await new Promise(r => { const im = new Image(); im.onload = r; im.onerror = r; im.src = dataUrl; });
+        this.onSettingCommit();
+        const decor = this.template.decorConfig || (this.template.decorConfig = {});
+        if (!decor.stickers) decor.stickers = [];
+        const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
+        const w = this.image.w || 1000;
+        const scale = clampNum((cw * 0.25) / Math.max(1, Math.max(w, 1000)), 0.02, 3);
+        decor.stickers.push({
+            src: dataUrl.replace('data:image/jpeg', 'data:image/png'),
+            x: cw / 2, y: ch / 2, scale, rotation: 0, opacity: 100, z: 20,
+        });
+        this.selectedEls = [{ kind: 'sticker', obj: decor.stickers[decor.stickers.length - 1] }];
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已添加贴纸(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
+    },
+
+    /* ══ Logo 页签 ══ */
+    renderLogoPools() {
+        const $ = this.$;
+        const pools = ['brandIconBox', 'photoDecorBox', 'simpleIconBox', 'weatherIconBox', 'customIconBox'];
+        // 简单分类:前四类按名称关键字,自定义留空待用户添加
+        const cats = { brandIconBox: [], photoDecorBox: [], simpleIconBox: [], weatherIconBox: [], customIconBox: [] };
+        this.logos.forEach(l => {
+            const n = l.name || '';
+            if (/brand|logo|品牌/i.test(n)) cats.brandIconBox.push(l);
+            else if (/weather|天/i.test(n)) cats.weatherIconBox.push(l);
+            else if (/deco|decor|装饰|花/i.test(n)) cats.photoDecorBox.push(l);
+            else cats.simpleIconBox.push(l);
+        });
+        pools.forEach((boxId, pi) => {
+            const box = $(boxId);
+            if (!box) return;
+            box.innerHTML = '';
+            const list = pi === 4 ? [] : cats[boxId];
+            if (!list.length) {
+                const e = document.createElement('div');
+                e.className = 'icon-cell empty';
+                e.textContent = pi === 4 ? '点击下方添加' : '无';
+                box.appendChild(e);
+                return;
+            }
+            list.forEach(l => {
+                const c = document.createElement('div');
+                c.className = 'icon-cell';
+                c.title = l.name;
+                const img = document.createElement('img');
+                img.src = l.dataUrl;
+                c.appendChild(img);
+                c.addEventListener('click', () => this.addLogoElement(l));
+                box.appendChild(c);
+            });
+            const cnt = this.$({ brandIconBox: 'brandCnt', photoDecorBox: 'photoDecorCnt', simpleIconBox: 'simpleIconCnt', weatherIconBox: 'weatherIconCnt', customIconBox: 'customIconCnt' }[boxId]);
+            if (cnt) cnt.textContent = `(${list.length})`;
+        });
+    },
+
+    addLogoElement(logo) {
+        if (!logo) return;
+        this.onSettingCommit();
+        if (!this.template) return;
+        if (!this.template.logoElements) this.template.logoElements = [];
+        const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
+        const el = {
+            name: logo.name, dataUrl: logo.dataUrl, img: null,
+            x: cw - 40, y: ch - 40, size: 60, opacity: 100, rotation: 0, z: 10, free: 1,
+        };
+        this.template.logoElements.push(el);
+        this.selectedEls = [{ kind: 'logo', obj: el }];
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus(`已添加 Logo「${logo.name}」`);
+    },
+
+    async addCustomIcon() {
+        const res = await window.qingframe.openImage();
+        if (!res || !res.data) return;
+        const dataUrl = 'data:image/jpeg;base64,' + res.data;
+        const im = new Image();
+        await new Promise(r => { im.onload = r; im.onerror = r; im.src = dataUrl; });
+        if (!im.naturalWidth) { this.setStatus('图片加载失败'); return; }
+        const logo = { name: res.name || '自定义', dataUrl };
+        this.logos.push(logo);
+        this.addLogoElement(logo);
+        this.renderLogoPools();
+    },
+
+    refreshElList() {
+        const $ = this.$;
+        const list = $('elList'), status = $('elStatus');
+        if (!list) return;
+        const t = this.template;
+        const items = [];
+        (t && t.logoElements || []).forEach((el, i) => items.push({ kind: 'logo', i, label: el.name || 'Logo', src: el.dataUrl, obj: el }));
+        (t && t.decorConfig && t.decorConfig.stickers || []).forEach((el, i) => items.push({ kind: 'sticker', i, label: '贴纸', src: el.src, obj: el }));
+        (t && t.decorConfig && t.decorConfig.textLines || []).forEach((el, i) => {
+            if (el.align === 'free') items.push({ kind: 'text', i, label: el.text.substring(0, 8), src: null, obj: el });
+        });
+        list.innerHTML = '';
+        if (!items.length) {
+            status.textContent = '未选中元素';
+            const e = document.createElement('div');
+            e.className = 'el-row';
+            e.textContent = '画布上暂无文字/贴纸/Logo';
+            list.appendChild(e);
+            return;
+        }
+        const tagMap = { logo: 'Logo', sticker: '贴纸', text: '文字' };
+        items.forEach(it => {
+            const r = document.createElement('div');
+            r.className = 'el-row';
+            if (it.kind === 'logo' || it.kind === 'sticker') {
+                const img = document.createElement('img');
+                img.src = it.src;
+                r.appendChild(img);
+            }
+            const span = document.createElement('span');
+            span.textContent = it.label;
+            r.appendChild(span);
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.textContent = tagMap[it.kind];
+            r.appendChild(tag);
+            const sel = this.selectedEls.some(x => x.kind === it.kind && x.obj === it.obj);
+            if (sel) r.classList.add('active');
+            r.addEventListener('click', () => {
+                const cur = this.selectedEls.some(x => x.kind === it.kind && x.obj === it.obj);
+                if (cur) this.selectedEls = this.selectedEls.filter(x => !(x.kind === it.kind && x.obj === it.obj));
+                else this.selectedEls = [{ kind: it.kind, obj: it.obj }];
+                this.refreshElList();
+            });
+            list.appendChild(r);
+        });
+        const first = this.selectedEls.length ? this.selectedEls[0] : null;
+        status.textContent = first ? `${tagMap[first.kind]}「${this.elLabel(first.obj)}」已选中` : `共 ${items.length} 个元素,点击选择`;
+        if (first) this.syncSliderFromEl({ kind: first.kind, obj: first.obj });
+    },
+
+    elLabel(el) {
+        if (!el) return '';
+        return el.name || el.text || '元素';
+    },
+
+    applyToSelectedEls(fn) {
+        this.selectedEls.forEach(s => fn(s.obj));
+    },
+
+    batchElOps() {
+        this.saveCurrentTemplate();
+        this.scheduleRender();
+    },
+
+    copyElement() {
+        const first = this.selectedEls[0];
+        if (!first) { this.setStatus('请先选中元素'); return; }
+        this._elClip = { kind: first.kind, el: JSON.parse(JSON.stringify(first.obj)) };
+        this.setStatus('已复制选中元素');
+    },
+
+    pasteElement() {
+        if (!this._elClip) { this.setStatus('剪贴板为空'); return; }
+        this.onSettingCommit();
+        const t = this.template;
+        const make = () => {
+            const copy = JSON.parse(JSON.stringify(this._elClip.el));
+            if (copy.x != null) copy.x += 24;
+            if (copy.y != null) copy.y += 24;
+            if (copy.offsetX != null) copy.offsetX += 24;
+            if (copy.offsetY != null) copy.offsetY += 24;
+            return copy;
+        };
+        let placed = null;
+        if (this._elClip.kind === 'logo') {
+            if (!t.logoElements) t.logoElements = [];
+            const n = make(); t.logoElements.push(n); placed = { kind: 'logo', obj: n };
+        } else if (this._elClip.kind === 'sticker') {
+            const decor = t.decorConfig || (t.decorConfig = {});
+            if (!decor.stickers) decor.stickers = [];
+            const n = make(); decor.stickers.push(n); placed = { kind: 'sticker', obj: n };
+        } else if (this._elClip.kind === 'text') {
+            const decor = t.decorConfig || (t.decorConfig = {});
+            if (!decor.textLines) decor.textLines = [];
+            const n = make(); decor.textLines.push(n); placed = { kind: 'text', obj: n };
+        }
+        if (placed) this.selectedEls = [placed];
+        this.refreshUI();
+        this.scheduleRender(true);
+    },
+
+    deleteElement() {
+        const sel = this.selectedEls;
+        if (!sel.length) { this.setStatus('请先选中元素'); return; }
+        this.onSettingCommit();
+        const t = this.template;
+        sel.forEach(s => {
+            if (s.kind === 'logo') { const i = (t.logoElements || []).indexOf(s.obj); if (i >= 0) t.logoElements.splice(i, 1); }
+            else if (s.kind === 'sticker') { const a = (t.decorConfig && t.decorConfig.stickers) || []; const i = a.indexOf(s.obj); if (i >= 0) a.splice(i, 1); }
+            else if (s.kind === 'text') { const a = (t.decorConfig && t.decorConfig.textLines) || []; const i = a.indexOf(s.obj); if (i >= 0) a.splice(i, 1); }
+        });
+        this.selectedEls = [];
+        this.refreshUI();
+        this.scheduleRender(true);
+    },
+
+    clearElements() {
+        if (!this.template) return;
+        this.onSettingCommit();
+        this.template.logoElements = [];
+        if (this.template.decorConfig) { this.template.decorConfig.stickers = []; this.template.decorConfig.textLines = []; }
+        this.selectedEls = [];
+        delete this.template._draftText;
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已清空全部元素');
+    },
+
+    moveZOrder(delta) {
+        if (!this.selectedEls.length) { this.setStatus('请先选中元素'); return; }
+        this.onSettingCommit();
+        const kinds = ['logo', 'sticker', 'text'];
+        kinds.forEach(kind => {
+            const els = (kind === 'logo') ? (this.template.logoElements || [])
+                : (kind === 'sticker') ? (this.template.decorConfig && this.template.decorConfig.stickers || [])
+                    : (this.template.decorConfig && this.template.decorConfig.textLines || []);
+            this.selectedEls.forEach(s => {
+                const i = els.indexOf(s.obj);
+                if (i < 0) return;
+                const n = els.length;
+                els[i].z = (els[i].z || 0) + delta;
+                // 通过 z 排序实现层级:直接赋序
+                els[i].z = clampNum(els[i].z, -100, 100);
+            });
+            // 依据 z 排序后按新序重排数组(等效 Java 中 moveZOrder 1/-1/2/-2)
+            els.sort((a, b) => (a.z || 0) - (b.z || 0));
+        });
+        this.refreshUI();
+        this.scheduleRender(true);
+    },
+
+    /* ══ 模板页签 ══ */
+    refreshTemplateFields() {
+        const $ = this.$;
+        const t = this.template || {};
+        if ($('tfTemplateName')) $('tfTemplateName').value = t.templateName || '';
+        if ($('tfTemplateTag')) $('tfTemplateTag').value = t.templateTag || '';
+    },
+
+    async refreshTemplates() {
+        const box = this.$('lvPresets');
+        if (!box) return;
+        const names = (await window.qingframe.listTemplates()) || [];
+        this._savedTemplates = names;
+        box.innerHTML = '';
+        if (!names.length) { box.innerHTML = '<div class="empty">暂无已存模板</div>'; return; }
+        names.forEach(n => {
+            const row = document.createElement('div');
+            row.className = 'tpl-row';
+            row.innerHTML = `<span>${n}</span><div><button class="mini-btn" data-load>应用</button><button class="mini-btn danger" data-del>删除</button></div>`;
+            row.querySelector('[data-load]').addEventListener('click', async () => this.loadTemplateByName(n));
+            row.querySelector('[data-del]').addEventListener('click', async () => { await window.qingframe.deleteTemplate(n); this.refreshTemplates(); });
+            box.appendChild(row);
+        });
+    },
+
+    async saveTemplate() {
+        const $ = this.$;
+        const name = ($('tfTemplateName') ? $('tfTemplateName').value : '').trim();
+        if (!name) { this.setStatus('请输入模板名称'); return; }
+        // 从回显字段刷新模板(名称/标签)
+        if (this.template) {
+            this.template.templateName = name;
+            this.template.templateTag = $('tfTemplateTag') ? $('tfTemplateTag').value.trim() : '';
+        }
+        this.syncModelFromUI();
+        const r = await window.qingframe.saveTemplate(name, this.cloneTemplate());
+        this.setStatus(r.ok ? `已保存模板「${name}」` : '保存失败：' + (r.error || ''));
+        this.refreshTemplates();
+    },
+
+    async loadTemplate() {
+        if (!this._savedTemplates || !this._savedTemplates.length) {
+            const names = (await window.qingframe.listTemplates()) || [];
+            this._savedTemplates = names;
+        }
+        if (!this._savedTemplates.length) { this.setStatus('暂无已存模板'); return; }
+        const opts = this._savedTemplates.map((n, i) => `${i + 1}. ${n}`).join('\n');
+        const choice = window.prompt('选择要加载的模板(输入序号或名称,留空取消):\n' + opts, '1');
+        if (!choice) { this.setStatus('已取消'); return; }
+        const idx = parseInt(choice, 10) - 1;
+        const name = this._savedTemplates[idx] || String(choice).trim();
+        if (!name) return;
+        await this.loadTemplateByName(name);
+    },
+
+    async loadTemplateByName(name) {
+        if (window.qingframe.loadTemplate) {
+            const data = await window.qingframe.loadTemplate(name);
+            if (!data) { this.setStatus('加载模板失败'); return; }
+            this.onSettingCommit();
+            this.template = JSON.parse(JSON.stringify(data));
+            this.normalizeTemplate();
+            this.saveCurrentTemplate();
+            this.refreshUI();
+            this.scheduleRender(true);
+            this.setStatus(`已应用模板「${name}」`);
+            return;
+        }
+    },
+
+    async exportTemplate() {
+        const name = (this.$('tfTemplateName') ? this.$('tfTemplateName').value : '').trim() || 'template';
+        this.syncModelFromUI();
+        const r = await window.qingframe.exportTemplate(name, this.cloneTemplate());
+        this.setStatus(r.ok ? '模板已导出' : (r.canceled ? '已取消' : '导出失败'));
+    },
+
+    async importTemplate() {
+        const r = await window.qingframe.importTemplate();
+        if (!r.ok) { this.setStatus(r.canceled ? '已取消' : '导入失败：' + (r.error || '')); return; }
+        this.onSettingCommit();
+        this.template = JSON.parse(JSON.stringify(r.data));
+        this.normalizeTemplate();
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus(`已导入模板「${r.name}」`);
+    },
+
+    applyQuickPreset(kind) {
+        if (!this.presets.length) { this.setStatus('预设库未加载'); return; }
+        this.onSettingCommit();
+        let p = null;
+        if (kind === 'film') p = this.presets.find(x => /胶片/i.test(x.templateName)) || this.presets[0];
+        else p = this.presets.find(x => /证件照/i.test(x.templateName)) || this.presets[0];
+        if (p) {
+            this.template = JSON.parse(JSON.stringify(p));
+            this.normalizeTemplate();
+            this.saveCurrentTemplate();
+            this.refreshUI();
+            this.scheduleRender(true);
+            this.setStatus(`已应用预设「${p.templateName}」`);
+        }
+    },
+
+    async autoColorBorder() {
+        if (!this.image) { this.setStatus('请先导入照片'); return; }
+        const color = window.EngineStyles && window.EngineStyles.extractDominant;
+        if (typeof color !== 'function') { this.setStatus('自动取色不可用'); return; }
+        try {
+            const c = await color(this.image.el);
+            this.onSettingCommit();
+            const layer = this.currentLayer();
+            layer.fillConfig.fillType = 'solid';
+            layer.fillConfig.fillHex = c.replace('#', '');
+            if (this.$('cpFillColor')) this.$('cpFillColor').value = c;
+            this.refreshUI();
+            this.scheduleRender(true);
+            this.setStatus(`已应用自动取色边框 #${c}`);
+        } catch (e) { this.setStatus('取色失败: ' + e.message); }
+    },
+
+    loadPresetFromList() {
+        const li = this.$('lvPresets');
+        const active = li && li.querySelector('.tpl-row span');
+        if (!this._savedTemplates || !this._savedTemplates.length) { this.setStatus('模板列表为空'); return; }
+        // 加载代码预设区:选择左侧预设树当前高亮
+        const activeItem = document.querySelector('.preset-item.active');
+        if (activeItem) { this.selectPresetFromTree(activeItem); return; }
+        this.setStatus('请在左侧预设树选择一个预设');
+    },
+
+    selectPresetFromTree(item) {
+        const label = item.querySelector('span:not(.dot)');
+        const name = label ? label.textContent.trim() : '';
+        const p = this.presets.find(x => x.templateName === name);
+        if (!p) { this.setStatus('未找到该预设'); return; }
+        this.onSettingCommit();
+        this.applyPreset(p);
+        this.refreshTemplates();
+        this.setStatus(`已应用预设「${p.templateName}」`);
+    },
+
+    /* ══ 拼图页签 ══ */
+    puzzleLayouts() {
+        return [
+            ['single', '单张'], ['h2', '2·左右'], ['v2', '2·上下'], ['as2', '一大一小'],
+            ['h3', '3·横排'], ['v3', '3·竖排'], ['grid4', '4·宫格'], ['as4', '1大3小'],
+            ['h4', '4·横排'], ['v4', '4·竖排'], ['grid6', '6·宫格'], ['grid9', '9·宫格'],
+        ];
+    },
+
+    buildPuzzleLayoutBtns() {
+        const box = this.$('puzzleLayouts');
+        if (!box) return;
+        box.innerHTML = '';
+        this.puzzleLayouts().forEach(([val, label], i) => {
+            const b = document.createElement('button');
+            b.className = 'mini-btn';
+            b.textContent = label;
+            b.dataset.val = val;
+            b.dataset.i = i;
+            b.addEventListener('click', () => {
+                this.onSettingCommit();
+                if (!this.template.puzzle) this.template.puzzle = this.defaultTemplate().puzzle;
+                this.template.puzzle.layout = val;
+                this.template.puzzle.enabled = 1;
+                this.refreshPuzzleUI();
+                this.scheduleRender(true);
+                this.setStatus(`已启用拼图布局「${label}」`);
+            });
+            box.appendChild(b);
+        });
+    },
+
+    puzzleSlotCount(layout) {
+        const n = { single: 1, as2: 2, h2: 2, v2: 2, h3: 3, v3: 3, as4: 4, grid4: 4, h4: 4, v4: 4, grid6: 6, grid9: 9 };
+        return n[layout] || 1;
+    },
+
+    syncPuzzleFromUI() {
+        if (!this.template) return;
+        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
+        const $ = this.$;
+        pk.gap = $('slPuzzleGap') ? parseInt($('slPuzzleGap').value, 10) : pk.gap;
+        pk.bgMode = $('cbPuzzleBg') ? parseInt($('cbPuzzleBg').value, 10) : 0;
+        pk.canvasRatio = $('cbPuzzleCanvas') ? $('cbPuzzleCanvas').value : 'auto';
+        pk.borderColor = $('cpPuzzleBorder') ? $('cpPuzzleBorder').value.replace('#', '') : 'ffffff';
+        pk.offsetX = $('slSlotOffsetX') ? parseInt($('slSlotOffsetX').value, 10) : 0;
+        pk.offsetY = $('slSlotOffsetY') ? parseInt($('slSlotOffsetY').value, 10) : 0;
+        pk.zoom = $('slSlotZoom') ? parseInt($('slSlotZoom').value, 10) : 100;
+        pk.slotFill = $('cbSlotFill') ? $('cbSlotFill').value : 'cover';
+        if (!this._skipPuzzleCapture && this._puzzleSlot != null) this.captureCaptionToModel(this._puzzleSlot);
+    },
+
+    // 槽位下拉改变:先把当前编辑字幕写回旧槽位,再提交/加载新槽位
+    onPuzzleSlotChange() {
+        const $ = this.$;
+        if (this._puzzleSlot != null) this.captureCaptionToModel(this._puzzleSlot);
+        this._skipPuzzleCapture = true;
+        try {
+            this.onSettingCommit();
+        } finally {
+            this._skipPuzzleCapture = false;
+        }
+        if ($('cbPuzzleGapPick')) this._puzzleSlot = parseInt($('cbPuzzleGapPick').value, 10);
+        this.loadCaptionFromModel();
+        this.renderCaptionEditorVisibility();
+    },
+
+    refreshPuzzleUI() {
+        if (!this.template) return;
+        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
+        const $ = this.$;
+        const n = this.puzzleSlotCount(pk.layout);
+        if ($('slPuzzleGap')) $('slPuzzleGap').value = pk.gap != null ? pk.gap : 6;
+        this.updateLabel('lblPuzzleGap', pk.gap != null ? pk.gap : 6);
+        if ($('cbPuzzleBg')) $('cbPuzzleBg').value = String(pk.bgMode || 0);
+        if ($('cbPuzzleCanvas')) $('cbPuzzleCanvas').value = pk.canvasRatio || 'auto';
+        if ($('cpPuzzleBorder')) $('cpPuzzleBorder').value = '#' + (pk.borderColor || 'ffffff');
+        if ($('slSlotOffsetX')) $('slSlotOffsetX').value = pk.offsetX || 0;
+        if ($('slSlotOffsetY')) $('slSlotOffsetY').value = pk.offsetY || 0;
+        if ($('slSlotZoom')) $('slSlotZoom').value = pk.zoom != null ? pk.zoom : 100;
+        this.updateLabel('lblSlotOffsetX', pk.offsetX || 0);
+        this.updateLabel('lblSlotOffsetY', pk.offsetY || 0);
+        this.updateLabel('lblSlotZoom', (pk.zoom != null ? pk.zoom : 100) + '%');
+        if ($('cbSlotFill')) $('cbSlotFill').value = pk.slotFill || 'cover';
+        // 槽位字幕下拉
+        const pick = $('cbPuzzleGapPick');
+        if (pick) {
+            pick.innerHTML = '';
+            for (let i = 0; i < n; i++) {
+                const o = document.createElement('option');
+                o.value = i;
+                o.textContent = `槽位 ${i + 1}`;
+                if (pk.captions && pk.captions[i]) o.textContent += ' · 字幕';
+                pick.appendChild(o);
+            }
+            if (this._puzzleSlot != null && this._puzzleSlot < n) pick.value = String(this._puzzleSlot);
+            else this._puzzleSlot = 0;
+            if ($('lblPuzzleSlot')) {
+                $('lblPuzzleSlot').textContent = pk.enabled ? `当前槽位:${(this._puzzleSlot || 0) + 1}/${n} (布局 ${pk.layout})` : '当前槽位：无（未启用）';
+            }
+        }
+        this.loadCaptionFromModel();
+        this.renderCaptionEditorVisibility();
+    },
+
+    loadCaptionFromModel() {
+        const $ = this.$;
+        const pk = this.template.puzzle || {};
+        const slot = $('cbPuzzleGapPick') ? parseInt($('cbPuzzleGapPick').value, 10) : 0;
+        const cap = pk.captions && pk.captions[slot] ? pk.captions[slot] : null;
+        const set = (id, v) => { const e = $(id); if (e) e.value = v == null ? '' : v; };
+        if (cap) {
+            set('tfCapLine1', cap.line1); set('tfCapLine2', cap.line2);
+            set('slCapSize1', cap.size1 || 28); set('slCapSize2', cap.size2 || 20);
+            set('cbCapFont1', cap.font1 || 'Microsoft YaHei'); set('cbCapFont2', cap.font2 || 'Microsoft YaHei');
+            if ($('cpCapColor')) $('cpCapColor').value = '#' + (cap.color || 'ffffff');
+            if ($('cbCapBgBar')) $('cbCapBgBar').checked = (cap.bgBar || 0) === 1;
+            set('slCapSpacing', cap.spacing != null ? cap.spacing : 60);
+            this.updateLabel('lblCapSize1', cap.size1 || 28); this.updateLabel('lblCapSize2', cap.size2 || 20);
+            this.updateLabel('lblCapSpacing', (cap.spacing != null ? cap.spacing : 60) + '%');
+        } else {
+            set('tfCapLine1', ''); set('tfCapLine2', '');
+            set('slCapSize1', 28); set('slCapSize2', 20);
+            set('cbCapFont1', 'Microsoft YaHei'); set('cbCapFont2', 'Microsoft YaHei');
+            if ($('cpCapColor')) $('cpCapColor').value = '#ffffff';
+            if ($('cbCapBgBar')) $('cbCapBgBar').checked = false;
+            set('slCapSpacing', 60);
+            this.updateLabel('lblCapSize1', 28); this.updateLabel('lblCapSize2', 20); this.updateLabel('lblCapSpacing', '60%');
+        }
+    },
+
+    captureCaptionToModel(slot) {
+        if (!this.template) return;
+        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
+        if (!pk.captions) pk.captions = {};
+        const $ = this.$;
+        const line1 = $('tfCapLine1') ? $('tfCapLine1').value.trim() : '';
+        const line2 = $('tfCapLine2') ? $('tfCapLine2').value.trim() : '';
+        if (!line1 && !line2) { delete pk.captions[slot]; return; }
+        pk.captions[slot] = {
+            line1, line2,
+            size1: $('slCapSize1') ? parseInt($('slCapSize1').value, 10) : 28,
+            size2: $('slCapSize2') ? parseInt($('slCapSize2').value, 10) : 20,
+            font1: $('cbCapFont1') ? $('cbCapFont1').value : 'Microsoft YaHei',
+            font2: $('cbCapFont2') ? $('cbCapFont2').value : 'Microsoft YaHei',
+            color: ($('cpCapColor') ? $('cpCapColor').value : '#ffffff').replace('#', ''),
+            bgBar: ($('cbCapBgBar') && $('cbCapBgBar').checked) ? 1 : 0,
+            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 60,
+        };
+    },
+
+    toggleCaptionEditor(show) {
+        const editor = this.$('vbCaptionEditor');
+        if (editor) editor.style.display = show ? 'block' : 'none';
+    },
+
+    renderCaptionEditorVisibility() {
+        const pk = this.template.puzzle || {};
+        const has = pk.captions && Object.keys(pk.captions).length;
+        this.toggleCaptionEditor(!!has);
+    },
+
+    deleteCaption() {
+        const $ = this.$;
+        const slot = $('cbPuzzleGapPick') ? parseInt($('cbPuzzleGapPick').value, 10) : 0;
+        if (!slot && slot !== 0) return;
+        this.onSettingCommit();
+        const pk = this.template.puzzle || {};
+        if (pk.captions) delete pk.captions[slot];
+        this.refreshPuzzleUI();
+        this.scheduleRender(true);
+    },
+
+    clearCaption() {
+        this.deleteCaption();
+    },
+
+    clearPuzzleSlots() {
+        if (!this.template.puzzle) return;
+        this.onSettingCommit();
+        this.template.puzzle.captions = {};
+        this.template.puzzle.enabled = 0;
+        this.template.puzzle.offsetX = 0;
+        this.template.puzzle.offsetY = 0;
+        this.template.puzzle.zoom = 100;
+        this._puzzleSlot = 0;
+        this.refreshPuzzleUI();
+        this.toggleCaptionEditor(false);
+        this.scheduleRender(true);
+    },
+
+    async exportPuzzle() {
+        const exportPuzzleNow = () => {
+            if (!window.__renderPuzzle) { this.setStatus('拼图渲染不可用'); return Promise.resolve(false); }
+            const prev = this.displayMax;
+            this.displayMax = 4000;
+            return new Promise(res => requestAnimationFrame(() => {
+                window.__renderPuzzle(this, false);
+                const data = this.dom.canvas.toDataURL('image/png');
+                const base64 = data.split(',')[1];
+                if (prev === undefined) delete this.displayMax;
+                else this.displayMax = prev;
+                res(base64);
+            }));
+        };
+        const base64 = await exportPuzzleNow();
+        if (!base64) return;
+        const r = await window.qingframe.saveImage(base64, '拼图.png');
+        if (r) this.setStatus('拼图已导出');
+        else this.setStatus('导出失败');
+    },
+
+    /* ══ 预设加载 ══ */
+    async loadPresets() {
+        this.presets = await window.__loadAllPresets();
+        this.buildTree();
+        if (this.presets.length) this.selectPreset(this.presets[0]);
+    },
+
+    async loadLogos() {
+        try { this.logos = (await window.qingframe.listLogos()) || []; }
+        catch (e) { this.logos = []; }
+        if (this.dom.stRes) this.renderLogoPools();
+    },
+
+    async loadTextures() {
+        try { this.textures = (await window.qingframe.listTextures()) || []; }
+        catch (e) { this.textures = []; }
+    },
+
+    buildTree(filter) {
+        const tree = this.dom.presetTree;
+        tree.innerHTML = '';
+        const f = (filter || '').toLowerCase();
+        const order = ['潮流', '高级感', '极简', '胶片', '质感', '复古', '杂志', '水印', '氛围', '比例', '票根'];
+        const merge = { 创意: '潮流', 奢华: '高级感', 现代: '极简', 排版: '极简', 影院: '胶片', 星空: '氛围' };
+        const groupIcons = {
+            潮流: '🪩', 高级感: '💎', 极简: '⚪', 胶片: '🎞️', 质感: '🪵',
+            复古: '📻', 杂志: '📰', 水印: '💧', 氛围: '🌙', 比例: '📐',
+            票根: '🎫', 通用: '🖼️'
+        };
+        const iconFor = name => {
+            const kw = [
+                ['拼贴', '🧩'], ['霓虹', '🪩'], ['光环', '✨'], ['双', '📎'], ['星', '🌌'], ['极光', '🌈'],
+                ['渐变', '🌈'], ['边框', '🖼️'], ['白框', '🖼️'], ['卡片', '💳'], ['卡', '🔲'], ['票根', '🎫'],
+                ['相机', '📷'], ['胶片', '🎞️'], ['胶卷', '🎞️'], ['电影', '🎬'], ['银幕', '🎬'], ['宽银幕', '🎬'],
+                ['撕裂', '💥'], ['双重曝光', '📸'], ['曝光', '📸'], ['杂志', '📰'], ['大刊头', '📰'], ['页眉', '📰'],
+                ['封面', '📕'], ['报纸', '📰'], ['海报', '🖼️'], ['波普', '🌀'],
+                ['极简', '⚪'], ['简约', '🗒️'], ['细线', '➖'], ['编号', '🔢'], ['日期', '📅'],
+                ['复古', '📻'], ['登机牌', '🎫'], ['深色', '🌑'], ['身份卡', '🪪'], ['苹果', '🍎'],
+                ['小红', '❤️'], ['cream', '🍰'], ['奶油', '🍰'], ['醒图', '🍰'], ['琉璃', '🍯'],
+                ['牛仔', '👖'], ['布纹', '🧵'], ['磨砂', '🌫️'], ['毛玻璃', '🌫️'], ['玻璃', '🪟'],
+                ['晨雾', '🌫️'], ['金箔', '🥇'], ['奢华', '👑'], ['丝绒', '🧶'], ['参数', '🔤'],
+                ['logo', '🔤'], ['留白', '🌬️'], ['画廊', '🏛️'], ['画框', '🖼️'], ['分层', '🗂️'],
+                ['胶片条', '🎞️'], ['比例', '📐'], ['信息条', 'ℹ️'], ['背景模糊', '🌫️'], ['模糊', '🌸']
+            ];
+            const n = String(name || '');
+            for (const [k, ic] of kw) if (n.includes(k)) return ic;
+            return '💠';
+        };
+        const groups = new Map();
+        for (const p of this.presets) {
+            if (f && !p.templateName.toLowerCase().includes(f) && !(p.templateTag || '').toLowerCase().includes(f)) continue;
+            const grp = merge[p.templateTag] || p.templateTag || '通用';
+            if (!groups.has(grp)) groups.set(grp, []);
+            groups.get(grp).push(p);
+        }
+        const sorted = [...groups.keys()].sort((a, b) => {
+            const ia = order.indexOf(a), ib = order.indexOf(b);
+            return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'zh');
+        });
+        const curName = (this.template && this.template.templateName) || '';
+        const curGrp = curName ? [...sorted].find(g => (groups.get(g) || []).some(p => p.templateName === curName)) : null;
+        const defOpen = curGrp || sorted[0] || null;
+        for (const grp of sorted) {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'preset-group' + ((f && groups.get(grp).length) || grp === defOpen ? ' open' : '');
+            const name = document.createElement('div');
+            name.className = 'group-name';
+            name.title = '点击展开/收起';
+            const caret = document.createElement('span');
+            caret.className = 'caret';
+            caret.textContent = '\u25B8';
+            name.appendChild(caret);
+            const gic = document.createElement('span');
+            gic.className = 'g-icon';
+            gic.textContent = groupIcons[grp] || '🖼️';
+            name.appendChild(gic);
+            const tag = document.createElement('span');
+            tag.textContent = `${grp} · ${groups.get(grp).length}`;
+            name.appendChild(tag);
+            name.addEventListener('click', () => {
+                groupEl.classList.toggle('open');
+            });
+            groupEl.appendChild(name);
+            tree.appendChild(groupEl);
+            for (const p of groups.get(grp)) {
+                const item = document.createElement('div');
+                item.className = 'preset-item';
+                const dot = document.createElement('span');
+                dot.className = 'dot';
+                dot.textContent = iconFor(p.templateName);
+                item.appendChild(dot);
+                const label = document.createElement('span');
+                label.textContent = p.templateName;
+                item.appendChild(label);
+                item.addEventListener('click', () => this.selectPreset(p, item));
+                item.dataset.grp = grp;
+                groupEl.appendChild(item);
+            }
+        }
+    },
+    filterTree(v) { this.buildTree(v); },
+
+    selectPreset(p, itemEl) {
+        this.pushUndo();
+        this.applyPreset(p);
+        document.querySelectorAll('.preset-item').forEach(el => el.classList.remove('active'));
+        if (itemEl) itemEl.classList.add('active');
+    },
+
+    applyPreset(p) {
+        this.template = JSON.parse(JSON.stringify(p));
+        this.normalizeTemplate();
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+    },
+
+    resetParams() {
+        if (!this.template) return;
+        this.pushUndo();
+        this.template = this.defaultTemplate();
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('参数已重置');
+    },
+
+    randomBorder() {
+        if (!this.presets.length) return;
+        this.pushUndo();
+        let p = this.presets[Math.floor(Math.random() * this.presets.length)];
+        this.template = JSON.parse(JSON.stringify(p));
+        this.normalizeTemplate();
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus(`已应用随机边框：${p.templateName}`);
+    },
+
+    syncToSelected() {
+        if (this.selectedIdx.length <= 1) { this.setStatus('请先在胶片条中多选需要同步的照片(Ctrl/Shift+点击)'); return; }
+        const src = this.cloneTemplate();
+        this.selectedIdx.forEach(i => {
+            if (i === this.currentIdx) return;
+            const im = this.images[i];
+            im.customSettings = JSON.parse(JSON.stringify(src));
+            this.imageTemplates.set(im, JSON.parse(JSON.stringify(src)));
+        });
+        this.setStatus(`已将边框效果同步到 ${this.selectedIdx.length - 1} 张选中照片`);
+        this.scheduleRender(true);
+    },
+
+    /* ══ 缩放 / 平移 / 状态栏 / 主题 ══ */
+    zoomAt(e, stage, factor) {
+        const rect = stage.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        const cx = rect.width / 2, cy = rect.height / 2;
+        const z0 = this.zoom;
+        const z1 = Math.min(3, Math.max(0.1, z0 * factor));
+        if (z1 === z0) return;
+        const px = (mx - cx - this.panX) / z0;
+        const py = (my - cy - this.panY) / z0;
+        this.panX = mx - cx - px * z1;
+        this.panY = my - cy - py * z1;
+        this.setZoom(z1);
+    },
+
+    setZoom(z) {
+        this.zoom = z;
+        this.dom.zoomInput.value = Math.round(z * 100) + '%';
+        this.dom.zoomRange.value = Math.round(z * 100);
+        this.applyZoomStyle();
+    },
+    fitZoom() {
+        if (!this.image) return;
+        const canvas = this.dom.canvas;
+        if (!canvas.width) return;
+        const stage = this.dom.stage;
+        const sw = stage.clientWidth - 8, sh = Math.max(60, stage.clientHeight - 8 - 78);
+        const z = Math.min(sw / canvas.width, sh / canvas.height);
+        this.panX = 0; this.panY = 0;
+        this.setZoom(Math.max(0.1, z));
+    },
+    applyZoomStyle() {
+        const canvas = this.dom.canvas;
+        const z = this.zoom;
+        canvas.style.width = Math.max(1, Math.round(canvas.width * z)) + 'px';
+        canvas.style.height = Math.max(1, Math.round(canvas.height * z)) + 'px';
+        canvas.style.transform = `translate(${Math.round(this.panX)}px, ${Math.round(this.panY)}px)`;
+    },
+
+    switchTab(name) {
+        this.dom.tabs.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+        this.dom.panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+        if (name === 'logo') this.renderLogoPools();
+        if (name === 'template') this.refreshTemplates();
+        if (name === 'puzzle') this.refreshPuzzleUI();
+    },
+
+    setupShortcuts() {
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openImage(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
+            else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); this.redo(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAllEls(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'c') { this.copyElement(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'v') { e.preventDefault(); this.pasteElement(); }
+            else if (e.key === 'Delete' && this.selectedEls.length) { e.preventDefault(); this.deleteElement(); }
+        });
+    },
+
+    selectAllEls() {
+        if (!this.template) return;
+        this.selectedEls = [];
+        (this.template.logoElements || []).forEach(o => this.selectedEls.push({ kind: 'logo', obj: o }));
+        (this.template.decorConfig && this.template.decorConfig.stickers || []).forEach(o => this.selectedEls.push({ kind: 'sticker', obj: o }));
+        (this.template.decorConfig && this.template.decorConfig.textLines || []).forEach(o => { if (o.align === 'free') this.selectedEls.push({ kind: 'text', obj: o }); });
+        this.refreshElList();
+    },
+
+    /* ── 拖拽导入 ── */
+    setupDragDrop() {
+        const pane = this.dom.canvasPane;
+        let depth = 0;
+        pane.addEventListener('dragenter', e => { e.preventDefault(); depth++; pane.classList.add('dragging'); });
+        pane.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+        pane.addEventListener('dragleave', e => { e.preventDefault(); if (--depth <= 0) { depth = 0; pane.classList.remove('dragging'); } });
+        pane.addEventListener('drop', e => {
+            e.preventDefault(); depth = 0; pane.classList.remove('dragging');
+            const files = Array.from(e.dataTransfer.files || []);
+            if (files.length) this.addImageFiles(files);
+        });
+    },
+
+    /* 状态栏 / 主题 */
+    statusMsg: '',
+    setStatus(msg) {
+        this.statusMsg = msg;
+        if (this.dom.stCanvas) this.dom.stCanvas.textContent = `画布 ${this.canvasW()}×${this.canvasH()}` + (msg ? ` · ${msg}` : '');
+    },
+    canvasW() { return this.dom.canvas ? this.dom.canvas.width : 0; },
+    canvasH() { return this.dom.canvas ? this.dom.canvas.height : 0; },
+    updateStatusBar() {
+        if (!this.image) { this.setStatus(''); return; }
+        const im = this.image;
+        this.dom.stRes.textContent = `${im.w}×${im.h}`;
+        this.dom.stInfo.textContent = `${this.currentIdx + 1}/${this.images.length} · ${im.name}`;
+        this.setStatus(this.statusMsg && !this.statusMsg.startsWith('画布') ? this.statusMsg : '');
+    },
+
+    toggleTheme() {
+        const root = document.documentElement;
+        root.classList.toggle('dark');
+    },
+
+    /* ── 导出 ── */
+    async exportImage() {
+        if (!this.image) { this.setStatus('请先导入照片'); return; }
+        const EXPORT_MAX = 8192;
+        const fmt = this.dom.selFormat.value;
+        const mime = fmt === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const ext = fmt === 'jpeg' ? 'jpg' : 'png';
+        const targets = this.selectedIdx.length > 1 ? this.selectedIdx : [this.currentIdx];
+        const originalIdx = this.currentIdx;
+        const baseTemplate = this.template;
+        const prevMax = this.displayMax;
+        const files = [];
+        const scaleElPix = (tpl, k) => {
+            if (k === 1) return false;
+            let any = false;
+            (tpl.logoElements || []).forEach(el => {
+                if (typeof el.x === 'number') {
+                    el.x *= k; el.y *= k; if (el.size) el.size *= k;
+                    if (el.offsetX) el.offsetX *= k;
+                    if (el.offsetY) el.offsetY *= k;
+                    any = true;
+                }
+            });
+            (tpl.decorConfig && tpl.decorConfig.stickers || []).forEach(s => {
+                s.x = (s.x || 0) * k; s.y = (s.y || 0) * k; s.scale = (s.scale || 1) * k;
+                any = true;
+            });
+            (tpl.decorConfig && tpl.decorConfig.textLines || []).forEach(l => {
+                if (l.align === 'free') { l.x = (l.x || 0) * k; l.y = (l.y || 0) * k; l.fontSize = (l.fontSize || 18) * k; any = true; }
+            });
+            return any;
+        };
+        try {
+            for (let n = 0; n < targets.length; n++) {
+                const idx = targets[n];
+                const im = this.images[idx];
+                if (!im) continue;
+                this.image = im;
+                this.invalidateStyleCaches();
+                this.currentIdx = idx;
+                this.template = im.customSettings || baseTemplate;
+                this.normalizeTemplate();
+                const puzzle = !!(this.template && this.template.puzzle && this.template.puzzle.enabled);
+                // 先按 UI 默认尺寸渲染一次,取得元素坐标的"基准画布宽度"
+                const uiMaxSave = this.displayMax;
+                this.displayMax = undefined;
+                await new Promise(res => requestAnimationFrame(() => {
+                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
+                    else window.__render(this, false);
+                    res();
+                }));
+                const beforeW = Math.max(1, this.dom.canvas.width || 1);
+                this.displayMax = EXPORT_MAX;
+                await new Promise(res => requestAnimationFrame(() => {
+                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
+                    else window.__render(this, false);
+                    res();
+                }));
+                const afterW = Math.max(1, this.dom.canvas.width || 1);
+                const k = afterW / beforeW;
+                // 元素坐标为基准画布像素:导出画布变大时等比放大,避免缩到角落
+                if (!puzzle && k !== 1 && scaleElPix(this.template, k)) {
+                    await new Promise(res => requestAnimationFrame(() => {
+                        window.__render(this, false);
+                        res();
+                    }));
+                    scaleElPix(this.template, 1 / k);
+                }
+                this.displayMax = uiMaxSave;
+                const dataUrl = this.dom.canvas.toDataURL(mime, fmt === 'jpeg' ? 0.92 : 1);
+                const base64 = dataUrl.split(',')[1];
+                const baseName = (im.name || 'photo').replace(/\.[^.]+$/, '');
+                files.push({ data: base64, filename: `${baseName}${puzzle ? '_拼图' : '_边框'}.${ext}` });
+                const bar = document.getElementById('progressBar');
+                if (bar) bar.style.width = Math.round(((n + 1) / targets.length) * 100) + '%';
+            }
+        } finally {
+            this.currentIdx = originalIdx;
+            this.image = this.images[this.currentIdx];
+            this.invalidateStyleCaches();
+            this.template = (this.image && this.image.customSettings) || baseTemplate;
+            if (prevMax === undefined) delete this.displayMax;
+            else this.displayMax = prevMax;
+        }
+
+        if (this.image) this.scheduleRender(true);
+
+        let result;
+        if (files.length > 1 && window.qingframe.saveImagesBatch) {
+            result = await window.qingframe.saveImagesBatch(files);
+            if (result && result.canceled) { this.setStatus('已取消导出'); this.resetProgress(); return; }
+        } else if (files.length === 1) {
+            result = await window.qingframe.saveImage(files[0].data, files[0].filename) ? { ok: 1 } : { ok: 0 };
+        } else {
+            result = { ok: 0, fail: files.length };
+        }
+        const r = result || {};
+        this.setStatus(`导出完成：成功 ${r.ok || 0}${r.fail ? `，失败 ${r.fail}` : ''}`);
+        this.resetProgress();
+        this.updateStatusBar();
+    },
+
+    resetProgress() {
+        const bar = document.getElementById('progressBar');
+        if (bar) setTimeout(() => bar.style.width = '0', 800);
+    },
+};
+
+/* 工具 */
+function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function num(el, def) {
+    if (!el) return def == null ? 0 : def;
+    const v = parseFloat(el.value);
+    return isNaN(v) ? (def == null ? 0 : def) : v;
+}
+function dashToArray(v) {
+    if (!v) return [];
+    const arr = String(v).split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x) && x > 0);
+    return arr;
+}
+
+document.addEventListener('DOMContentLoaded', () => App.init());

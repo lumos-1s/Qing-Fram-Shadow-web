@@ -1,0 +1,14 @@
+{
+  "name": "qingframe-web",
+  "version": "0.1.0",
+  "description": "清框影 Web 重构版(Electron + HTML/CSS/JS)",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

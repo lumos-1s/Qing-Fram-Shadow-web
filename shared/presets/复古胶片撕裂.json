@@ -1,0 +1,135 @@
+{
+  "templateName": "复古胶片撕裂",
+  "templateTag": "复古",
+  "exportDpi": 300,
+  "canvasRatio": "original",
+  "baseMargin": {
+    "marginLock": 0,
+    "marginTop": 100,
+    "marginBottom": 100,
+    "marginLeft": 100,
+    "marginRight": 100,
+    "imgScale": 0.95,
+    "imgOffsetX": 0,
+    "imgOffsetY": 0,
+    "bgBlurEnable": 0,
+    "bgBlurRadius": 30,
+    "bgBlurWhiteOverlay": 0
+  },
+  "layerList": [
+    {
+      "visible": true,
+      "marginTop": 0,
+      "marginBottom": 0,
+      "marginLeft": 0,
+      "marginRight": 0,
+      "fillConfig": {
+        "fillType": "solid",
+        "fillHex": "#e8e2d2",
+        "fillOpacity": 100,
+        "gradientType": "linear",
+        "gradientAngle": 0,
+        "gradientStops": [
+          {
+            "position": 0,
+            "color": "#ffffff"
+          },
+          {
+            "position": 1,
+            "color": "#cccccc"
+          }
+        ],
+        "gradientOpacity": 100,
+        "textureSrc": "",
+        "textureScale": 1,
+        "textureOffsetX": 0,
+        "textureOffsetY": 0,
+        "textureOpacity": 100,
+        "textureBlend": "normal"
+      },
+      "strokeConfig": {
+        "strokeWidth": 0,
+        "strokePos": "inside",
+        "strokeColorHex": "#b8ac92",
+        "strokeOpacity": 100,
+        "strokeDashArray": [],
+        "strokeDashOffset": 0,
+        "strokeFillType": "solid",
+        "strokeGradientType": "linear",
+        "strokeGradientAngle": 0,
+        "strokeGradientStops": []
+      },
+      "shadowGlowConfig": {
+        "shadowEnable": 0,
+        "shadowOffsetX": 3,
+        "shadowOffsetY": 3,
+        "shadowBlur": 16,
+        "shadowSpread": 0,
+        "shadowColorHex": "#000000",
+        "shadowOpacity": 25,
+        "glowEnable": 0,
+        "glowColorHex": "#ffffff",
+        "glowBlur": 15,
+        "glowSpread": 0,
+        "glowOpacity": 60,
+        "glowType": "outer"
+      }
+    }
+  ],
+  "cornerConfig": {
+    "cornerLock": 1,
+    "cornerRadiusAll": 0,
+    "cornerRadiusTL": 0,
+    "cornerRadiusTR": 0,
+    "cornerRadiusBL": 0,
+    "cornerRadiusBR": 0,
+    "shapeType": "rect",
+    "customShapeSvg": ""
+  },
+  "filmTearConfig": {
+    "tearEnable": 1,
+    "tearStrength": 35,
+    "tearDensity": 40,
+    "filmPerforationEnable": 1,
+    "filmPerforationType": "round",
+    "filmPerforationSize": 16,
+    "filmPerforationSpacing": 32,
+    "dustScratchEnable": 1,
+    "dustScratchIntensity": 22,
+    "yellowingEnable": 1,
+    "yellowingStrength": 25
+  },
+  "lightEffect": {
+    "vignetteEnable": 1,
+    "vignetteStrength": 40,
+    "vignetteFeather": 50,
+    "lightLeakEnable": 1,
+    "lightLeakType": "warm",
+    "lightLeakOpacity": 28,
+    "lightLeakAngle": 25,
+    "filmGrainEnable": 1,
+    "filmGrainIntensity": 16
+  },
+  "decorConfig": {
+    "textLines": [
+      {
+        "text": "EST. 1998",
+        "fontFamily": "Microsoft YaHei",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 3,
+        "colorHex": "#8a7f6a",
+        "opacity": 100,
+        "x": 0,
+        "y": 0,
+        "align": "bottom",
+        "enableShadow": 0
+      }
+    ],
+    "stickers": [],
+    "cornerDecorEnable": 0,
+    "cornerDecorType": "none",
+    "cornerDecorSize": 30,
+    "exifAutoText": 0
+  }
+}
