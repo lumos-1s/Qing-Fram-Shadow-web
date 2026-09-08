@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { createStateStore } = require('./state');
 
 if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -9,6 +10,7 @@ if (!app.requestSingleInstanceLock()) {
     const LOGOS_DIR = path.join(__dirname, '..', '..', 'shared', 'brandlogos');
     const TEXTURES_DIR = path.join(__dirname, '..', '..', 'shared', 'textures');
     const TEMPLATES_DIR = path.join(app.getPath('userData'), 'templates');
+    const { loadState, saveState, validDir, freeFilePath } = createStateStore(path.join(app.getPath('userData'), 'state.json'));
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -124,70 +126,105 @@ ipcMain.handle('delete-template', (_e, name) => {
 });
 
 ipcMain.handle('export-template', async (_e, { name, data }) => {
+    const st = loadState();
+    const baseName = (name || 'template') + '.json';
+    const def = validDir(st.lastExportDir) ? path.join(st.lastExportDir, baseName) : baseName;
     const { canceled, filePath } = await dialog.showSaveDialog({
         title: '导出模板',
-        defaultPath: (name || 'template') + '.json',
+        defaultPath: def,
         filters: [{ name: 'JSON 模板', extensions: ['json'] }]
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
     try {
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+        saveState({ lastExportDir: path.dirname(filePath) });
         return { ok: true };
     } catch (e) { return { ok: false, error: String(e) }; }
 });
 
 ipcMain.handle('import-template', async () => {
+    const st = loadState();
     const { canceled, filePaths } = await dialog.showOpenDialog({
         title: '导入模板',
+        defaultPath: validDir(st.lastOpenDir) ? st.lastOpenDir : undefined,
         filters: [{ name: 'JSON 模板', extensions: ['json'] }],
         properties: ['openFile']
     });
     if (canceled || !filePaths.length) return { ok: false, canceled: true };
     try {
         const data = JSON.parse(fs.readFileSync(filePaths[0], 'utf-8'));
+        saveState({ lastOpenDir: path.dirname(filePaths[0]) });
         return { ok: true, name: path.basename(filePaths[0], '.json'), data };
     } catch (e) { return { ok: false, error: '模板格式错误：' + e.message }; }
 });
 
 ipcMain.handle('open-image', async () => {
+    const st = loadState();
     const { canceled, filePaths } = await dialog.showOpenDialog({
         title: '选择照片',
+        defaultPath: validDir(st.lastOpenDir) ? st.lastOpenDir : undefined,
         filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
         properties: ['openFile']
     });
     if (canceled || filePaths.length === 0) return null;
+    saveState({ lastOpenDir: path.dirname(filePaths[0]) });
     const fp = filePaths[0];
     return { name: path.basename(fp), path: fp, data: fs.readFileSync(fp).toString('base64') };
 });
 
+ipcMain.handle('open-images', async () => {
+    const st = loadState();
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: '选择照片（可多选，第一张会成为当前主图）',
+        defaultPath: validDir(st.lastOpenDir) ? st.lastOpenDir : undefined,
+        filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
+        properties: ['openFile', 'multiSelections']
+    });
+    if (canceled || !filePaths.length) return null;
+    saveState({ lastOpenDir: path.dirname(filePaths[0]) });
+    return filePaths.map(fp => ({ name: path.basename(fp), path: fp, data: fs.readFileSync(fp).toString('base64') }));
+});
+
 ipcMain.handle('save-image-base64', async (_e, { data, filename }) => {
+    const st = loadState();
+    const dir = validDir(st.lastExportDir) ? st.lastExportDir : null;
+    // 目标目录已有同名文件时自动加号,再次导出数字继续递增
+    const def = dir ? freeFilePath(dir, filename) : filename;
     const { canceled, filePath } = await dialog.showSaveDialog({
         title: '导出图片',
-        defaultPath: filename,
+        defaultPath: def,
         filters: [{ name: 'PNG 图片', extensions: ['png'] }, { name: 'JPEG 图片', extensions: ['jpg'] }]
     });
     if (canceled || !filePath) return false;
     fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
+    saveState({ lastExportDir: path.dirname(filePath) });
     return true;
 });
 
 ipcMain.handle('save-images-batch', async (_e, files) => {
     // files: [{ data, filename }]
     let dir = null;
+    const st = loadState();
     try {
         const res = await dialog.showOpenDialog({
             title: '选择导出目录',
+            defaultPath: validDir(st.lastExportDir) ? st.lastExportDir : undefined,
             properties: ['openDirectory', 'createDirectory']
         });
         if (res.canceled || !res.filePaths.length) return { canceled: true };
         dir = res.filePaths[0];
     } catch (e) { return { canceled: true, error: String(e) }; }
+    saveState({ lastExportDir: dir });
     let ok = 0, fail = 0;
+    const written = new Set();
     try {
         for (const f of files) {
             if (!f || !f.data) { fail++; continue; }
             try {
-                fs.writeFileSync(path.join(dir, f.filename), Buffer.from(f.data, 'base64'));
+                // 目录里已有同名文件(含本次已写入)时自动加号
+                const dest = freeFilePath(dir, f.filename, written);
+                fs.writeFileSync(dest, Buffer.from(f.data, 'base64'));
+                written.add(path.basename(dest));
                 ok++;
             } catch (e) { fail++; }
         }

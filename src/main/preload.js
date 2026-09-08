@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('qingframe', {
     openImage: () => ipcRenderer.invoke('open-image'),
+    openImages: () => ipcRenderer.invoke('open-images'),
     listPresets: () => ipcRenderer.invoke('list-presets'),
     loadPreset: (name) => ipcRenderer.invoke('load-preset', name),
     saveImage: (data, filename) => ipcRenderer.invoke('save-image-base64', { data, filename }),
