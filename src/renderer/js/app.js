@@ -151,7 +151,7 @@ window.App = {
                     canvas.style.cursor = 'move';
                     return;
                 }
-                this.clearActivePuzzleSlot();
+                // 背景板/分割间隙:保持当前图片选择不取消,继续走右侧命中/画布平移
             }
             const pt = this.screenToCanvas(e);
             const el = this.pickElement(pt);
@@ -2446,7 +2446,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             pick.innerHTML = '';
             const noneOpt = document.createElement('option');
             noneOpt.value = '';
-            noneOpt.textContent = '不选中（点格子选中/点空白取消）';
+            noneOpt.textContent = '不选中';
             pick.appendChild(noneOpt);
             const mark = (bound) => bound ? '● ' : '';
             for (let i = 0; i < n; i++) {
@@ -2518,12 +2518,13 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         let cap = null;
         if (isGap) cap = (pk.gapCaptions && pk.gapCaptions[key]) || null;
         else if (key) { const idx = parseInt(key.substring(1), 10); cap = (pk.captions && pk.captions[idx]) || null; }
-        // 记录正在编辑的门牌号(与选中的项绑定)
-        this._editingGap = key ? key.toUpperCase() : null;
+        // 记录正在编辑的门牌号:仅当该位置已绑定字幕(或刚通过「添加/编辑字幕」显式新建)时打开编辑器,
+        // 仅在下拉里选择空位置不弹出空编辑器,避免误以为是添加字幕入口
+        this._editingGap = key && cap ? key.toUpperCase() : null;
         const lblEdit = $('lblEditingCap');
         if (lblEdit) {
             const nLabel = isGap ? (key.charAt(0) === 'h' ? '横间隙 ' : '竖间隙 ') : (/^s\d+$/.test(key) ? '格子 ' : '');
-            lblEdit.textContent = this._editingGap ? `正在编辑：${nLabel}${this._editingGap}${cap ? '' : '（未绑定，输入即新建）'}` : '';
+            lblEdit.textContent = this._editingGap ? `正在编辑：${nLabel}${this._editingGap}` : '';
         }
         const cbV = $('cbCapVertical');
         if (cbV) { cbV.disabled = !isGap; cbV.checked = !!(isGap && cap && cap.direction === 'vertical'); }
@@ -2902,19 +2903,6 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         this.refreshPuzzleUI();
         this.scheduleRender();
         this.setStatus(`已选中槽位 ${i + 1}`);
-    },
-
-    // 点击拼图以外画布 → 取消拼图内图片选取(清除选中高亮/槽位编辑态)
-    clearActivePuzzleSlot() {
-        if (this._activePuzzleSlot == null && this._puzzleSlot == null) return;
-        const oldKey = this._puzzleSlot;
-        if (typeof oldKey === 'string' && oldKey.charAt(0) === 's') this.captureCaptionToModel(oldKey);
-        else if (typeof oldKey === 'string' && /^[vh]\d+$/.test(oldKey)) this.captureGapCaptionToModel(oldKey);
-        this._puzzleSlot = null;
-        this._activePuzzleSlot = null;
-        this.refreshPuzzleUI();
-        this.scheduleRender();
-        this.setStatus('已取消选中拼图格');
     },
 
     // 胶片条照片→当前选中槽(拼图模式下 buildThumbnails 点击调用)
