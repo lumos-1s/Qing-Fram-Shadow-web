@@ -582,13 +582,13 @@
                             <div class="param-row">
                                 <label>选择</label>
                                 <select id="cbPuzzleGapPick" class="ctl-sel"></select>
-                                <button class="mini-btn" id="btnEditGapCaption">编辑</button>
-                                <button class="mini-btn danger" id="btnDeleteGapCaption">删除</button>
+                                <button class="mini-btn" id="btnEditGapCaption">添加/编辑字幕</button>
+                                <button class="mini-btn danger" id="btnDeleteGapCaption">删除字幕</button>
                             </div>
                         </div>
 
                         <div class="param-group" id="vbCaptionEditor" style="display:none">
-                            <div class="pg-title">字幕条编辑器</div>
+                            <div class="pg-title">字幕条编辑器<span id="lblEditingCap" class="pval"></span></div>
                             <div class="param-row"><label>第一行</label><input type="text" id="tfCapLine1" class="ctl-tx" placeholder="主标题" /></div>
                             <div class="param-row"><label>字号</label><input type="range" id="slCapSize1" class="ctl-rng" min="8" max="200" value="28" /><span class="pval" id="lblCapSize1"></span></div>
                             <div class="param-row"><label>字体</label><select id="cbCapFont1" class="ctl-sel"></select></div>
@@ -606,7 +606,7 @@
                                 <input type="checkbox" id="cbCapVertical" class="ctl-chk" />
                                 <span class="chk-hint">仅间隙字幕可用</span>
                             </div>
-                            <div class="param-row"><label>行距</label><input type="range" id="slCapSpacing" class="ctl-rng" min="0" max="300" value="60" /><span class="pval" id="lblCapSpacing"></span></div>
+                            <div class="param-row"><label>间距</label><input type="range" id="slCapSpacing" class="ctl-rng" min="0" max="300" value="0" /><span class="pval" id="lblCapSpacing"></span></div>
                             <button class="mini-btn danger" id="btnClearCapSlot">清空字幕</button>
                         </div>
 

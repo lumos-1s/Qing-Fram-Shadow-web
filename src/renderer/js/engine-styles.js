@@ -16,8 +16,8 @@
     // ── 工具 ──
     function newCanvas(w, h) {
         const c = document.createElement('canvas');
-        c.width = Math.max(1, Math.round(w));
-        c.height = Math.max(1, Math.round(h));
+        c.width = Number.isFinite(w) ? Math.max(1, Math.round(w)) : 1;
+        c.height = Number.isFinite(h) ? Math.max(1, Math.round(h)) : 1;
         return c;
     }
 
@@ -59,8 +59,10 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ── 图像主色(原版 extractDominantColors,16bin)──
     function smallImage(img, maxEdge) {
-        const sw = Math.min(maxEdge, img.naturalWidth);
-        const sh = Math.max(1, Math.round(sw * img.naturalHeight / img.naturalWidth));
+        const iw = Math.max(1, img.naturalWidth || 1);
+        const ih = Math.max(1, img.naturalHeight || 1);
+        const sw = Math.min(maxEdge, iw);
+        const sh = Math.max(1, Math.round(sw * ih / iw));
         const c = newCanvas(sw, sh);
         const g = c.getContext('2d');
         g.imageSmoothingEnabled = true;
@@ -556,11 +558,28 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         return Math.max(2, Math.min(800, Math.round(paramFs * k)));
     }
     function scaledBlurRadius(blurIntensity) { return Math.max(6, Math.round((50 + blurIntensity / 2.0) * 1.0)); }
-    function createBlurBacking(img, blurMargin, blurIntensity) {
-        const key = imgKey(img) + ':' + blurMargin + ':' + blurIntensity;
+    // 模糊留白带:上/左/右/下的解析度统一,由"模糊半径"兜底,边框粗细不超过图片短边的 7%,避免大边框预设把照片框出大片空白
+    function blurBand(size, iw, ih, intensity) {
+        const blurRadius = scaledBlurRadius(intensity);
+        const rim = Math.min(Math.max(scaledPx(50), Math.floor(size / 2)), Math.round(Math.min(iw, ih) * 0.07));
+        return Math.max(blurRadius, rim);
+    }
+    // 参数文字字号:由照片宽度驱动(跟随 paramFs 滑块),不受模糊带高度压缩,保证清晰可读
+    function blurExifSz(iw, ih, paramFs) {
+        return Math.max(20, Math.min(autoExifSize(paramFs, iw), Math.round(Math.min(iw, ih) * 0.06)));
+    }
+    // 底部参数带:至少能放下 型号行+参数行,其余三边仍用紧凑的模糊带
+    function blurBottom(size, iw, ih, S) {
+        const side = blurBand(size, iw, ih, S.blurIntensity);
+        const exifSz = blurExifSz(iw, ih, S.paramFs);
+        const blockH = (S.paramType === 0 ? (exifSz + scaledPx(4)) + scaledPx(6) + exifSz : exifSz);
+        return Math.max(side, Math.round(blockH + scaledPx(24)));
+    }
+    function createBlurBacking(img, marginLr, marginTop, marginBottom, blurIntensity) {
+        const key = imgKey(img) + ':' + marginLr + ':' + marginTop + ':' + marginBottom + ':' + blurIntensity;
         const hit = getBlurBacking(key);
         if (hit) return hit;
-        const bw = img.naturalWidth + blurMargin * 2, bh = img.naturalHeight + blurMargin + blurMargin;
+        const bw = img.naturalWidth + marginLr * 2, bh = img.naturalHeight + marginTop + marginBottom;
         const temp = newCanvas(bw, bh);
         const tg = temp.getContext('2d');
         tg.imageSmoothingEnabled = true;
@@ -585,18 +604,22 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = rad;
         g.fillRect(0, 0, backing.width, backing.height);
     }
-    function drawMainPhoto(g, img, cx, cy, arc) {
+    function drawMainPhoto(g, img, cx, cy, arc, scale, offX, offY) {
         const iw = img.naturalWidth, ih = img.naturalHeight;
+        const sc = scale || 1;
+        const dw = iw * sc, dh = ih * sc;
+        const dx = cx + (iw - dw) / 2 + (offX || 0);
+        const dy = cy + (ih - dh) / 2 + (offY || 0);
         g.save();
-        roundRectPath(g, cx, cy, iw, ih, Math.max(1, arc));
+        roundRectPath(g, dx, dy, dw, dh, Math.max(1, arc * sc));
         g.clip();
-        g.drawImage(img, cx, cy);
+        g.drawImage(img, dx, dy, dw, dh);
         for (const [wd, al] of [[Math.max(1, scaledPx(2)), 28], [Math.max(1, scaledPx(5)), 16], [Math.max(1, scaledPx(8)), 8]]) {
             g.strokeStyle = 'rgba(120,120,120,' + (al / 255).toFixed(3) + ')';
             g.lineWidth = wd;
             g.beginPath();
-            if (g.roundRect) { g.roundRect(cx + wd / 2, cy + wd / 2, Math.max(0, iw - wd), Math.max(0, ih - wd), Math.max(1, arc - wd / 2), Math.max(1, arc - wd / 2)); }
-            else { g.rect(cx + wd / 2, cy + wd / 2, Math.max(0, iw - wd), Math.max(0, ih - wd)); }
+            if (g.roundRect) { g.roundRect(dx + wd / 2, dy + wd / 2, Math.max(0, dw - wd), Math.max(0, dh - wd), Math.max(1, arc * sc - wd / 2), Math.max(1, arc * sc - wd / 2)); }
+            else { g.rect(dx + wd / 2, dy + wd / 2, Math.max(0, dw - wd), Math.max(0, dh - wd)); }
             g.stroke();
         }
         g.restore();
@@ -690,31 +713,29 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     // ── 阶段二:文本类风格(原版 addXxx 逐行移植)──
     const cx2 = (w, tw) => (w - tw) / 2;
     function styleBlurClassic(img, size, g, iw, ih, S) {
-        const blurRadius = scaledBlurRadius(S.blurIntensity);
-        const blurMargin = Math.max(Math.max(scaledPx(50), Math.floor(size / 2)), blurRadius);
-        styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurMargin, false);
+        const side = blurBand(size, iw, ih, S.blurIntensity);
+        const bottom = blurBottom(size, iw, ih, S);
+        styleBlurCommon(img, size, g, iw, ih, S, side, bottom, false);
     }
     function styleBlurDate(img, size, g, iw, ih, S) {
-        const blurRadius = scaledBlurRadius(S.blurIntensity);
-        const blurMargin = Math.max(Math.max(scaledPx(50), Math.floor(size / 2)), blurRadius);
-        styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurMargin, true);
+        const side = blurBand(size, iw, ih, S.blurIntensity);
+        const bottom = blurBottom(size, iw, ih, S);
+        styleBlurCommon(img, size, g, iw, ih, S, side, bottom, true);
     }
     function styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurBottom, dateLayout) {
-        const backing = createBlurBacking(img, blurMargin, S.blurIntensity);
+        const backing = createBlurBacking(img, blurMargin, blurMargin, blurBottom, S.blurIntensity);
         const cx = blurMargin, cy = blurMargin, cw = backing.width, ch = backing.height;
         drawBlurBackground(g, backing, img, cx, cy, blurMargin);
         const photoCr = Math.min(S.cornerAll, Math.min(iw, ih) / 2);
-        drawMainPhoto(g, img, cx, cy, photoCr);
+        drawMainPhoto(g, img, cx, cy, photoCr, S.imgScale, S.imgOffsetX, S.imgOffsetY);
 
         if (!S.useExif) return;
         const topY = cy + ih;
         const maskH = ch - topY;
         const centerY = topY + Math.floor(maskH / 2);
         const showModel = S.paramType === 0;
-        // 原版:字号受照片下方模糊带高度约束,fitSz 随滑块线性缩放(非固定钳制),保证模型行+参数行完整露出
-        const fitBase = Math.max(8, Math.round((maskH - scaledPx(8)) / 4 + 20));
-        const fitSz = Math.max(6, Math.round(fitBase * (S.paramFs / 100)));
-        const exifSz = Math.min(autoExifSize(S.paramFs, iw), fitSz);
+        // 原版:字号由照片宽度驱动(blurExifSz),底部参数带高度为其留出空间,两行完整露出且清晰
+        const exifSz = blurExifSz(iw, ih, S.paramFs);
         const modelSz = exifSz + scaledPx(4);
         const paramSz = exifSz;
 
@@ -1086,12 +1107,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function extractMultipleDominant(img, n) {
         const key = imgKey(img) + ':multi:' + n;
         if (_multiCache[key]) return _multiCache[key].slice();
-        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const iw = Math.max(1, img.naturalWidth || 1), ih = Math.max(1, img.naturalHeight || 1);
         const sw = Math.min(48, iw);
         const sh = Math.max(1, Math.floor(sw * ih / iw));
-        const small = smallImageCached(img, 48).c;
-        const sg = small.getContext('2d');
-        sg.imageSmoothingEnabled = true; sg.drawImage(img, 0, 0, sw, sh);
+        // smallImageCached 已按最小边 48 绘制缩略图,直接取数据,不必重复 drawImage
+        const sg = smallImageCached(img, 48).g;
         const { data } = sg.getImageData(0, 0, sw, sh);
         const bins = 12;
         const map = {};
@@ -1262,6 +1282,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             position: positionOf(t.paramPosition),
             useExif: true,
             cornerAll: cc.cornerRadiusAll != null ? cc.cornerRadiusAll : 30,
+            imgScale: (t.baseMargin && (t.baseMargin.imgScale || 1)) || 1,
+            imgOffsetX: (t.baseMargin && t.baseMargin.imgOffsetX) || 0,
+            imgOffsetY: (t.baseMargin && t.baseMargin.imgOffsetY) || 0,
             shadowSize: clampP(t.shadowSize != null ? t.shadowSize : 0, 0, 80),
             shadowDepth: clampP(t.shadowDepth != null ? t.shadowDepth : 30, 0, 100),
             shadowAlpha: 80,
@@ -1483,9 +1506,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'BLUR_CLASSIC':
             case 'BLUR_DATE': {
-                const blurRadius = Math.max(6, Math.round((50 + (S ? S.blurIntensity : 50) / 2.0)));
-                const blurMargin = Math.max(Math.max(50, Math.floor(size / 2)), blurRadius);
-                return { w: iw + blurMargin * 2, h: ih + blurMargin * 2 };
+                const side = blurBand(size, iw, ih, (S ? S.blurIntensity : 50));
+                const bottom = S ? blurBottom(size, iw, ih, S) : side;
+                return { w: iw + side * 2, h: ih + side + bottom };
             }
             case 'WM_CLASSIC': {
                 const barH = Math.max(50, size);
@@ -1586,6 +1609,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             const scale = Math.min(1, displayMax / Math.max(iw, ih));
             canvas.width = Math.max(1, Math.round(iw * scale));
             canvas.height = Math.max(1, Math.round(ih * scale));
+            canvas._logW = canvas.width;
+            canvas._logH = canvas.height;
             const g = canvas.getContext('2d');
             g.setTransform(1, 0, 0, 1, 0, 0);
             g.clearRect(0, 0, canvas.width, canvas.height);
@@ -1653,6 +1678,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             const finalScale = Math.min(1, displayMax / Math.max(out.width, out.height));
             canvas.width = Math.max(1, Math.round(out.width * finalScale));
             canvas.height = Math.max(1, Math.round(out.height * finalScale));
+            canvas._logW = canvas.width;
+            canvas._logH = canvas.height;
             const g = canvas.getContext('2d');
             g.setTransform(1, 0, 0, 1, 0, 0);
             g.clearRect(0, 0, canvas.width, canvas.height);
@@ -1668,6 +1695,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             const scale = Math.min(1, displayMax / Math.max(iw, ih));
             canvas.width = Math.max(1, Math.round(iw * scale));
             canvas.height = Math.max(1, Math.round(ih * scale));
+            canvas._logW = canvas.width;
+            canvas._logH = canvas.height;
             const g = canvas.getContext('2d');
             g.setTransform(1, 0, 0, 1, 0, 0);
             g.clearRect(0, 0, canvas.width, canvas.height);

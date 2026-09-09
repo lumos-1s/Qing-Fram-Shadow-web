@@ -136,7 +136,6 @@ body {
 #btnTheme .ico-sun { display: none; }
 html.dark #btnTheme .ico-sun { display: inline-flex; }
 html.dark #btnTheme .ico-moon { display: none; }
-.tbtn.icon { font-size: 12px; }
 .tbtn.warn:hover { background: rgba(217,154,62,.14); color: var(--amber); }
 .tbtn.primary {
     background: var(--primary-grad);
@@ -470,30 +469,6 @@ input[type=color]::-webkit-color-swatch {
     border: 1px solid var(--border-strong); border-radius: 8px;
 }
 
-/* ── Logo 库 ── */
-.logo-hint { font-size: 11px; color: var(--text-3); padding: 4px 6px 8px; }
-.logo-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    padding: 8px;
-}
-.logo-cell {
-    aspect-ratio: 1; background: var(--surface-alt);
-    border: 1px solid var(--border); border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    padding: 8px; cursor: pointer;
-    transition: all .15s;
-}
-.logo-cell:hover { border-color: var(--primary); transform: scale(1.04); box-shadow: 0 4px 12px var(--primary-soft); }
-.logo-cell img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.logo-manage {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 8px; margin: 4px 0;
-    background: var(--surface-alt); border-radius: 10px;
-}
-.logo-manage img { width: 28px; height: 28px; object-fit: contain; flex: 0 0 auto; }
-.logo-manage span { flex: 1; font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.logo-manage input[type=range] { width: 52px; }
-
 /* ── 通用小按钮 ── */
 .mini-btn {
     border: 1px solid var(--border-strong); background: var(--surface);
@@ -509,7 +484,6 @@ input[type=color]::-webkit-color-swatch {
 }
 html.dark .mini-btn.primary { color: #0c1914; }
 .mini-btn.block { display: block; width: 100%; margin-top: 6px; }
-.tpl-btns { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 8px; }
 .hint-box {
     font-size: 11px; color: var(--text-3); line-height: 1.6;
     background: var(--surface-alt); border: 1px dashed var(--border-strong);

@@ -109,9 +109,15 @@ function renderToCanvas(app, compare) {
 function setupCanvas(app, canvasW, canvasH) {
     const canvas = app.dom.canvas;
     const displayMax = (typeof app.displayMax === 'number' && app.displayMax > 0) ? app.displayMax : 1800;
-    const scale = Math.min(1, displayMax / Math.max(canvasW, canvasH));
+    // 高分屏(Windows 缩放等 DPR>1)下把后备缓冲区按 devicePixelRatio 放大,避免文字/照片被浏览器放大而发虚
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const ui = Math.min(1, displayMax / Math.max(canvasW, canvasH));
+    const scale = ui * dpr;
     canvas.width = Math.max(1, Math.round(canvasW * scale));
     canvas.height = Math.max(1, Math.round(canvasH * scale));
+    // 逻辑显示尺寸(CSS 像素),供 applyZoomStyle 使用(与后备缓冲解耦,不会因 DPR 放得更大)
+    canvas._logW = Math.max(1, Math.round(canvasW * ui));
+    canvas._logH = Math.max(1, Math.round(canvasH * ui));
     const ctx = canvas.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -198,6 +204,7 @@ function drawSingleLayer(ctx, layer, cw, ch, margin) {
     applyFill(ctx, fill, bx, by, bw, bh);
     fillLayerRect(ctx, bx, by, bw, bh, corners);
     ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
 
     const stroke = layer.strokeConfig || {};
     if ((stroke.strokeWidth || 0) > 0) {
@@ -247,7 +254,7 @@ function applyFill(ctx, fill, x, y, w, h) {
     const type = fill.fillType || 'solid';
     if (type === 'gradient') { applyGradient(ctx, fill, x, y, w, h); return; }
     if (type === 'transparent') { ctx.fillStyle = 'rgba(0,0,0,0)'; return; }
-    if (type === 'texture' && fill.textureSrc) { fillTexture(ctx, fill, x, y, w, h); return; }
+    if (type === 'texture' && fill.textureSrc && setTextureFill(ctx, fill, x, y, w, h)) return;
     ctx.fillStyle = rgba(parseColor(fill.fillHex, fill.fillOpacity));
 }
 
@@ -278,9 +285,7 @@ function getTexture(name) {
     if (!name) return null;
     if (TEXTURE_CACHE[name] && TEXTURE_CACHE[name].complete && TEXTURE_CACHE[name].naturalWidth > 0) return TEXTURE_CACHE[name];
     if (TEXTURE_CACHE[name]) return null;
-    
-
-const app = (typeof window !== 'undefined' && window.App) ? window.App : null;
+    const app = (typeof window !== 'undefined' && window.App) ? window.App : null;
     const t = app && app.textures ? app.textures.find(x => x.name === name) : null;
     if (!t) return null;
     const im = new Image();
@@ -294,8 +299,8 @@ const app = (typeof window !== 'undefined' && window.App) ? window.App : null;
 function getElementBitmap(src) {
     if (!src) return null;
     if (TEXTURE_CACHE[src] && TEXTURE_CACHE[src].complete && TEXTURE_CACHE[src].naturalWidth > 0) return TEXTURE_CACHE[src];
-    if (TEXTURE_CACHE[src]) return null; // 加载??    
-const app = (typeof window !== 'undefined' && window.App) ? window.App : null;
+    if (TEXTURE_CACHE[src]) return null; // 加载中
+    const app = (typeof window !== 'undefined' && window.App) ? window.App : null;
     let url = src;
     const tex = app && app.textures ? app.textures.find(x => x.name === src) : null;
     if (tex && tex.dataUrl) url = tex.dataUrl;
@@ -312,29 +317,30 @@ function mapBlend(blend) {
     if (blend === 'overlay') return 'overlay';
     return null;
 }
-function fillTexture(ctx, fill, x, y, w, h) {
+// 设置纹理填充画刷到当前 ctx.fillStyle(含缩放/偏移/混合/透明度),返回 true 表示成功。
+// 注意:不在这里 drawImage/fillRect,而是交由 fillLayerRect 做圆角裁剪后再 fill,
+// 这样纹理既能被圆角裁剪,也不会被随后 callLayerRect 的旧 fillStyle 覆盖。
+function setTextureFill(ctx, fill, x, y, w, h) {
     const name = fill.textureSrc;
     const tex = TEXTURE_CACHE[name];
     if (!tex || !tex.complete || !tex.naturalWidth) {
         getTexture(name);
-        ctx.fillStyle = rgba(parseColor(fill.fillHex, fill.fillOpacity));
-        return;
+        return false;
     }
     try {
         const scale = fill.textureScale || 1;
-        // 与原??ImagePattern 一??锚点 (x+offsetX, y+offsetY),纹素尺寸 texW*scale
-        const pat = ctx.createPattern(tex, 'repeat');
-        if (!pat) { ctx.fillStyle = rgba(parseColor(fill.fillHex, fill.fillOpacity)); return; }
-        pat.setTransform(new DOMMatrix().translate(x + (fill.textureOffsetX || 0), y + (fill.textureOffsetY || 0)).scale(scale));
+        const pattern = ctx.createPattern(tex, 'repeat');
+        if (!pattern) return false;
+        pattern.setTransform(new DOMMatrix()
+            .translate(x + (fill.textureOffsetX || 0), y + (fill.textureOffsetY || 0))
+            .scale(scale));
         const blend = mapBlend(fill.textureBlend);
-        ctx.save();
-        ctx.globalAlpha = clamp((fill.textureOpacity == null ? 100 : fill.textureOpacity) / 100, 0, 1);
         if (blend) ctx.globalCompositeOperation = blend;
-        ctx.fillStyle = pat;
-        ctx.fillRect(x, y, w, h);
-        ctx.restore();
+        ctx.globalAlpha = clamp((fill.textureOpacity == null ? 100 : fill.textureOpacity) / 100, 0, 1);
+        ctx.fillStyle = pattern;
+        return true;
     } catch (e) {
-        ctx.fillStyle = rgba(parseColor(fill.fillHex, fill.fillOpacity));
+        return false;
     }
 }
 
@@ -787,11 +793,11 @@ function renderCardStyle(app) {
     const prBL = (corner.cornerRadiusBL || 0) > 0 ? Math.min(corner.cornerRadiusBL, cardH / 2) : cr;
     const prBR = (corner.cornerRadiusBR || 0) > 0 ? Math.min(corner.cornerRadiusBR, cardH / 2) : cr;
 
-    const imgScale = Math.min(cardW0 / originW, cardH / originH);
+    const imgScale = Math.min(cardW0 / originW, cardH / originH) * (margin.imgScale || 1);
     const drawW = originW * imgScale;
     const drawH = originH * imgScale;
-    const drawX = cardX + (cardW0 - drawW) / 2;
-    const drawY = cardY + (cardH - drawH) / 2;
+    const drawX = cardX + (cardW0 - drawW) / 2 + (margin.imgOffsetX || 0);
+    const drawY = cardY + (cardH - drawH) / 2 + (margin.imgOffsetY || 0);
 
     // 阴影参数:优先图层启用的阴??否则默认柔和阴影
     let cardShadow = null;
@@ -965,7 +971,7 @@ function puzzleLayoutSize(layout, S, gap) {
         case 'v4': return [S, 4 * S + 3 * gap];
         case 'grid6': return [3 * S + 2 * gap, 2 * S + gap];
         case 'grid9': return [3 * S + 2 * gap, 3 * S + 2 * gap];
-        default: return [S, S];
+default: return [S, S];
     }
 }
 
@@ -1004,7 +1010,8 @@ function clampPuzzleAxes(layoutType, axes) {
     const out = { v: [], h: [] };
     for (const dim of ['v', 'h']) {
         const list = (axes && axes[dim]) || def[dim] || [];
-        const vals = list.slice().map(x => clamp(x == null ? (def[dim]||[])[list.indexOf(x)] : x, 0.12, 0.88)).sort((a, b) => a - b);
+        const defs = def[dim] || [];
+        const vals = list.slice().map((x, i) => clamp(x == null ? (defs[i] != null ? defs[i] : 0.5) : x, 0.12, 0.88)).sort((a, b) => a - b);
         if (vals.length > 1) {
             for (let i = 1; i < vals.length; i++) {
                 if (vals[i] - vals[i - 1] < 0.12) { vals[i] = Math.min(0.88, vals[i - 1] + 0.12); }
@@ -1079,49 +1086,69 @@ function puzzleFit(r, iw, ih, mode, zoomPct, offX, offY) {
     return { dx, dy, dw, dh };
 }
 
-// 槽位下方电影字幕??
-function drawPuzzleCaption(ctx, cap, r) {
-    if (!cap || (!cap.line1 && !cap.line2)) return;
-    const size1 = Math.max(6, cap.size1 || 28), size2 = Math.max(6, cap.size2 || 20);
+// 拼图字幕(横排):文本块(一行或两行)整体在条带内垂直居中,字号按 4000 长边基准缩放,
+// 过高/超宽会自动等比缩小;align='bottom' 用于格子画面字幕(叠印在图片底部)
+function drawPuzzleCaption(ctx, cap, r, align, fs) {
+    if (!cap || (!cap.line1 && !cap.line2) || !r || r.h < 1) return;
+    const F = (fs == null ? 1 : fs);
+    const base1 = Math.max(6, (cap.size1 || 28) * F), base2 = Math.max(6, (cap.size2 || 20) * F);
     const c = parseColor(cap.color || 'ffffff', 100);
-    const lead1 = Math.round(size1 * 1.15);
-    const spacing = ((cap.spacing == null ? 60 : cap.spacing) / 100) * size1;
-    const barH = lead1 + Math.max(size1, size2) * 0.35 + spacing + size2;
-    const barY = Math.max(r.y, r.y + r.h - barH);
+    const spPct = (cap.spacing == null ? 0 : cap.spacing) / 100;
+    let s1 = base1, s2 = base2;
+    // 高度自适应(双行整块 / 单行行高)
+    if (cap.line2) {
+        const rawH = Math.round(s1 * 1.15) + spPct * s1 + s2;
+        if (rawH > r.h) { const sc = Math.max(0.3, r.h / rawH); s1 = Math.max(6, s1 * sc); s2 = Math.max(6, s2 * sc); }
+    } else if (Math.round(s1 * 1.15) > r.h) { s1 = Math.max(6, r.h / 1.15); }
+    // 宽度自适应(测宽,超宽等比缩)
+    ctx.font = `${s1}px "${cap.font1 || 'Microsoft YaHei'}"`;
+    const w1 = cap.line1 ? ctx.measureText(cap.line1).width : 0;
+    ctx.font = `${s2}px "${cap.font2 || 'Microsoft YaHei'}"`;
+    const w2 = cap.line2 ? ctx.measureText(cap.line2).width : 0;
+    const mw = Math.max(w1, w2);
+    if (mw > r.w && r.w > 0) { const sc = Math.max(0.2, r.w / mw); s1 = Math.max(6, s1 * sc); s2 = Math.max(6, s2 * sc); }
+    const lead1 = Math.round(s1 * 1.15);
+    const spacing = cap.line2 ? Math.round(s1 * spPct) : 0;
+    const blockH = cap.line2 ? lead1 + spacing + s2 : lead1;
+    const top = (align === 'bottom') ? Math.max(r.y, r.y + r.h - blockH) : Math.max(r.y, r.y + (r.h - blockH) / 2);
     if (cap.bgBar === 1) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(r.x, barY, r.w, Math.min(barH, r.h));
+        ctx.fillRect(r.x, top, r.w, Math.min(blockH, r.h));
     }
     ctx.fillStyle = rgba(c);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     if (cap.line1) {
-        ctx.font = `${size1}px "${cap.font1 || 'Microsoft YaHei'}"`;
-        ctx.fillText(cap.line1, r.x + r.w / 2, barY + lead1);
+        ctx.font = `${s1}px "${cap.font1 || 'Microsoft YaHei'}"`;
+        const baseline = cap.line2 ? top + lead1 : (align === 'bottom' ? top + Math.round(s1 * 0.9) : r.y + r.h / 2 + Math.round(s1 * 0.36));
+        ctx.fillText(cap.line1, r.x + r.w / 2, baseline);
     }
     if (cap.line2) {
-        ctx.font = `${size2}px "${cap.font2 || 'Microsoft YaHei'}"`;
-        ctx.fillText(cap.line2, r.x + r.w / 2, Math.min(r.y + r.h - 4, barY + lead1 + spacing + size2));
+        ctx.font = `${s2}px "${cap.font2 || 'Microsoft YaHei'}"`;
+        ctx.fillText(cap.line2, r.x + r.w / 2, Math.min(r.y + r.h - 2, top + lead1 + spacing + s2));
     }
 }
 
-// 竖直字幕(沿 y 逐字排,x 方向在字幕条宽度内包裹)
-function drawVerticalPuzzleCaption(ctx, cap, x, y0, y1, maxH) {
+// 竖直间隙字幕:字符列水平居中于缝隙,字形宽度受缝隙厚度与 4000 长边基准限制,列整体垂直居中
+function drawVerticalPuzzleCaption(ctx, cap, x, y0, y1, gw, fs) {
     if (!cap || !cap.line1) return;
     const t = String(cap.line1);
-    const baseSize = cap.size1 || 28;
-    const size = Math.max(8, Math.min(baseSize, maxH / Math.max(1, t.length)));
+    const maxCharW = Math.max(1, gw * 0.9);
+    const baseSize = (cap.size1 || 28) * (fs == null ? 1 : fs);
+    const size = Math.max(6, Math.min(baseSize, maxCharW / 1.4));
     const c = parseColor(cap.color || 'ffffff', 100);
-    const w = size * 1.4;
+    const w = Math.min(size * 1.4, gw - 1);
+    const step = size * 1.3;
+    const totalH = t.length * step;
+    const yTop = y0 + Math.max(0, (y1 - y0 - totalH) / 2);
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(x - w / 2, y0, w, Math.max(0, y1 - y0));
+    ctx.fillRect(x - w / 2, yTop, w, Math.min(totalH, y1 - yTop));
     ctx.fillStyle = rgba(c);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.font = `${size}px "${cap.font1 || 'Microsoft YaHei'}"`;
-    const step = size * 1.3;
     for (let i = 0; i < t.length; i++) {
-        const cy = y0 + i * step;
+        const cy = yTop + i * step;
         if (cy > y1 - size) break;
         ctx.fillText(t[i], x, cy);
     }
@@ -1156,8 +1183,29 @@ function renderPuzzle(app, compare, noSelection) {
     const ctx = setupCanvas(app, W, H);
 
     const axes = clampPuzzleAxes(layout, pk.axisVals);
-    const slots0 = buildPuzzleSlots(layout, axes);
+    let slots0 = buildPuzzleSlots(layout, axes);
     const Wn = W || 1, Hn = H || 1;
+    const border = parseColor(pk.borderColor || 'ffffff', 100);
+    const b = Math.max(1, Math.round(Wn * 0.003));
+    const px = (x) => x * Wn, py = (y) => y * Hn, pw = (w) => w * Wn, ph = (h) => h * Hn;
+    const scaler = Math.min(Wn, Hn) / 1000;
+    // 格子间距统一只有一种来源:图片每侧内缩 gapPx;贴边格子的外边再内进 gapPx,
+    // 于是内部缝隙 = 2*gapPx = 四周留白 = 字幕条带厚度(gth),格子间距处处一致。
+    const gapG = Math.max(0, Math.round(((pk.gap == null ? 6 : pk.gap) / 100) * 1000));
+    const gapPx = Math.max(0, (pk.gap == null ? 6 : pk.gap) * scaler * 0.5);
+    const shift = gapPx;
+    const shiftX = shift / Wn, shiftY = shift / Hn;
+    const EPS = 1e-6;
+    slots0 = slots0.map(r => {
+        let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3], ch = false;
+        if (x0 <= EPS) { x0 += shiftX; ch = true; }
+        if (x1 >= 1 - EPS) { x1 -= shiftX; ch = true; }
+        if (y0 <= EPS) { y0 += shiftY; ch = true; }
+        if (y1 >= 1 - EPS) { y1 -= shiftY; ch = true; }
+        return ch ? [x0, y0, x1 - x0, y1 - y0] : r;
+    });
+    // 字幕字号存储为相对 4000 长边的像素基准值,按实际画布等比缩放
+    const capFs = Math.max(Wn, Hn) / 4000;
 
     if (pk.bgMode === 1 && used[0]) {
         drawDetailBlurBackground(ctx, used, slots0, Wn, Hn);
@@ -1165,12 +1213,6 @@ function renderPuzzle(app, compare, noSelection) {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, Wn, Hn);
     }
-
-    const border = parseColor(pk.borderColor || 'ffffff', 100);
-    const b = Math.max(1, Math.round(Wn * 0.003));
-    const px = (x) => x * Wn, py = (y) => y * Hn, pw = (w) => w * Wn, ph = (h) => h * Hn;
-    const scaler = Math.min(Wn, Hn) / 1000;
-    const gapPx = Math.max(0, (pk.gap == null ? 6 : pk.gap) * scaler * 0.5);
 
     if (pk.bgMode === 1 && used[0]) {
         // 模糊照片底:边框只框住每张图显示区域,背景从缝隙中透出
@@ -1189,6 +1231,14 @@ function renderPuzzle(app, compare, noSelection) {
 
     const rectPx = slots0.map(r => [px(r[0]), py(r[1]), pw(r[2]), ph(r[3])]);
 
+    // 间隙字幕:行内全宽通栏带;h 间隙按"行"计数(行数 = 横轴数 + 1,最后一条为底部字幕带),v 间隙按竖轴
+    const gcs = pk.gapCaptions;
+    const gth = Math.max(2, gapPx * 2);
+    const hAxRow = axes.h || [], vAxRow = axes.v || [];
+    const rowsN = hAxRow.length + 1;
+    const bbCap = gcs && gcs['h' + (rowsN - 1)];
+    const hasBottomCap = !!(bbCap && (bbCap.line1 || bbCap.line2));
+
     rectPx.forEach((r, i) => {
         const sc = slots[i] || {};
         const im = used[i] || null;
@@ -1200,7 +1250,10 @@ function renderPuzzle(app, compare, noSelection) {
         }
         ctx.save();
         ctx.beginPath();
-        const cx = rx + gapPx, cy = ry + gapPx, cw = Math.max(1, rw - gapPx * 2), chh = Math.max(1, rh - gapPx * 2);
+        const cx = rx + gapPx, cy = ry + gapPx, cw = Math.max(1, rw - gapPx * 2);
+        // 底部行图片让出等宽字幕带,字幕不叠到图上
+        let chh = Math.max(1, rh - gapPx * 2);
+        if (hasBottomCap && r[1] + 1e-6 >= (rowsN > 1 ? (hAxRow[rowsN - 2] || 1) : 0)) chh = Math.max(1, chh - gth);
         ctx.rect(cx, cy, cw, chh);
         ctx.clip();
         const fillMode = sc.fillMode || pk.slotFill || 'cover';
@@ -1210,8 +1263,9 @@ function renderPuzzle(app, compare, noSelection) {
         const fit = puzzleFit({ x: cx, y: cy, w: cw, h: chh }, im.el.naturalWidth, im.el.naturalHeight, fillMode, zoom, offX, offY);
         ctx.drawImage(im.el, fit.dx, fit.dy, fit.dw, fit.dh);
         ctx.restore();
-        const cap = (pk.captions && pk.captions[i]) || (sc.caption);
-        if (cap && (cap.line1 || cap.line2)) drawPuzzleCaption(ctx, cap, { x: cx, y: cy, w: cw, h: chh });
+        // 格子画面字幕:叠印在该格图片底部,宽度随格子自适应(门牌号 S<i>)
+        const scap = (pk.captions && pk.captions[i]);
+        if (scap && (scap.line1 || scap.line2)) drawPuzzleCaption(ctx, scap, { x: cx, y: cy, w: cw, h: chh }, 'bottom', capFs);
         // 选中格高亮(画布点击选中的槽位);导出(noSelection)时抑制,避免选中蓝边进入成品图
         if (app._activePuzzleSlot === i && !noSelection) {
             ctx.save();
@@ -1227,7 +1281,6 @@ function renderPuzzle(app, compare, noSelection) {
         }
     });
 
-    const gcs = pk.gapCaptions;
     if (gcs) {
         for (const key in gcs) {
             const cap = gcs[key];
@@ -1235,16 +1288,20 @@ function renderPuzzle(app, compare, noSelection) {
             const m = /^([vh])(\d+)$/.exec(key);
             if (!m) continue;
             const dim = m[1], idx = parseInt(m[2], 10);
-            const axList = axes[dim] || [];
-            const pos = axList[idx];
-            if (pos == null) continue;
-            if (dim === 'h' && cap.direction !== 'vertical') {
-                const bw = Wn, bhX = Math.max(1, Math.round(Hn * 0.18));
-                let by = py(pos) - bhX / 2;
-                by = Math.max(0, Math.min(Hn - bhX, by));
-                drawPuzzleCaption(ctx, cap, { x: 0, y: by, w: bw, h: bhX });
-            } else if (dim === 'v' || cap.direction === 'vertical') {
-                drawVerticalPuzzleCaption(ctx, cap, px(pos), 0, Hn, Hn);
+            if (dim === 'h') {
+                if (idx >= rowsN) continue;
+                let by;
+                if (idx === rowsN - 1) by = Math.max(0, Hn - gth); // 底部字幕带
+                else {
+                    const pos = hAxRow[idx];
+                    if (pos == null) continue;
+                    by = Math.max(0, Math.min(Hn - gth, py(pos) - gth / 2)); // 行间通栏带:以轴线居中
+                }
+                drawPuzzleCaption(ctx, cap, { x: 0, y: by, w: Wn, h: gth }, null, capFs);
+            } else {
+                const pos = vAxRow[idx];
+                if (pos == null) continue;
+                drawVerticalPuzzleCaption(ctx, cap, px(pos), 0, Hn, gth, capFs);
             }
         }
     }
@@ -1278,6 +1335,7 @@ function renderPuzzle(app, compare, noSelection) {
     }
 
     ctx.restore();
+    if (typeof window !== 'undefined') window.__lastPuzzleGeom = { Wn, Hn, shift, gapPx, gapG, layout, axes };
     app.applyZoomStyle();
 }
 

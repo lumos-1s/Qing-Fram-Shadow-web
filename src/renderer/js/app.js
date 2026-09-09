@@ -23,13 +23,18 @@ window.App = {
     logos: [],
     logoImgCache: {},
     textures: [],
-    curatedFonts: ['Microsoft YaHei', 'SimSun', 'SimHei', 'KaiTi', 'FangSong', 'Arial', 'Arial Black', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Segoe UI', 'PingFang SC'],
+    curatedFonts: ['Microsoft YaHei', 'SimSun', 'SimHei', 'KaiTi', 'FangSong', 'Arial', 'Arial Black', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Segoe UI', 'PingFang SC',
+        // 中文艺术字/印章体
+        '华文彩云', '华文琥珀', '华文行楷', '华文新魏', '幼圆', '隶书', '方正舒体', '方正姚体', '方正报宋', '汉仪雪峰体', '汉仪旗黑',
+        // 西文艺术字
+        'Segoe Script', 'Brush Script MT', 'Comic Sans MS', 'Impact', 'Papyrus', 'Ravie', 'Gigi', 'Chiller', 'Edwardian Script ITC', 'Monotype Corsiva', 'Snap ITC', 'Lucida Handwriting', 'Trebuchet MS', 'Copperplate Gothic Bold', 'Book Antiqua', 'Informal Roman', 'Bodoni MT'],
     _lastTplName: '',
     _firstRenderDone: false,
     selectedEls: [],      // 画布元素选中集(引用自模板数组)
     _elClip: null,        // 复制的元素快照 {kind, el}
     _draftPending: false,
     _puzzleSlot: 's0',       // 拼图当前编辑项('s0'..槽位 / 'v0'/'h0'..间隙)
+    _editingGap: null,       // 正在编辑的字幕门牌号('H0'/'V1'/'S2'),无则收起编辑器
     _activePuzzleSlot: null, // 画布选中槽位(高亮 + 换图)
     _puzzlePick: null,       // 拖拽抓取预览 {mode:'target'|'float',...}
     _puzzleDropTarget: null, // 拖拽互换预备目标格
@@ -231,7 +236,6 @@ window.App = {
                     this.refreshPuzzleUI();
                     this.saveCurrentTemplate();
                 }
-                if (this._dragPrevMax != null) { this.displayMax = this._dragPrevMax; this._dragPrevMax = null; this.scheduleRender(); }
                 canvas.style.cursor = '';
             }
             if (this._dragEl) {
@@ -282,8 +286,9 @@ window.App = {
     screenToCanvas(e) {
         const canvas = this.dom.canvas;
         const rect = canvas.getBoundingClientRect();
-        const cx = (e.clientX - rect.left) / this.zoom;
-        const cy = (e.clientY - rect.top) / this.zoom;
+        // 与 puzzlePx 一致:用 DOM 渲染尺寸(已含 CSS 缩放/平移)的比例换算到画布像素,避免二次除以 zoom
+        const cx = (rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0) * canvas.width;
+        const cy = (rect.height > 0 ? (e.clientY - rect.top) / rect.height : 0) * canvas.height;
         return { x: cx, y: cy, cw: canvas.width, ch: canvas.height };
     },
 
@@ -1040,15 +1045,26 @@ window.App = {
     },
 
     async applyOrientation(img, orientation) {
-        if (orientation !== 3 && orientation !== 6 && orientation !== 8) return null;
+        if (!orientation || orientation === 1 || orientation === 0) return null;
+        orientation = orientation | 0;
         const W = img.naturalWidth, H = img.naturalHeight;
+        // 旋转类(3/6/8,含镜像的 5/7)需要交换宽高;纯翻转(2/4)保持宽高
+        const swapsWH = (orientation === 6 || orientation === 8 || orientation === 5 || orientation === 7);
         const canvas = document.createElement('canvas');
-        const rotated = (orientation === 6 || orientation === 8);
-        canvas.width = rotated ? H : W;
-        canvas.height = rotated ? W : H;
+        canvas.width = swapsWH ? H : W;
+        canvas.height = swapsWH ? W : H;
         const ctx = canvas.getContext('2d');
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(orientation === 6 ? Math.PI / 2 : orientation === 8 ? -Math.PI / 2 : Math.PI);
+        switch (orientation) {
+            case 2: ctx.scale(-1, 1); break;                  // 水平翻转
+            case 3: ctx.rotate(Math.PI); break;               // 180°
+            case 4: ctx.scale(1, -1); break;                  // 垂直翻转
+            case 5: ctx.rotate(Math.PI / 2); ctx.scale(1, -1); break; // 转置+镜像
+            case 6: ctx.rotate(Math.PI / 2); break;           // 90°
+            case 7: ctx.rotate(-Math.PI / 2); ctx.scale(1, -1); break; // 横转+镜像
+            case 8: ctx.rotate(-Math.PI / 2); break;          // 270°
+            default: return null;
+        }
         ctx.drawImage(img, -W / 2, -H / 2);
         const out = new Image();
         await new Promise(res => { out.onload = res; out.onerror = res; out.src = canvas.toDataURL('image/jpeg', 0.95); });
@@ -1281,12 +1297,14 @@ window.App = {
         this.images.forEach((im, i) => {
             const wrap = document.createElement('div');
             wrap.className = 'thumb-item';
+            wrap.draggable = false;
             const t = document.createElement('img');
             const isSel = this.batchSel.includes(i);
             const cls = ['thumb'];
             if (isSel) cls.push('active');
             if (this.image && this.images.indexOf(this.image) === i) cls.push('main');
             t.className = cls.join(' ');
+            t.draggable = false;
             t.src = im.thumb || im.el.src;
             t.dataset.idx = i;
             t.title = im.name;
@@ -1493,7 +1511,7 @@ window.App = {
         bindBtn('btnAutoColorBorder', () => this.autoColorBorder());
         bindBtn('btnOpenMarket', () => this.setStatus('云市场：WEB 版未接入(可导出/导入 .qfs)'));
         bindBtn('btnLoadPreset', () => this.loadPresetFromList());
-        bindBtn('btnEditGapCaption', () => this.toggleCaptionEditor(true));
+        bindBtn('btnEditGapCaption', () => this.addEditGapCaption());
         bindBtn('btnDeleteGapCaption', () => this.deleteCaption());
         bindBtn('btnClearCapSlot', () => this.clearCaption());
         bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
@@ -1828,7 +1846,11 @@ window.App = {
         const res = await window.qingframe.openImage();
         if (!res || !res.data) { this.setStatus('已取消添加贴纸'); return; }
         const dataUrl = 'data:image/jpeg;base64,' + res.data;
+        // 预加载到缓存,避免后续每次渲染重新解码(保持真实 JPEG MIME,不伪造 PNG 头)
         await new Promise(r => { const im = new Image(); im.onload = r; im.onerror = r; im.src = dataUrl; });
+        if (!this.logoImgCache) this.logoImgCache = {};
+        this.logoImgCache[dataUrl] = new Image();
+        await new Promise(r => { this.logoImgCache[dataUrl].onload = r; this.logoImgCache[dataUrl].onerror = r; this.logoImgCache[dataUrl].src = dataUrl; });
         this.onSettingCommit();
         const decor = this.template.decorConfig || (this.template.decorConfig = {});
         if (!decor.stickers) decor.stickers = [];
@@ -1836,7 +1858,7 @@ window.App = {
         const w = this.image.w || 1000;
         const scale = clampNum((cw * 0.25) / Math.max(1, Math.max(w, 1000)), 0.02, 3);
         decor.stickers.push({
-            src: dataUrl.replace('data:image/jpeg', 'data:image/png'),
+            src: dataUrl,
             x: cw / 2, y: ch / 2, scale, rotation: 0, opacity: 100, z: 20,
         });
         this.selectedEls = [{ kind: 'sticker', obj: decor.stickers[decor.stickers.length - 1] }];
@@ -2085,9 +2107,17 @@ window.App = {
         names.forEach(n => {
             const row = document.createElement('div');
             row.className = 'tpl-row';
-            row.innerHTML = `<span>${n}</span><div><button class="mini-btn" data-load>应用</button><button class="mini-btn danger" data-del>删除</button></div>`;
-            row.querySelector('[data-load]').addEventListener('click', async () => this.loadTemplateByName(n));
-            row.querySelector('[data-del]').addEventListener('click', async () => { await window.qingframe.deleteTemplate(n); this.refreshTemplates(); });
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = n; // 用 textContent,避免恶意名称注入 HTML(XSS)
+            const btnBox = document.createElement('div');
+            const btnLoad = document.createElement('button');
+            btnLoad.className = 'mini-btn'; btnLoad.textContent = '应用';
+            const btnDel = document.createElement('button');
+            btnDel.className = 'mini-btn danger'; btnDel.textContent = '删除';
+            btnBox.appendChild(btnLoad); btnBox.appendChild(btnDel);
+            row.appendChild(nameSpan); row.appendChild(btnBox);
+            btnLoad.addEventListener('click', async () => this.loadTemplateByName(n));
+            btnDel.addEventListener('click', async () => { await window.qingframe.deleteTemplate(n); this.refreshTemplates(); });
             box.appendChild(row);
         });
     },
@@ -2258,6 +2288,7 @@ window.App = {
         pk.enabled = 1;
         this.migratePuzzle();
         this.ensurePuzzleSlotsCount(pk);
+        this.reconcilePuzzleCaptions(pk);
         this.autoFillPuzzleSlots();
         this.saveCurrentTemplate();
         this.switchTab('puzzle');
@@ -2311,6 +2342,28 @@ window.App = {
         }
     },
 
+    // 布局切换巡检字幕:绑定的分割轴在新布局不存在的间隙字幕直接删;格子字幕仅在下标越界时删
+    reconcilePuzzleCaptions(pk) {
+        if (!pk) return;
+        const n = this.puzzleSlotCount(pk.layout || 'single');
+        if (pk.captions) {
+            for (const k in pk.captions) {
+                const idx = parseInt(k, 10);
+                if (!isNaN(idx) && idx >= n) delete pk.captions[k];
+            }
+        }
+        const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout || 'single', pk.axisVals) : { v: [], h: [] };
+        if (pk.gapCaptions) {
+            for (const key in pk.gapCaptions) {
+                const m = /^([vh])(\d+)$/.exec(key);
+                if (!m) continue;
+                // h 字幕按行计数(行数 = 横轴数 + 1,含底部字幕带);v 字幕按竖轴计数
+                const maxN = m[1] === 'h' ? ((axes.h || []).length + 1) : (axes.v || []).length;
+                if (parseInt(m[2], 10) >= maxN) delete pk.gapCaptions[key];
+            }
+        }
+    },
+
     puzzleSlotCount(layout) {
         const n = { single: 1, as2: 2, h2: 2, v2: 2, h3: 3, v3: 3, as4: 4, grid4: 4, h4: 4, v4: 4, grid6: 6, grid9: 9 };
         return n[layout] || 1;
@@ -2351,6 +2404,10 @@ window.App = {
         }
         if ($('cbPuzzleGapPick')) this._puzzleSlot = $('cbPuzzleGapPick').value;
         if (this._puzzleSlot === '') this._activePuzzleSlot = null;
+        if (/^s\d+$/.test(this._puzzleSlot)) {
+            const si = parseInt(this._puzzleSlot.substring(1), 10);
+            if (this._activePuzzleSlot !== si) { this._activePuzzleSlot = si; this.scheduleRender(); }
+        }
         this.loadCaptionFromModel();
         this.renderCaptionEditorVisibility();
     },
@@ -2359,6 +2416,7 @@ window.App = {
         if (!this.template) return;
         const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
         this.ensurePuzzleSlotsCount(pk);
+        this.reconcilePuzzleCaptions(pk);
         // 「重拼(按序填满)」:拼图内存在图片内容时可用,拼图为空时置灰
         const rep = this.$('btnPuzzleRepuzzle');
         if (rep) {
@@ -2376,7 +2434,7 @@ window.App = {
         if ($('cbPuzzleCanvas')) $('cbPuzzleCanvas').value = pk.canvasRatio || 'auto';
         if ($('cpPuzzleBorder')) $('cpPuzzleBorder').value = '#' + (pk.borderColor || 'ffffff');
         if ($('cbSlotFill')) $('cbSlotFill').value = pk.slotFill || 'cover';
-        // 槽位 / 间隙字幕下拉
+        // 字幕门牌下拉:列出全部分割间隙与全部格子;已绑定字幕的项带圆点标记
         const pick = $('cbPuzzleGapPick');
         if (pick) {
             pick.innerHTML = '';
@@ -2384,26 +2442,27 @@ window.App = {
             noneOpt.value = '';
             noneOpt.textContent = '不选中（点格子选中/点空白取消）';
             pick.appendChild(noneOpt);
+            const mark = (bound) => bound ? '● ' : '';
             for (let i = 0; i < n; i++) {
                 const o = document.createElement('option');
                 o.value = 's' + i;
-                o.textContent = `槽位 ${i + 1}`;
-                if (pk.captions && pk.captions[i]) o.textContent += ' · 字幕';
+                o.textContent = mark(!!(pk.captions && pk.captions[i])) + `格子 ${i + 1}`;
                 pick.appendChild(o);
             }
-            const vAxes = (pk.axisVals && pk.axisVals.v) || [], hAxes = (pk.axisVals && pk.axisVals.h) || [];
-            hAxes.forEach((_, i) => {
+            const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout || 'single', pk.axisVals) : { v: [], h: [] };
+            const vAxes = axes.v || [], hAxes = axes.h || [];
+            // 横间隙:每行图片下方一条全宽字幕带(行数 = 横轴数 + 1,最末一条为底部字幕带)
+            const capRowN = hAxes.length + 1;
+            for (let i = 0; i < capRowN; i++) {
                 const o = document.createElement('option');
                 o.value = 'h' + i;
-                o.textContent = `横间隙 ${i + 1}`;
-                if (pk.gapCaptions && pk.gapCaptions['h' + i]) o.textContent += ' · 字幕';
+                o.textContent = mark(!!(pk.gapCaptions && pk.gapCaptions['h' + i])) + `横间隙 ${i + 1}`;
                 pick.appendChild(o);
-            });
+            }
             vAxes.forEach((_, i) => {
                 const o = document.createElement('option');
                 o.value = 'v' + i;
-                o.textContent = `竖间隙 ${i + 1}`;
-                if (pk.gapCaptions && pk.gapCaptions['v' + i]) o.textContent += ' · 字幕';
+                o.textContent = mark(!!(pk.gapCaptions && pk.gapCaptions['v' + i])) + `竖间隙 ${i + 1}`;
                 pick.appendChild(o);
             });
             const isNone = this._puzzleSlot == null || this._puzzleSlot === '';
@@ -2411,7 +2470,7 @@ window.App = {
                 pick.value = '';
             } else if (typeof this._puzzleSlot === 'string' && pick.querySelector('option[value="' + this._puzzleSlot + '"]')) {
                 pick.value = this._puzzleSlot;
-            } else { this._puzzleSlot = 's0'; pick.value = 's0'; }
+            } else { this._puzzleSlot = 's0'; if (pick.querySelector('option[value="s0"]')) pick.value = 's0'; }
             // 活跃槽位范围 + per-slot 滑块回读(未选中时跳过,避免自动回到槽位 0)
             if (!isNone) {
                 if (this._activePuzzleSlot == null || this._activePuzzleSlot < 0 || this._activePuzzleSlot >= n) this._activePuzzleSlot = 0;
@@ -2439,8 +2498,8 @@ window.App = {
     // 将槽位偏移同步到滑块 + 标签(拖动/回读共用;松手 commit 从滑块回写,需先同步防止被旧值覆盖)
     setSlotOffsetSliders(sc) {
         const $ = this.$;
-        if ($('slSlotOffsetX')) $('slSlotOffsetX').value = clamp((sc && sc.offsetX) || 0, -100, 100);
-        if ($('slSlotOffsetY')) $('slSlotOffsetY').value = clamp((sc && sc.offsetY) || 0, -100, 100);
+        if ($('slSlotOffsetX')) $('slSlotOffsetX').value = clampNum((sc && sc.offsetX) || 0, -100, 100);
+        if ($('slSlotOffsetY')) $('slSlotOffsetY').value = clampNum((sc && sc.offsetY) || 0, -100, 100);
         this.updateLabel('lblSlotOffsetX', (sc && sc.offsetX) || 0);
         this.updateLabel('lblSlotOffsetY', (sc && sc.offsetY) || 0);
     },
@@ -2453,6 +2512,13 @@ window.App = {
         let cap = null;
         if (isGap) cap = (pk.gapCaptions && pk.gapCaptions[key]) || null;
         else if (key) { const idx = parseInt(key.substring(1), 10); cap = (pk.captions && pk.captions[idx]) || null; }
+        // 记录正在编辑的门牌号(与选中的项绑定)
+        this._editingGap = key ? key.toUpperCase() : null;
+        const lblEdit = $('lblEditingCap');
+        if (lblEdit) {
+            const nLabel = isGap ? (key.charAt(0) === 'h' ? '横间隙 ' : '竖间隙 ') : (/^s\d+$/.test(key) ? '格子 ' : '');
+            lblEdit.textContent = this._editingGap ? `正在编辑：${nLabel}${this._editingGap}${cap ? '' : '（未绑定，输入即新建）'}` : '';
+        }
         const cbV = $('cbCapVertical');
         if (cbV) { cbV.disabled = !isGap; cbV.checked = !!(isGap && cap && cap.direction === 'vertical'); }
         const set = (id, v) => { const e = $(id); if (e) e.value = v == null ? '' : v; };
@@ -2462,17 +2528,17 @@ window.App = {
             set('cbCapFont1', cap.font1 || 'Microsoft YaHei'); set('cbCapFont2', cap.font2 || 'Microsoft YaHei');
             if ($('cpCapColor')) $('cpCapColor').value = '#' + (cap.color || 'ffffff');
             if ($('cbCapBgBar')) $('cbCapBgBar').checked = (cap.bgBar || 0) === 1;
-            set('slCapSpacing', cap.spacing != null ? cap.spacing : 60);
+            set('slCapSpacing', cap.spacing != null ? cap.spacing : 0);
             this.updateLabel('lblCapSize1', cap.size1 || 28); this.updateLabel('lblCapSize2', cap.size2 || 20);
-            this.updateLabel('lblCapSpacing', (cap.spacing != null ? cap.spacing : 60) + '%');
+            this.updateLabel('lblCapSpacing', (cap.spacing != null ? cap.spacing : 0) + '%');
         } else {
             set('tfCapLine1', ''); set('tfCapLine2', '');
             set('slCapSize1', 28); set('slCapSize2', 20);
             set('cbCapFont1', 'Microsoft YaHei'); set('cbCapFont2', 'Microsoft YaHei');
             if ($('cpCapColor')) $('cpCapColor').value = '#ffffff';
             if ($('cbCapBgBar')) $('cbCapBgBar').checked = false;
-            set('slCapSpacing', 60);
-            this.updateLabel('lblCapSize1', 28); this.updateLabel('lblCapSize2', 20); this.updateLabel('lblCapSpacing', '60%');
+            set('slCapSpacing', 0);
+            this.updateLabel('lblCapSize1', 28); this.updateLabel('lblCapSize2', 20); this.updateLabel('lblCapSpacing', '0%');
         }
     },
 
@@ -2488,16 +2554,16 @@ window.App = {
         const $ = this.$;
         const line1 = $('tfCapLine1') ? $('tfCapLine1').value.trim() : '';
         const line2 = $('tfCapLine2') ? $('tfCapLine2').value.trim() : '';
-        if (!line1 && !line2) { delete pk.captions[idx]; return; }
+        if (!line1 && !line2) { delete pk.captions[idx]; if (this._editingGap === ('S' + idx)) this._editingGap = null; return; }
         pk.captions[idx] = {
-            line1, line2,
+            line1, line2, gapId: 'S' + idx,
             size1: $('slCapSize1') ? parseInt($('slCapSize1').value, 10) : 28,
             size2: $('slCapSize2') ? parseInt($('slCapSize2').value, 10) : 20,
             font1: $('cbCapFont1') ? $('cbCapFont1').value : 'Microsoft YaHei',
             font2: $('cbCapFont2') ? $('cbCapFont2').value : 'Microsoft YaHei',
             color: ($('cpCapColor') ? $('cpCapColor').value : '#ffffff').replace('#', ''),
             bgBar: ($('cbCapBgBar') && $('cbCapBgBar').checked) ? 1 : 0,
-            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 60,
+            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 0,
         };
     },
 
@@ -2508,16 +2574,16 @@ window.App = {
         const $ = this.$;
         const line1 = $('tfCapLine1') ? $('tfCapLine1').value.trim() : '';
         const line2 = $('tfCapLine2') ? $('tfCapLine2').value.trim() : '';
-        if (!line1 && !line2) { delete pk.gapCaptions[key]; return; }
+        if (!line1 && !line2) { delete pk.gapCaptions[key]; if (this._editingGap === key.toUpperCase()) this._editingGap = null; return; }
         pk.gapCaptions[key] = {
-            line1, line2,
+            line1, line2, gapId: key.toUpperCase(),
             size1: $('slCapSize1') ? parseInt($('slCapSize1').value, 10) : 28,
             size2: $('slCapSize2') ? parseInt($('slCapSize2').value, 10) : 20,
             font1: $('cbCapFont1') ? $('cbCapFont1').value : 'Microsoft YaHei',
             font2: $('cbCapFont2') ? $('cbCapFont2').value : 'Microsoft YaHei',
             color: ($('cpCapColor') ? $('cpCapColor').value : '#ffffff').replace('#', ''),
             bgBar: ($('cbCapBgBar') && $('cbCapBgBar').checked) ? 1 : 0,
-            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 60,
+            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 0,
             direction: ($('cbCapVertical') && $('cbCapVertical').checked) ? 'vertical' : 'horizontal',
         };
     },
@@ -2528,21 +2594,38 @@ window.App = {
     },
 
     renderCaptionEditorVisibility() {
-        const pk = this.template.puzzle || {};
-        const hasSlots = pk.captions && Object.keys(pk.captions).length;
-        const hasGaps = pk.gapCaptions && Object.keys(pk.gapCaptions).length;
-        this.toggleCaptionEditor(!!(hasSlots || hasGaps));
+        this.toggleCaptionEditor(this._editingGap != null);
+    },
+
+    // 「添加/编辑字幕」:按选中项的门牌号到字幕列表找对应,没有则新建一条并绑定,然后打开编辑
+    addEditGapCaption() {
+        const $ = this.$;
+        const key = $('cbPuzzleGapPick') ? $('cbPuzzleGapPick').value : '';
+        if (!key) { this.setStatus('请先在上方选择一条分割间隙或格子'); return; }
+        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
+        const isGap = /^[vh]\d+$/.test(key);
+        let cap = null;
+        if (isGap) { if (!pk.gapCaptions) pk.gapCaptions = {}; cap = pk.gapCaptions[key]; if (!cap) cap = pk.gapCaptions[key] = { size1: 28, size2: 20, color: 'ffffff', bgBar: 0, spacing: 0, direction: 'horizontal' }; }
+        else { if (!pk.captions) pk.captions = {}; const idx = parseInt(key.substring(1), 10); cap = pk.captions[idx]; if (!cap) cap = pk.captions[idx] = { size1: 28, size2: 20, color: 'ffffff', bgBar: 0, spacing: 0 }; }
+        if (cap && !cap.gapId) cap.gapId = key.toUpperCase();
+        this._editingGap = key.toUpperCase();
+        this.loadCaptionFromModel();
+        this.renderCaptionEditorVisibility();
+        this.setStatus(`已绑定字幕到 ${this._editingGap}，编辑输入即时生效`);
     },
 
     deleteCaption() {
         const $ = this.$;
         const key = $('cbPuzzleGapPick') ? $('cbPuzzleGapPick').value : 's0';
+        if (!key) { this.setStatus('请先在上方选择要删除的一条字幕'); return; }
         this.onSettingCommit();
         const pk = this.template.puzzle || {};
         if (/^[vh]\d+$/.test(key)) { if (pk.gapCaptions) delete pk.gapCaptions[key]; }
         else if (pk.captions) delete pk.captions[parseInt(key.substring(1), 10)];
+        if (this._editingGap === key.toUpperCase()) this._editingGap = null;
         this.refreshPuzzleUI();
         this.scheduleRender(true);
+        this.setStatus('已删除字幕 ' + key.toUpperCase());
     },
 
     clearCaption() {
@@ -2657,11 +2740,18 @@ window.App = {
         const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(layout, pk.axisVals) : (pk.axisVals || {});
         const rects = window.__buildPuzzleSlots(layout, axes);
         const gapPx = Math.max(0, (pk.gap == null ? 6 : pk.gap) * (Math.min(W, H) / 1000) * 0.5);
+        const shiftX = gapPx / W, shiftY = gapPx / H;
+        const EPS = 1e-6;
         for (let i = 0; i < rects.length; i++) {
             const r = rects[i];
-            const x0 = r[0] * W + gapPx, y0 = r[1] * H + gapPx;
-            const x1 = r[0] * W + r[2] * W - gapPx, y1 = r[1] * H + r[3] * H - gapPx;
-            if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return i;
+            let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3];
+            if (x0 <= EPS) x0 += shiftX;
+            if (x1 >= 1 - EPS) x1 -= shiftX;
+            if (y0 <= EPS) y0 += shiftY;
+            if (y1 >= 1 - EPS) y1 -= shiftY;
+            const hx0 = x0 * W + gapPx, hy0 = y0 * H + gapPx;
+            const hx1 = x1 * W - gapPx, hy1 = y1 * H - gapPx;
+            if (x >= hx0 && x <= hx1 && y >= hy0 && y <= hy1) return i;
         }
         return null;
     },
@@ -2693,7 +2783,9 @@ window.App = {
         const r = this.slotRectPx(pk, i);
         if (!r) return { x: 0, y: 0 };
         const sc = pk.slots[i] || (pk.slots[i] = {});
-        const gapPx = Math.round((this.template && this.template.puzzle && this.template.puzzle.gap) || 0);
+        const gap = (this.template && this.template.puzzle && this.template.puzzle.gap) || 6;
+        const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        const gapPx = Math.max(0, gap * (Math.min(W, H) / 1000) * 0.5);
         const cw = Math.max(1, r.w - gapPx * 2), chh = Math.max(1, r.h - gapPx * 2);
         const im = this.puzzleImageAt(pk, i);
         const fillMode = sc.fillMode || (this.template.puzzle.slotFill) || 'cover';
@@ -2770,8 +2862,8 @@ window.App = {
         if (!d._anchored) { d._anchored = true; d._ax = p.x; d._ay = p.y; d._oaX = sc.offsetX || 0; d._oaY = sc.offsetY || 0; }
         const slack = this.slotSlackPx(pk, src);
         const mdx = p.x - d._ax, mdy = p.y - d._ay;
-        if (Math.abs(slack.x) > 2) sc.offsetX = clamp(d._oaX + (mdx / slack.x) * 100, -100, 100);
-        if (Math.abs(slack.y) > 2) sc.offsetY = clamp(d._oaY + (mdy / slack.y) * 100, -100, 100);
+        if (Math.abs(slack.x) > 2) sc.offsetX = clampNum(d._oaX + (mdx / slack.x) * 100, -100, 100);
+        if (Math.abs(slack.y) > 2) sc.offsetY = clampNum(d._oaY + (mdy / slack.y) * 100, -100, 100);
         // 拖动结果同步到滑块(松手 commit 时会从滑块回写,不同步则会被旧值覆盖)
         this.setSlotOffsetSliders(sc);
     },
@@ -2784,6 +2876,13 @@ window.App = {
         sa.imagePath = sb.imagePath;
         sb.imageIndex = tmpIdx;
         sb.imagePath = tmpPath;
+        // 绑在格子上的字幕跟图:交换两个格子的字幕并更新其门牌号
+        if (pk.captions) {
+            const ka = String(a), kb = String(b);
+            const ta = pk.captions[ka], tb = pk.captions[kb];
+            if (tb !== undefined) { pk.captions[ka] = tb; tb.gapId = 'S' + a; } else delete pk.captions[ka];
+            if (ta !== undefined) { pk.captions[kb] = ta; ta.gapId = 'S' + b; } else delete pk.captions[kb];
+        }
     },
 
     // 点击画布选择当前编辑/渲染的槽位
@@ -2834,7 +2933,7 @@ window.App = {
         this.ensurePuzzleSlotsCount(pk);
         const sc = pk.slots[i] || (pk.slots[i] = {});
         const cur = sc.zoom != null ? sc.zoom : 100;
-        const z = clamp(Math.round(cur * factor), 100, 400);
+        const z = clampNum(Math.round(cur * factor), 100, 400);
         if (Math.abs(z - cur) < 1) return;
         if (!this._wheelUndo) { this._wheelUndo = setTimeout(() => this._wheelUndo = null, 600); this.pushUndo(); }
         sc.zoom = z;
@@ -3104,8 +3203,10 @@ window.App = {
     applyZoomStyle() {
         const canvas = this.dom.canvas;
         const z = this.zoom;
-        canvas.style.width = Math.max(1, Math.round(canvas.width * z)) + 'px';
-        canvas.style.height = Math.max(1, Math.round(canvas.height * z)) + 'px';
+        // 显示尺寸用逻辑像素(backing/DPR),高分屏不放大,文字保持清晰
+        const lw = canvas._logW || canvas.width, lh = canvas._logH || canvas.height;
+        canvas.style.width = Math.max(1, Math.round(lw * z)) + 'px';
+        canvas.style.height = Math.max(1, Math.round(lh * z)) + 'px';
         canvas.style.transform = `translate(${Math.round(this.panX)}px, ${Math.round(this.panY)}px)`;
     },
 
@@ -3147,7 +3248,10 @@ window.App = {
         pane.addEventListener('dragleave', e => { e.preventDefault(); if (--depth <= 0) { depth = 0; pane.classList.remove('dragging'); } });
         pane.addEventListener('drop', e => {
             e.preventDefault(); depth = 0; pane.classList.remove('dragging');
-            const files = Array.from(e.dataTransfer.files || []);
+            // 只接受操作系统文件拖放(类型为 "Files");应用内元素(缩略图等)的拖拽不触发重导入
+            const types = Array.from(e.dataTransfer && e.dataTransfer.types || []);
+            const osDrop = types.some(t => String(t).toLowerCase() === 'files');
+            const files = osDrop ? Array.from(e.dataTransfer.files || []) : [];
             if (files.length) this.addImageFiles(files);
         });
     },
