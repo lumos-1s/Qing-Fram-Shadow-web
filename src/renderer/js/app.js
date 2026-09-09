@@ -63,6 +63,7 @@ window.App = {
             canvas: $('previewCanvas'), canvasPane: $('canvasPane'), placeholder: $('placeholder'),
             stage: document.querySelector('.stage'),
             thumbStrip: $('thumbStrip'), dropOverlay: $('dropOverlay'),
+            importProgress: $('importProgress'), importProgressFill: $('importProgressFill'), importProgressText: $('importProgressText'),
             tabs: $('inspTabs'), panels: Array.from(document.querySelectorAll('.tab-panel')),
             stRes: $('stRes'), stInfo: $('stInfo'), stCanvas: $('stCanvas'),
             btnCompare: $('btnCompare'),
@@ -522,11 +523,6 @@ window.App = {
         const decor = this.template.decorConfig || (this.template.decorConfig = {});
 
         this.template.canvasRatio = $('cbCanvasRatio') ? $('cbCanvasRatio').value : 'original';
-        m.marginLock = $('cbMarginLock') && $('cbMarginLock').checked ? 1 : 0;
-        m.marginTop = num($('tfMarginTop'), m.refTop != null ? m.refTop : m.marginTop);
-        m.marginBottom = num($('tfMarginBottom'), m.refBottom != null ? m.refBottom : m.marginBottom);
-        m.marginLeft = num($('tfMarginLeft'), m.refLeft != null ? m.refLeft : m.marginLeft);
-        m.marginRight = num($('tfMarginRight'), m.refRight != null ? m.refRight : m.marginRight);
         const gm = $('slGlobalMargin') ? parseInt($('slGlobalMargin').value, 10) / 100 : 1;
         m.globalMargin = gm;
         this.applyGlobalMargin(gm, false);
@@ -661,9 +657,6 @@ window.App = {
     refreshMarginFields() {
         const $ = this.$;
         const m = this.template.baseMargin || {};
-        const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = Math.round(v || 0); };
-        set('tfMarginTop', m.marginTop); set('tfMarginBottom', m.marginBottom);
-        set('tfMarginLeft', m.marginLeft); set('tfMarginRight', m.marginRight);
         if ($('slGlobalMargin')) { const g = m.globalMargin != null ? m.globalMargin : 1; $('slGlobalMargin').value = Math.round(g * 100); this.updateLabel('lblGlobalMargin', Math.round(g * 100) + '%'); }
     },
 
@@ -682,7 +675,6 @@ window.App = {
             const decor = this.template.decorConfig || {};
 
             if ($('cbCanvasRatio')) $('cbCanvasRatio').value = this.template.canvasRatio || 'original';
-            if ($('cbMarginLock')) $('cbMarginLock').checked = (m.marginLock || 0) === 1;
             this.refreshMarginFields();
             if ($('slImgScale')) $('slImgScale').value = Math.round((m.imgScale || 1) * 100);
             this.updateLabel('lblImgScale', Math.round((m.imgScale || 1) * 100) + '%');
@@ -692,7 +684,7 @@ window.App = {
             if ($('cbCornerLock')) $('cbCornerLock').checked = (cc.cornerLock || 0) === 1;
             const r = cc.cornerRadiusAll != null ? cc.cornerRadiusAll : 0;
             if ($('slCornerRadius')) $('slCornerRadius').value = r;
-            if ($('tfCornerRadius')) $('tfCornerRadius').value = r;
+            this.updateLabel('lblCornerRadius', r);
             if ($('slCornerTL')) $('slCornerTL').value = cc.cornerRadiusTL || 0;
             if ($('slCornerTR')) $('slCornerTR').value = cc.cornerRadiusTR || 0;
             if ($('slCornerBL')) $('slCornerBL').value = cc.cornerRadiusBL || 0;
@@ -746,7 +738,6 @@ window.App = {
             if ($('cbLayerCornerLock')) $('cbLayerCornerLock').checked = (lcc.cornerLock || 0) === 1;
             const lr = lcc.cornerRadiusAll != null ? lcc.cornerRadiusAll : 0;
             if ($('slLayerCornerRadius')) $('slLayerCornerRadius').value = lr;
-            if ($('tfLayerCornerRadius')) $('tfLayerCornerRadius').value = lr;
             if ($('slLayerCornerTL')) $('slLayerCornerTL').value = lcc.cornerRadiusTL || 0;
             if ($('slLayerCornerTR')) $('slLayerCornerTR').value = lcc.cornerRadiusTR || 0;
             if ($('slLayerCornerBL')) $('slLayerCornerBL').value = lcc.cornerRadiusBL || 0;
@@ -755,11 +746,10 @@ window.App = {
             this.updateLabel('lblLayerCornerBL', lcc.cornerRadiusBL || 0); this.updateLabel('lblLayerCornerBR', lcc.cornerRadiusBR || 0);
             this.updateLabel('lblLayerCornerRadius', lr);
 
-            if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
-            if ($('cbShadowL')) $('cbShadowL').checked = (sg.shadowEnable || 0) === 1;
+if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             this.syncShadowL();
+
             if ($('cbGlow')) $('cbGlow').checked = (sg.glowEnable || 0) === 1;
-            if ($('cbGlowL')) $('cbGlowL').checked = (sg.glowEnable || 0) === 1;
 
             const ft = this.template.filmTearConfig || {};
             if ($('cbTearEnable')) $('cbTearEnable').checked = (ft.tearEnable || 0) === 1;
@@ -792,8 +782,32 @@ window.App = {
             this.refreshTemplateFields();
             this.refreshPuzzleUI();
             this.updateHistoryButtons();
+            this.applyModeControls();
         } finally {
             this.isUpdating = false;
+        }
+    },
+
+    // 面板联动:图层组只服务默认模板样式;光影组在相框样式下不生效,整页隐藏
+    applyModeControls() {
+        const t = this.template;
+        if (!t) return;
+        const pf = String(t.photoFrameStyle || '').toUpperCase();
+        const frame = !!(pf && pf !== 'NONE');
+        const card = !frame && (t.baseMargin || {}).bgBlurEnable === 1;
+        const showLayers = !frame && !card;
+        const showLight = !frame;
+        const q = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
+        q('.ctl-grp-layers').forEach(el => { el.style.display = showLayers ? '' : 'none'; });
+        q('.ctl-grp-light').forEach(el => { el.style.display = showLight ? '' : 'none'; });
+        const lightTab = document.querySelector('#inspTabs [data-tab="light"]');
+        if (lightTab) lightTab.style.display = showLight ? '' : 'none';
+        if (!showLight) {
+            const active = document.querySelector('.tab.active');
+            if (active && active.getAttribute('data-tab') === 'light') {
+                const firstVis = document.querySelector('#inspTabs .tab:not([style*="display: none"])');
+                if (firstVis) firstVis.click();
+            }
         }
     },
 
@@ -1000,31 +1014,67 @@ window.App = {
         const images = files.filter(f => /^image\//i.test(f.type) || /\.(jpe?g|png|webp|bmp)$/i.test(f.name));
         if (!images.length) { this.setStatus('不支持的文件格式'); return; }
         const skipped = files.length - images.length;
-        const loaders = images.map(file => this.loadFile(file));
-        const results = await Promise.all(loaders);
-        let loaded = 0;
-        for (let i = 0; i < images.length; i++) {
-            const r = results[i];
-            if (!r || !r.url) continue;
-            const img = new Image();
-            const loadedOk = await new Promise(res => { img.onload = () => res(true); img.onerror = () => res(false); img.src = r.url; });
-            if (!loadedOk || !img.naturalWidth) continue;
-            const rawExif = (r.buffer && window.__parseExif) ? window.__parseExif(r.buffer) : {};
-            const exif = window.__exifSummary ? window.__exifSummary(rawExif) : {};
-            const oriented = await this.applyOrientation(img, exif.orientation);
-            const useEl = oriented ? oriented.el : img;
-            const w = oriented ? oriented.w : img.naturalWidth;
-            const h = oriented ? oriented.h : img.naturalHeight;
-            const im = { el: useEl, name: images[i].name, w, h, exif, customSettings: null };
-            this.queueThumb(im);
-            this.images.push(im);
-            loaded++;
+        const total = images.length;
+        this.showImportProgress(total);
+        let done = 0;
+        const tick = (name) => { done++; this.setImportProgress(done, total, name); };
+        try {
+            const results = await Promise.allSettled(images.map(async (file, i) => {
+                const r = await this.loadFile(file);
+                if (!r || !r.url) { tick(images[i].name); return null; }
+                const img = new Image();
+                const loadedOk = await new Promise(res => { img.onload = () => res(true); img.onerror = () => res(false); img.src = r.url; });
+                if (!loadedOk || !img.naturalWidth) { tick(images[i].name); return null; }
+                const rawExif = (r.buffer && window.__parseExif) ? window.__parseExif(r.buffer) : {};
+                const exif = window.__exifSummary ? window.__exifSummary(rawExif) : {};
+                const oriented = await this.applyOrientation(img, exif.orientation);
+                const useEl = oriented ? oriented.el : img;
+                const w = oriented ? oriented.w : img.naturalWidth;
+                const h = oriented ? oriented.h : img.naturalHeight;
+                const im = { el: useEl, name: images[i].name, w, h, exif, customSettings: null };
+                tick(images[i].name);
+                return im;
+            }));
+            let loaded = 0;
+            for (let i = 0; i < results.length; i++) {
+                const im = results[i].status === 'fulfilled' ? results[i].value : null;
+                if (!im) continue;
+                this.images.push(im);
+                this.queueThumb(im);
+                loaded++;
+            }
+            if (loaded) {
+                this.buildThumbnails();
+                this.selectImage(this.images.length - loaded);
+                this.setStatus(`已导入 ${loaded} 张图片${skipped ? '，跳过 ' + skipped + ' 个不支持的文件' : ''}`);
+            } else if (skipped) this.setStatus('不支持的文件格式');
+        } finally {
+            this.finishImportProgress();
         }
-        if (loaded) {
-            this.buildThumbnails();
-            this.selectImage(this.images.length - loaded);
-            this.setStatus(`已导入 ${loaded} 张图片${skipped ? '，跳过 ' + skipped + ' 个不支持的文件' : ''}`);
-        } else if (skipped) this.setStatus('不支持的文件格式');
+    },
+
+    // 导入进度条:total>0 显示;set 更新百分比/文案;finish 置满后淡出
+    showImportProgress(total) {
+        const prog = this.dom.importProgress;
+        if (!prog) return;
+        this._importTotal = total;
+        this._importDone = 0;
+        prog.style.display = 'flex';
+        this.setImportProgress(0, total, null);
+    },
+    setImportProgress(done, total, name) {
+        const prog = this.dom.importProgress;
+        if (!prog) return;
+        const pct = Math.max(0, Math.min(100, Math.round(done / Math.max(1, total || 1) * 100)));
+        if (this.dom.importProgressFill) this.dom.importProgressFill.style.width = pct + '%';
+        if (this.dom.importProgressText) this.dom.importProgressText.textContent = `正在导入 ${done}/${total}${name ? ' · ' + name : ''}`;
+    },
+    finishImportProgress() {
+        const prog = this.dom.importProgress;
+        if (!prog) return;
+        if (this.dom.importProgressFill) this.dom.importProgressFill.style.width = '100%';
+        if (this.dom.importProgressText) this.dom.importProgressText.textContent = '导入完成';
+        setTimeout(() => { prog.style.display = 'none'; }, 420);
     },
 
     async loadFile(file) {
@@ -1193,10 +1243,16 @@ window.App = {
     async openImages() {
         const res = await window.qingframe.openImages();
         if (!res || !res.length) return;
+        this.showImportProgress(res.length);
         let loaded = 0;
-        for (const r of res) {
-            const idx = await this.appendImageFromPick(r);
-            if (idx >= 0) loaded++;
+        try {
+            for (let i = 0; i < res.length; i++) {
+                const idx = await this.appendImageFromPick(res[i]);
+                if (idx >= 0) loaded++;
+                this.setImportProgress(i + 1, res.length, res[i].name);
+            }
+        } finally {
+            this.finishImportProgress();
         }
         if (!loaded) { this.setStatus('图片加载失败'); return; }
         this.selectImage(this.images.length - loaded);
@@ -1393,7 +1449,6 @@ window.App = {
             'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
             'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap',
             'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
-            'slShadowXL', 'slShadowYL', 'slShadowBlurL', 'slShadowSpreadL', 'slShadowOpacityL', 'slGlowBlurL', 'slGlowOpacityL',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
         ]);
         const onEdit = ['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
@@ -1404,21 +1459,13 @@ window.App = {
         });
 
         // 复选框 -> onSettingCommit
-        const chks = ['cbMarginLock', 'cbCornerLock', 'cbLayerVisible', 'cbShadow', 'cbGlow', 'cbTearEnable',
+        const chks = ['cbCornerLock', 'cbLayerVisible', 'cbShadow', 'cbGlow', 'cbTearEnable',
             'cbVignette', 'cbLightLeak', 'cbExifText', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock'];
         chks.forEach(id => {
             const el = $(id);
             if (el) el.addEventListener('change', () => this.onSettingCommit());
         });
-        // 光影页签复制的阴影/发光
-        ['cbShadowL', 'cbGlowL'].forEach(id => {
-            const el = $(id);
-            if (el) el.addEventListener('change', () => {
-                const main = $(id === 'cbShadowL' ? 'cbShadow' : 'cbGlow');
-                if (main) main.checked = el.checked;
-                this.onSettingCommit();
-            });
-        });
+        // 光照页签复制的阴影/发光已移除,统一收敛到「边框」页签
 
         // select 变更 -> commit
         const sels = ['cbCanvasRatio', 'cbParamPosition', 'cbParamType', 'cbFillType', 'cbGradientType', 'cbTextureBlend',
@@ -1430,7 +1477,7 @@ window.App = {
         });
 
         // 数字/文本输入:input 即时同步(防抖),change 提交
-        const nums = ['tfMarginTop', 'tfMarginBottom', 'tfMarginLeft', 'tfMarginRight', 'tfImgOffsetX', 'tfImgOffsetY',
+        const nums = ['tfImgOffsetX', 'tfImgOffsetY',
             'tfLayerMarginTop', 'tfLayerMarginRight', 'tfLayerMarginBottom', 'tfLayerMarginLeft'];
         nums.forEach(id => {
             const el = $(id);
@@ -1450,38 +1497,6 @@ window.App = {
             el.addEventListener('input', () => this.onTextCustom(id));
             el.addEventListener('change', () => this.onSettingCommit());
         });
-        const cr = $('tfCornerRadius');
-        if (cr) {
-            cr.addEventListener('focus', () => this.beginGesture());
-            cr.addEventListener('blur', () => this.endGesture());
-            cr.addEventListener('input', () => {
-                const v = clampNum(parseInt(cr.value, 10) || 0, 0, 500);
-                const cc = this.template.cornerConfig || {};
-                cc.cornerRadiusAll = v;
-                ['slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR'].forEach(id => {
-                    if ($(id)) $(id).value = v;
-                });
-                this.onSettingChanged();
-            });
-            cr.addEventListener('change', () => this.onSettingCommit());
-        }
-        const lcr = $('tfLayerCornerRadius');
-        if (lcr) {
-            lcr.addEventListener('focus', () => this.beginGesture());
-            lcr.addEventListener('blur', () => this.endGesture());
-            lcr.addEventListener('input', () => {
-                const v = clampNum(parseInt(lcr.value, 10) || 0, 0, 500);
-                const layer = this.currentLayer ? this.currentLayer() : null;
-                if (!layer) return;
-                const lcc = layer.cornerConfig || (layer.cornerConfig = {});
-                lcc.cornerRadiusAll = v;
-                ['slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR'].forEach(id => {
-                    if ($(id)) $(id).value = v;
-                });
-                this.onSettingChanged();
-            });
-            lcr.addEventListener('change', () => this.onSettingCommit());
-        }
 
         // 图层按钮
         const bindBtn = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => fn()); };
@@ -1566,7 +1581,7 @@ window.App = {
                 }
                 cc.cornerRadiusAll = v;
                 if (this.$('slCornerRadius')) this.$('slCornerRadius').value = v;
-                if (this.$('tfCornerRadius')) this.$('tfCornerRadius').value = v;
+                this.updateLabel('lblCornerRadius', v);
                 this.onSettingChanged();
                 break;
             }
@@ -1575,7 +1590,7 @@ window.App = {
                 cc.cornerRadiusAll = v;
                 cc.cornerRadiusTL = v; cc.cornerRadiusTR = v; cc.cornerRadiusBL = v; cc.cornerRadiusBR = v;
                 ['slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
-                if (this.$('tfCornerRadius')) this.$('tfCornerRadius').value = v;
+                this.updateLabel('lblCornerRadius', v);
                 if (this.$('lblCornerTL')) this.$('lblCornerTL').textContent = v;
                 if (this.$('lblCornerTR')) this.$('lblCornerTR').textContent = v;
                 if (this.$('lblCornerBL')) this.$('lblCornerBL').textContent = v;
@@ -1604,7 +1619,7 @@ window.App = {
                 }
                 lcc.cornerRadiusAll = v;
                 if (this.$('slLayerCornerRadius')) this.$('slLayerCornerRadius').value = v;
-                if (this.$('tfLayerCornerRadius')) this.$('tfLayerCornerRadius').value = v;
+                this.updateLabel('lblLayerCornerRadius', v);
                 this.onSettingChanged();
                 break;
             }
@@ -1615,7 +1630,7 @@ window.App = {
                 lcc.cornerRadiusAll = v;
                 lcc.cornerRadiusTL = v; lcc.cornerRadiusTR = v; lcc.cornerRadiusBL = v; lcc.cornerRadiusBR = v;
                 ['slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
-                if (this.$('tfLayerCornerRadius')) this.$('tfLayerCornerRadius').value = v;
+                this.updateLabel('lblLayerCornerRadius', v);
                 this.updateLabel('lblLayerCornerTL', v); this.updateLabel('lblLayerCornerTR', v);
                 this.updateLabel('lblLayerCornerBL', v); this.updateLabel('lblLayerCornerBR', v);
                 this.updateLabel('lblLayerCornerRadius', v);
@@ -1695,9 +1710,6 @@ window.App = {
             slPuzzleGap: ['lblPuzzleGap', v], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
             slCapSpacing: ['lblCapSpacing', v + '%'], slSlotOffsetX: ['lblSlotOffsetX', v], slSlotOffsetY: ['lblSlotOffsetY', v],
             slSlotZoom: ['lblSlotZoom', v + '%'],
-            slShadowXL: ['lblShadowXL', v], slShadowYL: ['lblShadowYL', v], slShadowBlurL: ['lblShadowBlurL', v],
-            slShadowSpreadL: ['lblShadowSpreadL', v], slShadowOpacityL: ['lblShadowOpacityL', v + '%'],
-            slGlowBlurL: ['lblGlowBlurL', v], slGlowOpacityL: ['lblGlowOpacityL', v + '%'],
         };
         const entry = map[id];
         if (entry) this.updateLabel(entry[0], entry[1]);
@@ -1707,12 +1719,6 @@ window.App = {
         if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
         if (id === 'slTextSize') { this.previewDraftText(); return; }
-        if (id === 'slShadowXL' || id === 'slShadowYL' || id === 'slShadowBlurL' || id === 'slShadowSpreadL' || id === 'slShadowOpacityL') {
-            const map = { slShadowXL: 'slShadowX', slShadowYL: 'slShadowY', slShadowBlurL: 'slShadowBlur', slShadowSpreadL: 'slShadowSpread', slShadowOpacityL: 'slShadowOpacity' };
-            const main = this.$(map[id]); if (main) main.value = v;
-        } else if (id === 'slGlowBlurL' || id === 'slGlowOpacityL') {
-            const main = this.$(id === 'slGlowBlurL' ? 'slGlowBlur' : 'slGlowOpacity'); if (main) main.value = v;
-        }
         if (id === 'slPuzzleGap' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
             this.syncPuzzleFromUI(); this.onSettingChanged(); return;
         }
@@ -3195,7 +3201,7 @@ window.App = {
         const canvas = this.dom.canvas;
         if (!canvas.width) return;
         const stage = this.dom.stage;
-        const sw = stage.clientWidth - 8, sh = Math.max(60, stage.clientHeight - 8 - 78);
+        const sw = stage.clientWidth - 8, sh = Math.max(60, stage.clientHeight - 8);
         const z = Math.min(sw / canvas.width, sh / canvas.height);
         this.panX = 0; this.panY = 0;
         this.setZoom(Math.max(0.1, z));

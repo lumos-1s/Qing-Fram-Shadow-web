@@ -72,6 +72,16 @@ function computeCanvasSize(imgW, imgH, template) {
 
 // ── 渲染主入??对应原版 renderToCanvas 的三路分??──
 function renderToCanvas(app, compare) {
+    const canvas = app.dom.canvas;
+    const prevW = canvas.width, prevH = canvas.height;
+    _renderToCanvasInner(app, compare);
+    // 画布后备尺寸变化后自动重新适配显示(缩略图条上方留白),避免旧缩放下画布溢出盖住缩略图条
+    const curW = canvas.width, curH = canvas.height;
+    if (prevW > 0 && prevH > 0 && (curW !== prevW || curH !== prevH)) {
+        if (typeof app.fitZoom === 'function') requestAnimationFrame(() => app.fitZoom());
+    }
+}
+function _renderToCanvasInner(app, compare) {
     const { image, template } = app;
     const img = image.el;
     const cw0 = img.naturalWidth, ch0 = img.naturalHeight;

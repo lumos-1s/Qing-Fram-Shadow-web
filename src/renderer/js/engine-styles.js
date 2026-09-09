@@ -566,7 +566,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
     // 参数文字字号:由照片宽度驱动(跟随 paramFs 滑块),不受模糊带高度压缩,保证清晰可读
     function blurExifSz(iw, ih, paramFs) {
-        return Math.max(20, Math.min(autoExifSize(paramFs, iw), Math.round(Math.min(iw, ih) * 0.06)));
+        return Math.max(16, Math.min(Math.round(autoExifSize(paramFs, iw) * 0.75), Math.round(Math.min(iw, ih) * 0.045)));
     }
     // 底部参数带:至少能放下 型号行+参数行,其余三边仍用紧凑的模糊带
     function blurBottom(size, iw, ih, S) {
@@ -610,8 +610,21 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const dw = iw * sc, dh = ih * sc;
         const dx = cx + (iw - dw) / 2 + (offX || 0);
         const dy = cy + (ih - dh) / 2 + (offY || 0);
+        const radius = Math.max(1, arc * sc);
+        // 悬浮阴影:大小与糊度跟随照片尺寸及图片缩放同步放大(图片越大/越放大,影子越宽越柔和)
+        // 透明度刻意压低,避免在模糊底上形成"黑圈/黑框"轮廓
+        const shBlur = Math.max(4, Math.round(Math.min(iw, ih) * 0.03 * sc));
+        const shOff = Math.max(3, Math.round(shBlur * 0.8));
         g.save();
-        roundRectPath(g, dx, dy, dw, dh, Math.max(1, arc * sc));
+        g.shadowColor = 'rgba(0,0,0,0.22)';
+        g.shadowBlur = shBlur;
+        g.shadowOffsetY = shOff;
+        g.fillStyle = '#ffffff';
+        roundRectPath(g, dx, dy, dw, dh, radius);
+        g.fill();
+        g.shadowBlur = 0;
+        g.shadowOffsetY = 0;
+        roundRectPath(g, dx, dy, dw, dh, radius);
         g.clip();
         g.drawImage(img, dx, dy, dw, dh);
         for (const [wd, al] of [[Math.max(1, scaledPx(2)), 28], [Math.max(1, scaledPx(5)), 16], [Math.max(1, scaledPx(8)), 8]]) {

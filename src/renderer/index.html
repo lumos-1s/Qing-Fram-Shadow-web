@@ -89,6 +89,10 @@
                 </div>
                 <div id="thumbStrip" class="thumb-strip"></div>
                 <div id="dropOverlay" class="drop-overlay"><div>松手导入照片</div></div>
+                <div id="importProgress" class="import-progress" style="display:none">
+                    <div class="ip-bar"><div id="importProgressFill" class="ip-fill"></div></div>
+                    <span id="importProgressText" class="ip-text"></span>
+                </div>
             </section>
 
             <!-- 右侧：参数面板(多页签,静态控件骨架,对齐 Java FXML 命名) -->
@@ -124,21 +128,12 @@
 
                         <div class="param-group">
                             <div class="pg-title">画布边距</div>
-                            <div class="param-row chk-row">
-                                <label>边距锁定</label>
-                                <input type="checkbox" id="cbMarginLock" class="ctl-chk" />
-                                <span class="chk-hint">四边联动</span>
-                            </div>
-                            <div class="param-row"><label>上</label><input type="number" id="tfMarginTop" class="ctl-num" min="0" max="1500" /></div>
-                            <div class="param-row"><label>下</label><input type="number" id="tfMarginBottom" class="ctl-num" min="0" max="1500" /></div>
-                            <div class="param-row"><label>左</label><input type="number" id="tfMarginLeft" class="ctl-num" min="0" max="1500" /></div>
-                            <div class="param-row"><label>右</label><input type="number" id="tfMarginRight" class="ctl-num" min="0" max="1500" /></div>
                             <div class="param-row">
-                                <label>全局边距</label>
+                                <label>统一边距</label>
                                 <input type="range" id="slGlobalMargin" class="ctl-rng" min="10" max="300" step="10" value="100" />
                                 <span class="pval" id="lblGlobalMargin"></span>
                             </div>
-                            <div class="hint-box">全局边距按原预设四边的参考值等比缩放，锁定后同步四边。</div>
+                            <div class="hint-box">按该预设四边的参考值等比缩放。</div>
                         </div>
 
                         <div class="param-group">
@@ -166,7 +161,7 @@
                             <div class="param-row">
                                 <label>统一圆角</label>
                                 <input type="range" id="slCornerRadius" class="ctl-rng" min="0" max="500" value="0" />
-                                <input type="number" id="tfCornerRadius" class="ctl-num ctl-num-sm" min="0" max="500" />
+                                <span class="pval" id="lblCornerRadius"></span>
                             </div>
                         </div>
 
@@ -212,7 +207,7 @@
 
                     <!-- ══ Tab2 边框 ══ -->
                     <div class="tab-panel" id="panel-border">
-                        <div class="param-group">
+                        <div class="param-group ctl-grp-layers">
                             <div class="pg-title">图层管理</div>
                             <div class="btn-row">
                                 <button class="mini-btn" id="btnAddLayer">+ 添加图层</button>
@@ -234,7 +229,7 @@
                             </div>
                         </div>
 
-                        <div class="param-group">
+                        <div class="param-group ctl-grp-layers">
                             <div class="pg-title">填充</div>
                             <div class="param-row">
                                 <label>填充类型</label>
@@ -286,7 +281,7 @@
                             </div>
                         </div>
 
-                        <div class="param-group">
+                        <div class="param-group ctl-grp-layers">
                             <div class="pg-title">描边</div>
                             <div class="param-row">
                                 <label>描边粗细</label>
@@ -317,7 +312,7 @@
 </div>
 </div>
 
-<div class="param-group">
+<div class="param-group ctl-grp-layers">
 <div class="pg-title">边框圆角</div>
 <div class="param-row chk-row">
 <label>四角联动</label>
@@ -331,12 +326,12 @@
 <div class="param-row">
 <label>统一圆角</label>
 <input type="range" id="slLayerCornerRadius" class="ctl-rng" min="0" max="500" value="0" />
-<input type="number" id="tfLayerCornerRadius" class="ctl-num ctl-num-sm" min="0" max="500" />
+<span class="pval" id="lblLayerCornerRadius"></span>
 </div>
 <div class="hint-box">此处圆角只作用于边框图层(含描边/投影),照片圆角在“模板”页签单独调整。</div>
 </div>
 
-                        <div class="param-group">
+                        <div class="param-group ctl-grp-layers">
                             <div class="pg-title">阴影 / 发光</div>
                             <div class="param-row chk-row">
                                 <label>投影</label>
@@ -371,28 +366,7 @@
 
                     <!-- ══ Tab3 光影 ══ -->
                     <div class="tab-panel" id="panel-light">
-                        <div class="param-group">
-                            <div class="pg-title">阴影 / 发光（同边框页签）</div>
-                            <div class="param-row chk-row">
-                                <label>投影</label>
-                                <input type="checkbox" id="cbShadowL" class="ctl-chk" />
-                            </div>
-                            <div class="param-row"><label>偏移 X</label><input type="range" id="slShadowXL" class="ctl-rng" min="-60" max="60" value="0" /><span class="pval" id="lblShadowXL"></span></div>
-                            <div class="param-row"><label>偏移 Y</label><input type="range" id="slShadowYL" class="ctl-rng" min="-60" max="60" value="8" /><span class="pval" id="lblShadowYL"></span></div>
-                            <div class="param-row"><label>模糊</label><input type="range" id="slShadowBlurL" class="ctl-rng" min="0" max="120" value="20" /><span class="pval" id="lblShadowBlurL"></span></div>
-                            <div class="param-row"><label>扩散</label><input type="range" id="slShadowSpreadL" class="ctl-rng" min="0" max="100" value="0" /><span class="pval" id="lblShadowSpreadL"></span></div>
-                            <div class="param-row"><label>阴影颜色</label><input type="color" id="cpShadowColorL" class="ctl-cl" value="#000000" /></div>
-                            <div class="param-row"><label>阴影透明度</label><input type="range" id="slShadowOpacityL" class="ctl-rng" min="0" max="100" value="35" /><span class="pval" id="lblShadowOpacityL"></span></div>
-                            <div class="param-row chk-row">
-                                <label>发光</label>
-                                <input type="checkbox" id="cbGlowL" class="ctl-chk" />
-                            </div>
-                            <div class="param-row"><label>发光颜色</label><input type="color" id="cpGlowColorL" class="ctl-cl" value="#ffffff" /></div>
-                            <div class="param-row"><label>发光模糊</label><input type="range" id="slGlowBlurL" class="ctl-rng" min="0" max="120" value="30" /><span class="pval" id="lblGlowBlurL"></span></div>
-                            <div class="param-row"><label>发光透明度</label><input type="range" id="slGlowOpacityL" class="ctl-rng" min="0" max="100" value="60" /><span class="pval" id="lblGlowOpacityL"></span></div>
-                        </div>
-
-                        <div class="param-group">
+                        <div class="param-group ctl-grp-light">
                             <div class="pg-title">暗角</div>
                             <div class="param-row chk-row">
                                 <label>暗角</label>
@@ -402,7 +376,7 @@
                             <div class="param-row"><label>羽化</label><input type="range" id="slVignetteFeather" class="ctl-rng" min="0" max="100" value="50" /><span class="pval" id="lblVignetteFeather"></span></div>
                         </div>
 
-                        <div class="param-group">
+                        <div class="param-group ctl-grp-light">
                             <div class="pg-title">漏光</div>
                             <div class="param-row chk-row">
                                 <label>漏光</label>
