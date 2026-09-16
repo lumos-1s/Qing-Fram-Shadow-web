@@ -2,7 +2,7 @@
   "name": "qingframe-web",
   "version": "0.1.0",
   "description": "清框影 Web 重构版(Electron + HTML/CSS/JS)",
-"main": "src/main/index.js",
+  "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "lint": "eslint src --ext .js",
@@ -53,7 +53,10 @@
   },
   "devDependencies": {
     "electron": "^31.0.0",
-    "eslint": "^8.57.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "eslint": "^8.57.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

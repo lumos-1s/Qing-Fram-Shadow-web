@@ -66,6 +66,20 @@ app.whenReady().then(() => {
         }
     });
     createWindow();
+
+    // ── 自动更新：仅打包后(app.isPackaged)生效，开发模式跳过；任何异常都不阻塞启动 ──
+    if (app.isPackaged) {
+        try {
+            const { autoUpdater } = require('electron-updater');
+            autoUpdater.autoDownload = true;
+            autoUpdater.checkForUpdatesAndNotify().catch(err => {
+                console.warn('[updater] 检查更新失败:', err && err.message);
+            });
+        } catch (e) {
+            console.warn('[updater] 初始化失败:', e && e.message);
+        }
+    }
+
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
