@@ -1,0 +1,87 @@
+// 状态模块：删除等多种条件的变更提交 / 撤销栈（上限 50 步）—— 从 app.js 拆分
+window.App = Object.assign(window.App || {}, {
+    /* ══ 四方法核心 ══ */
+    // 高频修改(拖滑块/输入文字):仅同步 + 防抖渲染,不压撤销栈
+    onSettingChanged() {
+        this.syncModelFromUI();
+        this.saveCurrentTemplate();
+        this.scheduleRender();
+    },
+
+    // 一次性提交(切换/勾选/按钮/change):压撤销栈 -> 清重做 -> 同步 -> 立即渲染
+    // 若处于手势中(滑块下按/文本框聚焦时已压过快照),则不重复压栈
+    onSettingCommit() {
+        if (!this._gesture) this.pushUndo();
+        this._commit();
+    },
+
+    // 手势开始:滑块 pointerdown / 文本框 focus 时压入手势前快照
+    beginGesture() {
+        if (this._gesture || !this.template || !this.image) return;
+        this._gesture = true;
+        this.pushUndo();
+        // 拖拽/拖动滑块期间用 900px 低分辨率即时渲染,松手后恢复全分辨率,桌面交互更流畅
+        if (this._gesturePrevMax == null) {
+            this._gesturePrevMax = this.displayMax !== undefined ? this.displayMax : 1800;
+            this.displayMax = 900;
+        }
+    },
+    // 手势结束:pointerup / blur
+    endGesture() {
+        if (this._gesture) this._gesture = false;
+        if (this._gesturePrevMax != null) {
+            this.displayMax = this._gesturePrevMax;
+            this._gesturePrevMax = null;
+            this.scheduleRender(true);
+        }
+    },
+    // 提交但不压栈(手势快照已在上一步压入)
+    commitNoPush() { this._commit(); },
+    _commit() {
+        this.syncModelFromUI();
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+    },
+    /* ══ 撤销 / 重做 ══ */
+    // 无条件压栈(离散操作/手势开始调用);连续手势的快照由 beginGesture 去重
+    MAX_UNDO: 50,
+    pushUndo() {
+        this.undoStack.push(this.cloneTemplate());
+        if (this.undoStack.length > this.MAX_UNDO) this.undoStack.shift();
+        this.redoStack = [];
+        this.updateHistoryButtons();
+    },
+
+    undo() {
+        if (!this.undoStack.length) { this.setStatus('没有可撤销的操作'); return; }
+        this.redoStack.push(this.cloneTemplate());
+        this.template = this.undoStack.pop();
+        this.normalizeTemplate();
+        this.selectedEls = [];
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已撤销');
+    },
+
+    redo() {
+        if (!this.redoStack.length) { this.setStatus('没有可重做的操作'); return; }
+        this.undoStack.push(this.cloneTemplate());
+        if (this.undoStack.length > this.MAX_UNDO) this.undoStack.shift();
+        this.template = this.redoStack.pop();
+        this.normalizeTemplate();
+        this.selectedEls = [];
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus('已重做');
+    },
+
+    updateHistoryButtons() {
+        if (!this.dom.btnUndo) return;
+        this.dom.btnUndo.disabled = !this.undoStack.length;
+        this.dom.btnRedo.disabled = !this.redoStack.length;
+    },
+
+    cloneTemplate() { return JSON.parse(JSON.stringify(this.template || null)); }
+});

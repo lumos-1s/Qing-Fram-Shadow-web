@@ -137,6 +137,40 @@ function setupCanvas(app, canvasW, canvasH) {
 }
 
 // ── 模板图层样式(对应原版 renderToCanvas 非卡片体)──
+// 整体卡片圆角:跟随“边框圆角(最外层边框图层 cornerConfig)”,未配置时回退到合成短边的 5%。
+// 供 renderTemplateStyle(镂空四角)与 beginCardClip(元素叠层剪辑)共用,保证两者一致。
+function computeCardRadii(template, cw, ch) {
+    const ccCard = template.cornerConfig || {};
+    const outerRound = ccCard.outerRound === 1;
+    const maxCardR = Math.floor(Math.min(cw, ch) / 2);
+    // 最外层可见边框图层(= 绘制时最后画在最上层、整体形状可见的那层):其 cornerConfig 即“边框圆角”
+    let borderLayer = null;
+    for (let i = 0; i < (template.layerList || []).length; i++) {
+        const l = (template.layerList || [])[i];
+        if (l && l.visible !== false) { borderLayer = l; break; }
+    }
+    const blConf = borderLayer && borderLayer.cornerConfig;
+    const hasBorderRadii = !!(blConf && (blConf.cornerRadiusAll != null || blConf.cornerRadiusTL != null || blConf.cornerRadiusTR != null || blConf.cornerRadiusBL != null || blConf.cornerRadiusBR != null));
+    const blAll = blConf ? clamp(blConf.cornerRadiusAll || 0, 0, maxCardR) : 0;
+    const blOne = (k) => (blConf && (blConf[k] || 0) > 0) ? clamp(blConf[k], 0, maxCardR) : blAll;
+    const fallbackR = Math.round(Math.min(cw, ch) * 0.05);
+    const card = hasBorderRadii
+        ? { tl: blOne('cornerRadiusTL'), tr: blOne('cornerRadiusTR'), bl: blOne('cornerRadiusBL'), br: blOne('cornerRadiusBR') }
+        : { tl: fallbackR, tr: fallbackR, bl: fallbackR, br: fallbackR };
+    return { outerRound, tl: card.tl, tr: card.tr, bl: card.bl, br: card.br };
+}
+
+// 若卡片为圆角(outerRound),将元素叠层(Logo/贴纸/自由文字/装饰)剪辑到卡片轮廓内,
+// 保证 Logo 只出现在“加边框后的图片之中”,不会透出圆角镂空区。返回是否已 clip(需要 restore)。
+function beginCardClip(ctx, template, cw, ch) {
+    const c = computeCardRadii(template, cw, ch);
+    if (!c.outerRound) return false;
+    ctx.save();
+    buildRoundedPath(ctx, 0, 0, cw, ch, c.tl, c.tr, c.bl, c.br);
+    ctx.clip();
+    return true;
+}
+
 function renderTemplateStyle(app) {
     const { image, template } = app;
     const img = image.el;
@@ -145,6 +179,12 @@ function renderTemplateStyle(app) {
     const cs = computeCanvasSize(img.naturalWidth, img.naturalHeight, template);
     const canvasW = cs[0], canvasH = cs[1];
     const ctx = setupCanvas(app, canvasW, canvasH);
+
+    // 圆角卡片(outerRound):整体图片的圆角跟随“边框圆角”设置,四角真镂空,形成圆角卡片外观。
+    // 不整体 clip:裁剪态下 Chromium 对照片 drawImage 走慢路径,周期纹理在特定缩放比会出现摩尔纹横线;
+    // 改为整图绘制完毕后用 destination-out 镂空四角(外观与导出一致且无混叠线)。元素叠层另行剪辑。
+    const card = computeCardRadii(template, canvasW, canvasH);
+    const outerRound = card.outerRound;
 
     // 白底
     ctx.fillStyle = '#ffffff';
@@ -168,13 +208,26 @@ function renderTemplateStyle(app) {
     // 全局光影
     applyGlobalLight(ctx, template.lightEffect, canvasW, canvasH);
 
+    // 圆角卡片(outerRound):整图完成后按边框圆角镂空四角,形成整体圆角卡片;照片圆角另在临时画布处理,不受此影响
+    if (outerRound) {
+        punchRoundedCorners(ctx, 0, 0, canvasW, canvasH, card.tl, card.tr, card.bl, card.br);
+    }
+
     ctx.restore();
 
-    // 元素叠层(基准画布像素坐标):文字/贴纸/四角括号/EXIF 底条 + Logo
+    // 元素叠层(基准画布像素坐标):文字/贴纸/四角括号/EXIF 参数 + Logo
     const cw = app.dom.canvas.width, ch = app.dom.canvas.height;
-    drawDecoration(ctx, template.decorConfig || {}, cw, ch, image);
+    const scl = canvasW > 0 ? cw / canvasW : 1;
+    const pm = image.el ? (template.baseMargin || {}) : {};
+    const pih = (image.el ? image.el.naturalHeight : 0) * (pm.imgScale || 1);
+    const pusableH = canvasH - (pm.marginTop || 0) - (pm.marginBottom || 0);
+    const stripTop = image.el ? ((pm.marginTop || 0) + (pusableH - pih) / 2 + (pm.imgOffsetY || 0) + pih) * scl : ch;
+    // Logo/贴纸/文字/装饰仅允许出现在“加边框后的成品图片”范围内:圆角卡片时剪辑到卡片轮廓
+    const cardClip = beginCardClip(ctx, template, cw, ch);
+    drawDecoration(ctx, template.decorConfig || {}, cw, ch, image, template, stripTop);
     drawDraftText(ctx, template, cw, ch);
     drawLogoElements(ctx, template.logoElements || [], cw, ch);
+    if (cardClip) ctx.restore();
 
     app.applyZoomStyle();
 }
@@ -380,6 +433,11 @@ function applyStroke(ctx, stroke, x, y, w, h, corners) {
 // 构建圆角矩形路径(与原??buildRoundedPath 一??
 function buildRoundedPath(ctx, x, y, w, h, tl, tr, bl, br) {
     ctx.beginPath();
+    appendRoundedPath(ctx, x, y, w, h, tl, tr, bl, br);
+}
+
+// 不重置当前路径地追加一条圆角矩形子路径(供 evenodd 双路径镂空等复用)
+function appendRoundedPath(ctx, x, y, w, h, tl, tr, bl, br) {
     ctx.moveTo(x + tl, y);
     ctx.lineTo(x + w - tr, y);
     ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
@@ -392,6 +450,20 @@ function buildRoundedPath(ctx, x, y, w, h, tl, tr, bl, br) {
     ctx.closePath();
 }
 
+// 用 destination-out 镂空矩形四角外的圆角外侧区域(等效"圆角裁剪"),且不影响已画内容的其他区域。
+// 与 clip 的差别:照片 drawImage 全程不处于裁剪态,规避 Chromium 裁剪态缩放照片的高频纹理混叠横线。
+function punchRoundedCorners(ctx, x, y, w, h, tl, tr, bl, br) {
+    if (!tl && !tr && !bl && !br) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    appendRoundedPath(ctx, x, y, w, h, tl || 0, tr || 0, bl || 0, br || 0);
+    ctx.fill('evenodd');
+    ctx.restore();
+}
+
 // 照片绘制(投影 + 圆角裁剪),与原??drawOriginImage 一??
 function drawOriginImage(ctx, img, margin, cw, ch, template) {
     const iw = img.naturalWidth * (margin.imgScale || 1);
@@ -401,8 +473,9 @@ function drawOriginImage(ctx, img, margin, cw, ch, template) {
     const ox = (margin.marginLeft || 0) + (usableW - iw) / 2 + (margin.imgOffsetX || 0);
     const oy = (margin.marginTop || 0) + (usableH - ih) / 2 + (margin.imgOffsetY || 0);
     const corner = template.cornerConfig || {};
-    const rTL = corner.cornerRadiusTL || 0, rTR = corner.cornerRadiusTR || 0;
-    const rBL = corner.cornerRadiusBL || 0, rBR = corner.cornerRadiusBR || 0;
+    let rTL = corner.cornerRadiusTL || 0, rTR = corner.cornerRadiusTR || 0;
+    let rBL = corner.cornerRadiusBL || 0, rBR = corner.cornerRadiusBR || 0;
+    // 照片圆角只由右侧栏 cornerRadius 控制;outerRound 仅作用于边框/卡片外角,不强改照片
     const hasCorner = rTL > 0 || rTR > 0 || rBL > 0 || rBR > 0;
 
     // 照片后的投影:优先使用图层中启用的阴影参数
@@ -462,8 +535,8 @@ function drawOriginImage(ctx, img, margin, cw, ch, template) {
             ctx.fillRect(cx, cy, cw2, ch2);
             ctx.restore();
         }
-    } else {
-        // 默认小阴??        
+} else if (corner.outerRound !== 1) {
+        // 默认小阴影:圆角卡片(outerRound)四角镂空后,偏移阴影会从镂空角/右侧/下侧漏出黑边,不再绘制
             ctx.save();
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
         if (hasCorner) {
@@ -475,12 +548,22 @@ function drawOriginImage(ctx, img, margin, cw, ch, template) {
         ctx.restore();
     }
 
-    // 照片本体
+    // 照片本体:同尺寸临时画布(设备分辨率)绘制后单独镂空四角,再 1:1 贴回主画布。
+    // 这样照片圆角外露出下方边框/卡片本体,而不会把边框凿穿成透明(否则深色主题下四角透出黑底);
+    // 主画布 drawImage 全程不处于裁剪态,规避裁剪态缩放照片产生的高频纹理摩尔纹横线。
     if (hasCorner) {
+        const sc = Math.abs(ctx.getTransform().a) || 1;
+        const tmpW = Math.max(1, Math.round(iw * sc));
+        const tmpH = Math.max(1, Math.round(ih * sc));
+        const tmp = document.createElement('canvas');
+        tmp.width = tmpW; tmp.height = tmpH;
+        const tg = tmp.getContext('2d');
+        tg.setTransform(sc, 0, 0, sc, 0, 0);
+        tg.drawImage(img, 0, 0, iw, ih);
+        punchRoundedCorners(tg, 0, 0, iw, ih, rTL, rTR, rBL, rBR);
         ctx.save();
-        buildRoundedPath(ctx, ox, oy, iw, ih, rTL, rTR, rBL, rBR);
-        ctx.clip();
-        ctx.drawImage(img, ox, oy, iw, ih);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(tmp, ox * sc, oy * sc, tmpW, tmpH);
         ctx.restore();
     } else {
         ctx.drawImage(img, ox, oy, iw, ih);
@@ -713,18 +796,30 @@ function buildExifLines(template, image) {
 }
 
 // 装饰总入??原版 drawDecoration:文字/贴纸/四角括号/EXIF 底条)
-function drawDecoration(ctx, decor, cw, ch, image) {
+function drawDecoration(ctx, decor, cw, ch, image, template, stripTop) {
     if (!decor) return;
 
-    // 文字??    
-for (const textLine of (decor.textLines || [])) {
+    const exifOn = (decor.exifAutoText || 0) === 1;
+    const tpl = template || {};
+    const manual = (tpl.manualExif && typeof tpl.manualExif === 'object') ? tpl.manualExif : {};
+    const hasManual = !!(manual.brand || manual.model || manual.focal || manual.aperture || manual.iso || manual.shutter);
+    const src = hasManual ? manual : ((image && image.exif) || {});
+    const exifParts = [
+        src.brand && src.model ? `${src.brand} ${src.model}` : (src.brand || src.model || ''),
+        (src.shutter != null ? src.shutter : ''), (src.aperture != null ? src.aperture : ''),
+        (src.iso != null ? src.iso : ''), (src.focal != null ? src.focal : ''),
+    ].map(String).filter(Boolean);
+    const lines = decor.textLines || [];
+    const exifLineIdx = exifOn ? lines.findIndex(l => l.text && (l.align === 'bottom' || l.align === 'exif')) : -1;
+
+    for (let i = 0; i < lines.length; i++) {
+        const textLine = lines[i];
         if (!textLine.text) continue;
+        if (i === exifLineIdx) continue;
         drawTextLine(ctx, textLine, cw, ch, false, 0, 0);
     }
-    // web ??EXIF 水印??
     const exifLines = buildExifLines({ decor }, image);
     for (const line of exifLines) drawTextLine(ctx, line, cw, ch, false, 0, 0);
-    // 贴纸
     for (const sticker of (decor.stickers || [])) {
         if (!sticker.src) continue;
         const tex = getElementBitmap(sticker.src);
@@ -738,12 +833,34 @@ for (const textLine of (decor.textLines || [])) {
         ctx.drawImage(tex, -sw / 2, -sh / 2, sw, sh);
         ctx.restore();
     }
-    // 四角括号
     if ((decor.cornerDecorEnable || 0) === 1) {
         drawCornerDecor(ctx, decor.cornerDecorType || 'line', decor.cornerDecorSize || 30, cw, ch);
     }
-    // EXIF 底条
-    drawExifBar(ctx, decor, cw, ch);
+    if (exifOn) {
+        const srcLine = exifLineIdx >= 0 ? lines[exifLineIdx] : null;
+        const text = exifParts.length ? exifParts.join(' · ') : (srcLine && srcLine.text);
+        if (text) drawExifStrip(ctx, String(text), stripTop, cw, ch);
+    }
+}
+
+// EXIF 参数文字:黑色、字号随底部留白(图片底边~卡片底边)自适应,垂直居中于留白条内
+function drawExifStrip(ctx, text, stripTop, cw, ch) {
+    const stripH = Math.max(4, ch - (stripTop || 0));
+    const minFs = Math.max(11, Math.round(cw / 260));
+    let fs = Math.round(stripH * 0.55);
+    const maxFs = Math.max(stripH * 0.7, minFs + 2);
+    fs = Math.max(minFs, Math.min(fs, maxFs));
+    const font = (s) => `400 ${s}px "Microsoft YaHei"`;
+    ctx.font = font(fs);
+    const padX = Math.max(16, cw * 0.015);
+    const avail = Math.max(1, cw - padX * 2);
+    const w = ctx.measureText(text).width;
+    if (w > avail && w > 0) fs = Math.max(minFs, Math.round(fs * avail / w));
+    ctx.font = font(fs);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.fillText(text, cw / 2, stripTop + stripH / 2 + fs * 0.06);
 }
 
 // ── 卡片样式(原版 renderCardStyle:独立管线,不画图层)──
@@ -853,7 +970,8 @@ function renderCardStyle(app) {
 
     // 元素叠层(基准画布像素坐标)
     const cw = app.dom.canvas.width, ch = app.dom.canvas.height;
-    drawDecoration(ctx, template.decorConfig || {}, cw, ch, image);
+    const cardScl = canvasW > 0 ? cw / canvasW : 1;
+    drawDecoration(ctx, template.decorConfig || {}, cw, ch, image, template, (drawY + drawH) * cardScl);
     drawDraftText(ctx, template, cw, ch);
     drawLogoElements(ctx, template.logoElements || [], cw, ch);
 

@@ -141,6 +141,7 @@
     "cornerRadiusBL": 18,
     "cornerRadiusBR": 18,
     "shapeType": "round",
+    "outerRound": 1,
     "customShapeSvg": ""
   },
   "filmTearConfig": {
@@ -187,6 +188,6 @@
     "cornerDecorEnable": 0,
     "cornerDecorType": "none",
     "cornerDecorSize": 30,
-    "exifAutoText": 1
+    "exifAutoText": 0
   }
 }

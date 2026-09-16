@@ -1,7 +1,26 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { createStateStore } = require('./state');
+
+// 渲染进程通过 qflocal:// 协议在磁盘上直接读取照片(不经过 base64 过 IPC,节省内存)
+protocol.registerSchemesAsPrivileged([
+    { scheme: 'qflocal', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+]);
+
+// 主进程侧 EXIF 解析(渲染进程 exif.js 以 CommonJS 导出)
+const exifUtil = require(path.join(__dirname, '..', 'renderer', 'js', 'exif.js'));
+function readExif(filePath) {
+    try {
+        if (!filePath || !fs.existsSync(filePath)) return {};
+        const buf = fs.readFileSync(filePath);
+        if (!buf || !buf.length) return {};
+        const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+        const raw = exifUtil.parseExif(ab);
+        return exifUtil.exifSummary(raw) || {};
+    } catch (e) { return {}; }
+}
 
 if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -36,6 +55,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    protocol.handle('qflocal', (request) => {
+        try {
+            const u = new URL(request.url);
+            const filePath = u.searchParams.get('p');
+            if (!filePath || !fs.existsSync(filePath)) return new Response('Not Found', { status: 404 });
+            return net.fetch(pathToFileURL(filePath).href);
+        } catch (e) {
+            return new Response('Not Found', { status: 404 });
+        }
+    });
     createWindow();
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -158,6 +187,61 @@ ipcMain.handle('import-template', async () => {
     } catch (e) { return { ok: false, error: '模板格式错误：' + e.message }; }
 });
 
+// ── .qfs 工程文件:自包含单文件(模板 + 源照片 + 每图模板,照片以 base64 内嵌) ──
+ipcMain.handle('export-qfs', async (_e, data) => {
+    const st = loadState();
+    const baseName = (data && data.name ? String(data.name) : '未命名工程') + '.qfs';
+    const def = validDir(st.lastExportDir) ? path.join(st.lastExportDir, baseName) : baseName;
+    const { canceled, filePath } = await dialog.showSaveDialog({
+        title: '导出工程 (.qfs)',
+        defaultPath: def,
+        filters: [
+            { name: '清框影工程 (*.qfs)', extensions: ['qfs'] },
+            { name: 'JSON', extensions: ['json'] }
+        ]
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    try {
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+        saveState({ lastExportDir: path.dirname(filePath) });
+        return { ok: true };
+    } catch (e) { return { ok: false, error: String(e) }; }
+});
+
+ipcMain.handle('open-qfs', async () => {
+    const st = loadState();
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: '打开工程 (.qfs)',
+        defaultPath: validDir(st.lastOpenDir) ? st.lastOpenDir : undefined,
+        filters: [
+            { name: '清框影工程 (*.qfs)', extensions: ['qfs'] },
+            { name: 'JSON', extensions: ['json'] }
+        ],
+        properties: ['openFile']
+    });
+    if (canceled || !filePaths.length) return { ok: false, canceled: true };
+    try {
+        const data = JSON.parse(fs.readFileSync(filePaths[0], 'utf-8'));
+        saveState({ lastOpenDir: path.dirname(filePaths[0]) });
+        return { ok: true, name: path.basename(filePaths[0], path.extname(filePaths[0])), data };
+    } catch (e) { return { ok: false, error: '工程文件格式错误：' + e.message }; }
+});
+
+ipcMain.handle('get-user', () => {
+    const st = loadState();
+    return st.user || null;
+});
+
+ipcMain.handle('save-user', (_e, user) => {
+    saveState({ user });
+    return { ok: true };
+});
+
+ipcMain.handle('logout-user', () => {
+    saveState({ user: null });
+    return { ok: true };
+});
+
 ipcMain.handle('open-image', async () => {
     const st = loadState();
     const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -169,7 +253,7 @@ ipcMain.handle('open-image', async () => {
     if (canceled || filePaths.length === 0) return null;
     saveState({ lastOpenDir: path.dirname(filePaths[0]) });
     const fp = filePaths[0];
-    return { name: path.basename(fp), path: fp, data: fs.readFileSync(fp).toString('base64') };
+    return { name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: readExif(fp) };
 });
 
 ipcMain.handle('open-images', async () => {
@@ -182,7 +266,24 @@ ipcMain.handle('open-images', async () => {
     });
     if (canceled || !filePaths.length) return null;
     saveState({ lastOpenDir: path.dirname(filePaths[0]) });
-    return filePaths.map(fp => ({ name: path.basename(fp), path: fp, data: fs.readFileSync(fp).toString('base64') }));
+    return filePaths.map(fp => ({ name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: readExif(fp) }));
+});
+
+ipcMain.handle('read-exif', (_e, filePath) => readExif(String(filePath || '')));
+
+// 贴纸 / 自定义图标:体积小且须内嵌进模板(导出/导入不丢),仍走 base64 dataUrl
+ipcMain.handle('open-sticker-image', async () => {
+    const st = loadState();
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: '选择贴纸 / 图标图片',
+        defaultPath: validDir(st.lastOpenDir) ? st.lastOpenDir : undefined,
+        filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
+        properties: ['openFile']
+    });
+    if (canceled || filePaths.length === 0) return null;
+    saveState({ lastOpenDir: path.dirname(filePaths[0]) });
+    const fp = filePaths[0];
+    return { name: path.basename(fp), data: fs.readFileSync(fp).toString('base64') };
 });
 
 ipcMain.handle('save-image-base64', async (_e, { data, filename }) => {

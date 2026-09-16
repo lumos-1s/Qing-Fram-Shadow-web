@@ -14,5 +14,12 @@ contextBridge.exposeInMainWorld('qingframe', {
     loadTemplate: (name) => ipcRenderer.invoke('load-template', name),
     deleteTemplate: (name) => ipcRenderer.invoke('delete-template', name),
     exportTemplate: (name, data) => ipcRenderer.invoke('export-template', { name, data }),
-    importTemplate: () => ipcRenderer.invoke('import-template')
+    importTemplate: () => ipcRenderer.invoke('import-template'),
+    exportQfs: (data) => ipcRenderer.invoke('export-qfs', data),
+    openQfs: () => ipcRenderer.invoke('open-qfs'),
+    getUser: () => ipcRenderer.invoke('get-user'),
+    saveUser: (user) => ipcRenderer.invoke('save-user', user),
+    logoutUser: () => ipcRenderer.invoke('logout-user'),
+    readExif: (filePath) => ipcRenderer.invoke('read-exif', filePath),
+    openStickerImage: () => ipcRenderer.invoke('open-sticker-image')
 });

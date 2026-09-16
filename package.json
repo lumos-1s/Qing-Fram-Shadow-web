@@ -2,13 +2,58 @@
   "name": "qingframe-web",
   "version": "0.1.0",
   "description": "清框影 Web 重构版(Electron + HTML/CSS/JS)",
-  "main": "src/main/index.js",
+"main": "src/main/index.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "lint": "eslint src --ext .js",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
   },
   "author": "",
   "license": "MIT",
+  "build": {
+    "appId": "com.qingframe.web",
+    "productName": "清框影",
+    "executableName": "Qingframe",
+    "copyright": "Copyright © 2026 清框影",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "shared/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "lumos-1s",
+        "repo": "Qing-Fram-Shadow-web"
+      }
+    ],
+    "win": {
+      "icon": "src/main/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "清框影",
+      "artifactName": "Qingframe-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Qingframe-Portable-${version}-${arch}.${ext}"
+    }
+  },
   "devDependencies": {
-    "electron": "^31.0.0"
+    "electron": "^31.0.0",
+    "eslint": "^8.57.0",
+    "electron-builder": "^26.0.0"
   }
 }

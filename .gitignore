@@ -1,7 +1,9 @@
 node_modules/
-web-app/web-app
+dist/
 npm-debug.log*
 *.log
 s_err.log
 .DS_Store
 Thumbs.db
+icon_new_2048.png
+resume_input.png

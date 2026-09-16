@@ -384,13 +384,195 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.drawImage(img, margin, margin);
     }
 
+    // ── 自研特色风格:仿古邮票 / 撕纸边 / 折角相纸 / 胶带挂片 ──
+    // 确定性噪声:同照片同风格下渲染结果稳定(基于照片尺寸+盐的 Java LCG)
+    function styleNoise(iw, ih, salt) { return javaRandom(iw * 7919 + ih * 104729 + salt); }
+
+    function stampMatte(size) {
+        const m = Math.max(56, Math.floor(size * 2));
+        const d = Math.max(10, Math.floor(m / 4));
+        return { m, d };
+    }
+    // 邮票齿孔:沿四周外缘打半圆孔(destination-out,露出透明底)
+    function stampPerforate(g, w, h, d) {
+        const r = d / 2, pitch = Math.max(Math.ceil(d * 1.6), d + 2);
+        g.save();
+        g.globalCompositeOperation = 'destination-out';
+        for (let x = r; x < w; x += pitch) {
+            g.beginPath(); g.arc(x, 0, r, 0, 6.2832); g.fill();
+            g.beginPath(); g.arc(x, h, r, 0, 6.2832); g.fill();
+        }
+        for (let y = r; y < h; y += pitch) {
+            g.beginPath(); g.arc(0, y, r, 0, 6.2832); g.fill();
+            g.beginPath(); g.arc(w, y, r, 0, 6.2832); g.fill();
+        }
+        g.restore();
+    }
+    function styleStampPostage(img, size, g, iw, ih) {
+        const { m, d } = stampMatte(size);
+        const w = iw + m * 2, h = ih + m * 2;
+        g.fillStyle = '#f6f3ea';
+        g.fillRect(0, 0, w, h);
+        stampPerforate(g, w, h, d);
+        const px = Math.max(6, Math.floor(d * 0.9));
+        g.drawImage(img, px, px, iw, ih);
+        g.strokeStyle = 'rgba(120,110,88,0.5)';
+        g.lineWidth = 1;
+        g.strokeRect(px - 0.5, px - 0.5, iw + 1, ih + 1);
+        const ink = 'rgba(66,58,120,0.62)';
+        const fs = Math.max(11, Math.floor(m / 5));
+        const fy = Math.floor(fs * 0.36);
+        drawTrackedTextL(g, '中国邮政', w / 2, Math.floor(px / 2) + fy, fs, ink, true, 0.55, null);
+        const val = '¥ 0.80';
+        drawTrackedTextL(g, val, w / 2, h - Math.floor((px - fs) / 2) + fy, fs, ink, true, 0.55, null);
+        // 邮戳(右上,盖在照片上)
+        const rnd = styleNoise(iw, ih, 9301);
+        const pr0 = Math.max(16, Math.floor(Math.min(iw, ih) * 0.16));
+        g.save();
+        g.translate(px + Math.floor(iw * 0.76), px + Math.floor(ih * 0.30));
+        g.rotate(-0.14);
+        g.strokeStyle = 'rgba(46,40,108,0.4)';
+        g.lineWidth = 1.5;
+        g.beginPath(); g.arc(0, 0, pr0, 0, 6.2832); g.stroke();
+        g.beginPath(); g.arc(0, 0, pr0 * 0.55, 0, 6.2832); g.stroke();
+        g.lineWidth = 1.1;
+        for (let k = 0; k < 2; k++) {
+            const yy = (k - 0.5) * pr0 * 0.68;
+            g.beginPath();
+            for (let x = -pr0; x <= pr0; x += pr0 / 8) g.lineTo(x, yy + (rnd(3) - 1) * 3);
+            g.stroke();
+        }
+        g.restore();
+    }
+
+    // 撕纸边:照片轻微倾斜 + 白纸毛边镂空(角度/毛边均由尺寸+盐确定,稳定可复现)
+    function tornPaperParams(iw, ih, size) {
+        const rnd = styleNoise(iw, ih, 113);
+        const deg = (rnd(500) - 250) / 250 * 2.4;
+        const a = deg * 0.01745329252;
+        const s = Math.sin(a), c = Math.cos(a);
+        const bw = Math.ceil(iw * c + ih * Math.abs(s));
+        const bh = Math.ceil(iw * Math.abs(s) + ih * c);
+        const pad = Math.max(40, Math.floor(size * 1.4));
+        return { a, bw, bh, pad, rnd };
+    }
+    function tornHolePath(rnd, iw, ih, amp) {
+        const n = Math.max(3, Math.floor(Math.max(iw, ih) / 16));
+        const p = new Path2D();
+        const pts = [];
+        const j = (v) => v + (rnd(3) - 1) * amp;
+        const px0 = -iw / 2, py0 = -ih / 2;
+        for (let i = 0; i <= n; i++) pts.push([j(px0 + iw * i / n), py0 + (rnd(3) - 1) * amp]);
+        for (let i = 1; i <= n; i++) pts.push([iw / 2 + (rnd(3) - 1) * amp, j(py0 + ih * i / n)]);
+        for (let i = 1; i <= n; i++) pts.push([j(iw / 2 - iw * i / n), ih / 2 + (rnd(3) - 1) * amp]);
+        for (let i = 1; i <= n; i++) pts.push([-iw / 2 + (rnd(3) - 1) * amp, j(ih / 2 - ih * i / n)]);
+        p.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]);
+        p.closePath();
+        return p;
+    }
+    function styleTornPaper(img, size, g, iw, ih) {
+        const { a, bw, bh, pad, rnd } = tornPaperParams(iw, ih, size);
+        const w = bw + pad * 2, h = bh + pad * 2;
+        const cx = w / 2, cy = h / 2;
+        const paper = '#fbfaf4';
+        g.fillStyle = paper;
+        g.fillRect(0, 0, w, h);
+        g.save();
+        g.translate(cx, cy);
+        g.rotate(a);
+        g.drawImage(img, -iw / 2, -ih / 2);
+        g.restore();
+        // 白纸覆盖(留毛边孔):先画纸,再按抖动照片轮廓挖空,边缘描淡影
+        const ov = newCanvas(w, h);
+        const og = ov.getContext('2d');
+        og.fillStyle = paper;
+        og.fillRect(0, 0, w, h);
+        const amp = Math.max(3, Math.floor(Math.min(iw, ih) * 0.014));
+        const hole = tornHolePath(rnd, iw, ih, amp);
+        og.save();
+        og.translate(cx, cy);
+        og.rotate(a);
+        og.globalCompositeOperation = 'destination-out';
+        og.fillStyle = '#000';
+        og.fill(hole);
+        og.globalCompositeOperation = 'source-over';
+        og.strokeStyle = 'rgba(0,0,0,0.07)';
+        og.lineWidth = 2;
+        og.stroke(hole);
+        og.restore();
+        g.drawImage(ov, 0, 0);
+    }
+
+    // 折角相纸:白卡纸四边留白,右上角撕折(缺角 + 翻起的纸角落在照片上)
+    function styleFoldCorner(img, size, g, iw, ih) {
+        const w = iw + size * 2, h = ih + size * 2;
+        const px = size, py = size;
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, w, h);
+        g.drawImage(img, px, py);
+        const fl = Math.max(36, Math.floor(Math.min(iw, ih) * 0.10));
+        const P0 = [px + iw, py], P1 = [px + iw - fl, py], P2 = [px + iw, py + fl], R = [px + iw - fl, py + fl];
+        // 先镂空被折掉的照片角(露出底色)
+        g.save();
+        g.globalCompositeOperation = 'destination-out';
+        g.beginPath();
+        g.moveTo(P0[0], P0[1]); g.lineTo(P1[0], P1[1]); g.lineTo(P2[0], P2[1]); g.closePath();
+        g.fill();
+        g.restore();
+        // 折痕投影
+        g.strokeStyle = 'rgba(0,0,0,0.12)';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(P1[0] + 1, P1[1] + 2); g.lineTo(P2[0] + 2, P2[1] - 1);
+        g.stroke();
+        // 翻起的纸角(纸背高光渐变面)
+        const lg = g.createLinearGradient(P2[0], P2[1], P1[0], P1[1]);
+        lg.addColorStop(0, 'rgb(245,242,233)');
+        lg.addColorStop(1, 'rgb(226,222,210)');
+        g.fillStyle = lg;
+        g.beginPath();
+        g.moveTo(P1[0], P1[1]); g.lineTo(R[0], R[1]); g.lineTo(P2[0], P2[1]); g.closePath();
+        g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.16)';
+        g.lineWidth = 1;
+        g.stroke();
+    }
+
+    // 胶带挂片:牛皮纸底 + 和纸胶带(半透明)压住照片
+    function drawTape(g, x, y, len, th, ang, color) {
+        g.save();
+        g.translate(x, y);
+        g.rotate(ang);
+        g.fillStyle = color;
+        fillRoundRectCtx(g, -len / 2, -th / 2, len, th, th / 2);
+        g.strokeStyle = 'rgba(255,255,255,0.5)';
+        g.lineWidth = 1;
+        const rr = th * 0.7;
+        g.beginPath(); g.moveTo(-len / 2 + rr, -th / 2 + 1); g.quadraticCurveTo(-len / 2 + rr, 0, -len / 2 + rr, th / 2 - 1); g.stroke();
+        g.beginPath(); g.moveTo(len / 2 - rr, -th / 2 + 1); g.quadraticCurveTo(len / 2 - rr, 0, len / 2 - rr, th / 2 - 1); g.stroke();
+        g.restore();
+    }
+    function stylePinboardTape(img, size, g, iw, ih) {
+        const w = iw + size * 2, h = ih + size * 2;
+        g.fillStyle = '#f5f2ea';
+        g.fillRect(0, 0, w, h);
+        g.drawImage(img, size, size);
+        const th = Math.max(14, Math.floor(size * 0.5));
+        const len = Math.max(90, Math.floor(iw * 0.3));
+        drawTape(g, size + Math.floor(len * 0.35), size - Math.floor(th * 0.3), len, th, -0.16, 'rgba(222,208,156,0.62)');
+        drawTape(g, w - size - Math.floor(len * 0.35), size - Math.floor(th * 0.3), len, th, 0.16, 'rgba(156,178,208,0.55)');
+        drawTape(g, w / 2, h - size + Math.floor(th * 0.3), Math.floor(len * 0.7), th, 0.04, 'rgba(190,168,190,0.5)');
+    }
+
     // ── 阶段二基设:风格序号 / Java Random(原件 cameraFor 的 seed RNG)──
     const ORD = { NONE:0,SIMPLE:1,POLAROID:2,FILM_STRIP:3,ROUNDED:4,DOUBLE_LINE:5,VINTAGE:6,GRADIENT:7,DROP_SHADOW:8,
         BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,
         XIAOMI_IMP:17,CARD_LEICA:18,CARD_LOGO_PARAM:19,CARD_PURE_LOGO:20,CARD_SIMPLE:21,CARD_IMMERSION:22,
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
-        PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35 };
+        PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35,
+        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -1604,6 +1786,17 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const barH = Math.max(36, size), pad = pad2(8);
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
+            case 'STAMP_POSTAGE': {
+                const sd = stampMatte(size);
+                return { w: iw + sd.m * 2, h: ih + sd.m * 2 };
+            }
+            case 'TEARED_PAPER': {
+                const tp = tornPaperParams(iw, ih, size);
+                return { w: tp.bw + tp.pad * 2, h: tp.bh + tp.pad * 2 };
+            }
+            case 'FOLD_CORNER':
+            case 'PINBOARD_TAPE':
+                return { w: iw + size * 2, h: ih + size * 2 };
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
@@ -1653,6 +1846,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             COLOR_CLASSIC: styleColorClassic, COLOR_REFINED: styleColorRefined, ART_CARD: styleArtCard,
             FUJI_WHITE: styleFujiWhite, SIMPLE_FILM: styleSimpleFilm,
             PARAM_TOP_LEFT: styleParamTopLeft, PARAM_BOTTOM_LEFT: styleParamBottomLeft, PARAM_BOTTOM_SINGLE: styleParamBottomSingle,
+            STAMP_POSTAGE: styleStampPostage, TEARED_PAPER: styleTornPaper,
+            FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 

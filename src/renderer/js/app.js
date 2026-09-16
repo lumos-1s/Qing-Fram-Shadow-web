@@ -41,6 +41,7 @@ window.App = {
     _skipPuzzleCapture: false,
 
     init() {
+        this.initSplash();
         this.cacheDom();
         this.bind();
         this.loadPresets();
@@ -50,6 +51,8 @@ window.App = {
         this.setupShortcuts();
         this.setupPanelInteractions();
         this.updateHistoryButtons();
+        this.initLogin();
+        this.initDraft();
     },
 
     cacheDom() {
@@ -67,6 +70,18 @@ window.App = {
             tabs: $('inspTabs'), panels: Array.from(document.querySelectorAll('.tab-panel')),
             stRes: $('stRes'), stInfo: $('stInfo'), stCanvas: $('stCanvas'),
             btnCompare: $('btnCompare'),
+            loginStatus: $('loginStatus'),
+            loginModal: $('loginModal'),
+            loginModalClose: $('loginModalClose'),
+            loginUsername: $('loginUsername'),
+            loginNickname: $('loginNickname'),
+            loginSubmit: $('loginSubmit'),
+            loginLogout: $('loginLogout'),
+            loginFormView: $('loginFormView'),
+            loginProfileView: $('loginProfileView'),
+            loginAvatar: $('loginAvatar'),
+            loginDisplayName: $('loginDisplayName'),
+            loginUsernameDisplay: $('loginUsernameDisplay'),
         };
     },
 
@@ -96,6 +111,13 @@ window.App = {
         d.btnCompare.addEventListener('mousedown', () => this.setCompare(true));
         d.btnCompare.addEventListener('mouseup', () => this.setCompare(false));
         d.btnCompare.addEventListener('mouseleave', () => this.setCompare(false));
+        d.loginStatus.addEventListener('click', () => this.openLoginModal());
+        d.loginModalClose.addEventListener('click', () => this.closeLoginModal());
+        d.loginModal.addEventListener('mousedown', e => { if (e.target === d.loginModal) this.closeLoginModal(); });
+        d.loginSubmit.addEventListener('click', () => this.doLogin());
+        d.loginLogout.addEventListener('click', () => this.doLogout());
+        d.loginUsername.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
+        d.loginNickname.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
         this.setupDragDrop();
         this.bindInteractive();
     },
@@ -377,9 +399,11 @@ window.App = {
 
     moveElement(drag, x, y) {
         const e = drag.ref;
-        if (drag.kind === 'logo') { e.x = x; e.y = y; e.offsetX = 0; e.offsetY = 0; }
-        else if (drag.kind === 'sticker') { e.x = x; e.y = y; }
-        else if (drag.kind === 'text') { e.x = x; e.y = y; }
+        const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
+        const clampV = (v, max, half) => half > 0 ? Math.max(half, Math.min(v, max - half)) : Math.max(0, Math.min(v, max));
+        if (drag.kind === 'logo') { e.x = clampV(x, cw, (e.size || 60) / 2); e.y = clampV(y, ch, (e.size || 60) / 2); e.offsetX = 0; e.offsetY = 0; }
+        else if (drag.kind === 'sticker') { e.x = clampV(x, cw, 20); e.y = clampV(y, ch, 20); }
+        else if (drag.kind === 'text') { e.x = clampV(x, cw, 30); e.y = clampV(y, ch, 20); }
         this.onSettingChanged();
     },
 
@@ -397,11 +421,14 @@ window.App = {
         if (!el || !el.kind) return;
         const e = el.obj;
         const $ = this.$;
-        const rot = $('slElementRotation'), op = $('slActiveIconOpacity');
-        if (rot) rot.value = Math.round(e.rotation || 0);
+        const rot = $('slElementRotation'), op = $('slActiveIconOpacity'), sz = $('slElementSize');
+        if (rot) rot.value = ((e.rotation || 0) % 360 + 360) % 360;
         if (op) op.value = Math.round(e.opacity != null ? e.opacity : 100);
-        this.updateLabel('lblElementRotation', Math.round(e.rotation || 0) + '°');
+        const sizeVal = el.kind === 'logo' ? Math.round(e.size || 60) : el.kind === 'sticker' ? Math.round((e.scale || 1) * 60) : 60;
+        if (sz) sz.value = sizeVal;
+        this.updateLabel('lblElementRotation', ((e.rotation || 0) % 360 + 360) % 360 + '°');
         this.updateLabel('lblActiveIconOpacity', Math.round(e.opacity != null ? e.opacity : 100) + '%');
+        this.updateLabel('lblElementSize', sizeVal);
     },
 
     /* ══ 默认模板 ══ */
@@ -466,48 +493,6 @@ window.App = {
         };
     },
 
-    /* ══ 四方法核心 ══ */
-    // 高频修改(拖滑块/输入文字):仅同步 + 防抖渲染,不压撤销栈
-    onSettingChanged() {
-        this.syncModelFromUI();
-        this.saveCurrentTemplate();
-        this.scheduleRender();
-    },
-
-    // 一次性提交(切换/勾选/按钮/change):压撤销栈 -> 清重做 -> 同步 -> 立即渲染
-    // 若处于手势中(滑块下按/文本框聚焦时已压过快照),则不重复压栈
-    onSettingCommit() {
-        if (!this._gesture) this.pushUndo();
-        this._commit();
-    },
-
-    // 手势开始:滑块 pointerdown / 文本框 focus 时压入手势前快照
-    beginGesture() {
-        if (this._gesture || !this.template || !this.image) return;
-        this._gesture = true;
-        this.pushUndo();
-        // 拖拽/拖动滑块期间用 900px 低分辨率即时渲染,松手后恢复全分辨率,桌面交互更流畅
-        if (this._gesturePrevMax == null) {
-            this._gesturePrevMax = this.displayMax !== undefined ? this.displayMax : 1800;
-            this.displayMax = 900;
-        }
-    },
-    // 手势结束:pointerup / blur
-    endGesture() {
-        if (this._gesture) this._gesture = false;
-        if (this._gesturePrevMax != null) {
-            this.displayMax = this._gesturePrevMax;
-            this._gesturePrevMax = null;
-            this.scheduleRender(true);
-        }
-    },
-    // 提交但不压栈(手势快照已在上一步压入)
-    commitNoPush() { this._commit(); },
-    _commit() {
-        this.syncModelFromUI();
-        this.saveCurrentTemplate();
-        this.scheduleRender(true);
-    },
 
     syncModelFromUI() {
         if (this.isUpdating || !this.template || !this.image) return;
@@ -919,6 +904,17 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             t.baseMargin.refLeft = t.baseMargin.marginLeft != null ? t.baseMargin.marginLeft : 80;
             t.baseMargin.refRight = t.baseMargin.marginRight != null ? t.baseMargin.marginRight : 80;
         }
+        const stripHash = (v) => (v == null ? '' : String(v)).replace(/^#+/, '');
+        (t.layerList || []).forEach(lay => {
+            if (lay.visible !== undefined) lay.visible = (lay.visible === false || lay.visible === 0) ? 0 : 1;
+            const f = lay.fillConfig || {}, s = lay.strokeConfig || {}, sg = lay.shadowGlowConfig || {};
+            if (f.fillHex) f.fillHex = stripHash(f.fillHex);
+            (f.gradientStops || []).forEach(g => { if (g && g.color) g.color = stripHash(g.color); });
+            if (s.strokeColorHex) s.strokeColorHex = stripHash(s.strokeColorHex);
+            (s.gradientStops || []).forEach(g => { if (g && g.color) g.color = stripHash(g.color); });
+            if (sg.shadowColorHex) sg.shadowColorHex = stripHash(sg.shadowColorHex);
+            if (sg.glowColorHex) sg.glowColorHex = stripHash(sg.glowColorHex);
+        });
     },
 
     requestRender() { this.scheduleRender(true); },
@@ -936,46 +932,6 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
     },
 
-    /* ══ 撤销 / 重做 ══ */
-    // 无条件压栈(离散操作/手势开始调用);连续手势的快照由 beginGesture 去重
-    pushUndo() {
-        this.undoStack.push(this.cloneTemplate());
-        if (this.undoStack.length > 60) this.undoStack.shift();
-        this.redoStack = [];
-        this.updateHistoryButtons();
-    },
-
-    undo() {
-        if (!this.undoStack.length) { this.setStatus('没有可撤销的操作'); return; }
-        this.redoStack.push(this.cloneTemplate());
-        this.template = this.undoStack.pop();
-        this.normalizeTemplate();
-        this.selectedEls = [];
-        this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus('已撤销');
-    },
-
-    redo() {
-        if (!this.redoStack.length) { this.setStatus('没有可重做的操作'); return; }
-        this.undoStack.push(this.cloneTemplate());
-        this.template = this.redoStack.pop();
-        this.normalizeTemplate();
-        this.selectedEls = [];
-        this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus('已重做');
-    },
-
-    updateHistoryButtons() {
-        if (!this.dom.btnUndo) return;
-        this.dom.btnUndo.disabled = !this.undoStack.length;
-        this.dom.btnRedo.disabled = !this.redoStack.length;
-    },
-
-    cloneTemplate() { return JSON.parse(JSON.stringify(this.template || null)); },
 
     saveCurrentTemplate() {
         if (!this.image) return;
@@ -983,6 +939,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         this.imageTemplates.set(this.image, snap);
         this.image.customSettings = snap;
         this.queueThumb(this.image);
+        if (typeof this.scheduleDraft === 'function') this.scheduleDraft();
     },
 
     /* ══ 图片选择 / 每图模板 ══ */
@@ -1024,10 +981,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
                 if (!r || !r.url) { tick(images[i].name); return null; }
                 const img = new Image();
                 const loadedOk = await new Promise(res => { img.onload = () => res(true); img.onerror = () => res(false); img.src = r.url; });
-                if (!loadedOk || !img.naturalWidth) { tick(images[i].name); return null; }
+                if (!loadedOk || !img.naturalWidth) { tick(images[i].name); if (r.revoke) r.revoke(); return null; }
                 const rawExif = (r.buffer && window.__parseExif) ? window.__parseExif(r.buffer) : {};
                 const exif = window.__exifSummary ? window.__exifSummary(rawExif) : {};
                 const oriented = await this.applyOrientation(img, exif.orientation);
+                if (r.revoke) r.revoke();
                 const useEl = oriented ? oriented.el : img;
                 const w = oriented ? oriented.w : img.naturalWidth;
                 const h = oriented ? oriented.h : img.naturalHeight;
@@ -1078,20 +1036,10 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     },
 
     async loadFile(file) {
-        const url = await new Promise(res => {
-            const r = new FileReader();
-            r.onload = () => res(r.result);
-            r.onerror = () => res(null);
-            r.readAsDataURL(file);
-        });
-        if (!url) return null;
-        const buf = await new Promise(res => {
-            const r = new FileReader();
-            r.onload = () => res(r.result);
-            r.onerror = () => res(null);
-            r.readAsArrayBuffer(file);
-        });
-        return { url, buffer: buf };
+        // ObjectURL 直接引用磁盘(内存不再产生 base64 字符串);buffer 仅临时用于 EXIF 解析
+        const url = URL.createObjectURL(file);
+        const buf = await file.arrayBuffer().catch(() => null);
+        return { url, buffer: buf, revoke: () => URL.revokeObjectURL(url) };
     },
 
     async applyOrientation(img, orientation) {
@@ -1122,28 +1070,23 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         return { el: out, w: canvas.width, h: canvas.height };
     },
 
+    // 本地照片引用 URL(经 qflocal: 协议由主进程直接流式读取,不产生 base64 副本)
+    photoUrl(filePath) { return 'qflocal://img?p=' + encodeURIComponent(filePath); },
+
     // 把系统选择框返回的单个文件构造成胶片条照片对象(不插入)
     async imageFromPick(res) {
         if (!res) return null;
+        if (!res.path) { this.setStatus('图片加载失败：缺少文件路径'); return null; }
         const img = new Image();
-        const dataUrl = 'data:image/jpeg;base64,' + res.data;
-        await new Promise(r => { img.onload = r; img.onerror = r; img.src = dataUrl; });
+        const src = this.photoUrl(res.path);
+        await new Promise(r => { img.onload = r; img.onerror = r; img.src = src; });
         if (!img.naturalWidth) return null;
-        let exif = {};
-        if (window.__parseExif) {
-            try {
-                const bin = atob(res.data);
-                const buf = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-                const raw = window.__parseExif(buf.buffer);
-                exif = window.__exifSummary ? window.__exifSummary(raw) : {};
-            } catch (e) { /* EXIF 解析失败不影响加载 */ }
-        }
+        const exif = res.exif || {};
         const oriented = await this.applyOrientation(img, exif.orientation);
         const useEl = oriented ? oriented.el : img;
         const w = oriented ? oriented.w : img.naturalWidth;
         const h = oriented ? oriented.h : img.naturalHeight;
-        const im = { el: useEl, name: res.name, w, h, exif, customSettings: null };
+        const im = { el: useEl, name: res.name, path: res.path, w, h, exif, customSettings: null };
         this.queueThumb(im);
         return im;
     },
@@ -1392,11 +1335,16 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         strip.style.display = this.images.length > 1 ? 'flex' : 'none';
     },
 
-    // 把当前主图的边框模板复制给指定缩略图(每图边框独立,同步后该图也恢复此边框)
+    // 把当前主图的边框模板复制给指定缩略图(每图边框独立,同步后该图也恢复此边框;
+    // Logo/贴纸/自由文字/拼图布局不随迁移,保持各图独立记忆)
     syncBorderTo(i) {
         const tgt = this.images[i];
         if (!tgt || !this.image) return;
-        this.imageTemplates.set(tgt, this.cloneTemplate());
+        const snap = this.cloneTemplate();
+        if (Array.isArray(snap.logoElements)) snap.logoElements = [];
+        if (snap.decorConfig) { delete snap.decorConfig.stickers; delete snap.decorConfig.textLines; }
+        delete snap.puzzle;
+        this.imageTemplates.set(tgt, snap);
         this.queueThumb(tgt);
         this.setStatus('已将当前边框同步到「' + tgt.name + '」');
     },
@@ -1546,6 +1494,15 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             const v = parseInt($('slElementRotation').value, 10);
             this.updateLabel('lblElementRotation', v + '°');
             this.applyToSelectedEls(el => { el.rotation = v; });
+            this.batchElOps();
+        });
+        if ($('slElementSize')) $('slElementSize').addEventListener('input', () => {
+            const v = parseInt($('slElementSize').value, 10);
+            this.updateLabel('lblElementSize', v);
+            this.applyToSelectedEls(el => {
+                if (el.kind === 'logo') el.size = v;
+                else if (el.kind === 'sticker') el.scale = clampNum(v / 60, 0.02, 3);
+            });
             this.batchElOps();
         });
 
@@ -1832,6 +1789,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if ($('tfCustomText')) $('tfCustomText').value = '';
         delete this.template._draftText;
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
         this.setStatus('已添加文字(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
     },
@@ -1845,11 +1803,12 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         selected.forEach(s => { const i = lines.indexOf(s.obj); if (i >= 0) lines.splice(i, 1); });
         this.selectedEls = [];
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
     },
 
     async addSticker() {
-        const res = await window.qingframe.openImage();
+        const res = await window.qingframe.openStickerImage();
         if (!res || !res.data) { this.setStatus('已取消添加贴纸'); return; }
         const dataUrl = 'data:image/jpeg;base64,' + res.data;
         // 预加载到缓存,避免后续每次渲染重新解码(保持真实 JPEG MIME,不伪造 PNG 头)
@@ -1869,6 +1828,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
         this.selectedEls = [{ kind: 'sticker', obj: decor.stickers[decor.stickers.length - 1] }];
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
         this.setStatus('已添加贴纸(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
     },
@@ -1913,25 +1873,49 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
     },
 
-    addLogoElement(logo) {
+    async addLogoElement(logo) {
         if (!logo) return;
         this.onSettingCommit();
         if (!this.template) return;
+        // 预加载图标到缓存,确保渲染时图片已就绪(避免首帧因 Image 未加载完而跳过绘制)
+        const bmp = this.logoImgCache[logo.dataUrl] || new Image();
+        this.logoImgCache[logo.dataUrl] = bmp;
+        if (!bmp.complete || !bmp.naturalWidth) {
+            await new Promise(res => { bmp.onload = res; bmp.onerror = res; bmp.src = logo.dataUrl; });
+        }
         if (!this.template.logoElements) this.template.logoElements = [];
         const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
+        const size = Math.max(48, Math.round(Math.min(cw, ch) * 0.07));
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
-            x: cw - 40, y: ch - 40, size: 60, opacity: 100, rotation: 0, z: 10, free: 1,
+            x: Math.round(cw / 2), y: Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
         };
         this.template.logoElements.push(el);
         this.selectedEls = [{ kind: 'logo', obj: el }];
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
         this.setStatus(`已添加 Logo「${logo.name}」`);
+        requestAnimationFrame(() => this.focusElement(el, 2.5));
+    },
+
+    focusElement(el, factor) {
+        if (!el || !this.image) return;
+        const canvas = this.dom.canvas;
+        if (!canvas.width) return;
+        const stage = this.dom.stage;
+        const rect = stage.getBoundingClientRect();
+        const z0 = this.zoom || 0.1;
+        const z1 = Math.min(3, Math.max(0.1, z0 * (factor || 2.5)));
+        const lw = canvas._logW || canvas.width, lh = canvas._logH || canvas.height;
+        const fx = (el.x / canvas.width) * lw, fy = (el.y / canvas.height) * lh;
+        this.panX = Math.round(rect.width / 2 - fx * z1);
+        this.panY = Math.round(rect.height / 2 - fy * z1);
+        this.setZoom(z1);
     },
 
     async addCustomIcon() {
-        const res = await window.qingframe.openImage();
+        const res = await window.qingframe.openStickerImage();
         if (!res || !res.data) return;
         const dataUrl = 'data:image/jpeg;base64,' + res.data;
         const im = new Image();
@@ -2042,6 +2026,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         }
         if (placed) this.selectedEls = [placed];
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
     },
 
@@ -2057,6 +2042,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
         this.selectedEls = [];
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
     },
 
@@ -2068,6 +2054,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         this.selectedEls = [];
         delete this.template._draftText;
         this.refreshUI();
+        this.saveCurrentTemplate();
         this.scheduleRender(true);
         this.setStatus('已清空全部元素');
     },
@@ -2092,1076 +2079,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             els.sort((a, b) => (a.z || 0) - (b.z || 0));
         });
         this.refreshUI();
-        this.scheduleRender(true);
-    },
-
-    /* ══ 模板页签 ══ */
-    refreshTemplateFields() {
-        const $ = this.$;
-        const t = this.template || {};
-        if ($('tfTemplateName')) $('tfTemplateName').value = t.templateName || '';
-        if ($('tfTemplateTag')) $('tfTemplateTag').value = t.templateTag || '';
-    },
-
-    async refreshTemplates() {
-        const box = this.$('lvPresets');
-        if (!box) return;
-        const names = (await window.qingframe.listTemplates()) || [];
-        this._savedTemplates = names;
-        box.innerHTML = '';
-        if (!names.length) { box.innerHTML = '<div class="empty">暂无已存模板</div>'; return; }
-        names.forEach(n => {
-            const row = document.createElement('div');
-            row.className = 'tpl-row';
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = n; // 用 textContent,避免恶意名称注入 HTML(XSS)
-            const btnBox = document.createElement('div');
-            const btnLoad = document.createElement('button');
-            btnLoad.className = 'mini-btn'; btnLoad.textContent = '应用';
-            const btnDel = document.createElement('button');
-            btnDel.className = 'mini-btn danger'; btnDel.textContent = '删除';
-            btnBox.appendChild(btnLoad); btnBox.appendChild(btnDel);
-            row.appendChild(nameSpan); row.appendChild(btnBox);
-            btnLoad.addEventListener('click', async () => this.loadTemplateByName(n));
-            btnDel.addEventListener('click', async () => { await window.qingframe.deleteTemplate(n); this.refreshTemplates(); });
-            box.appendChild(row);
-        });
-    },
-
-    async saveTemplate() {
-        const $ = this.$;
-        const name = ($('tfTemplateName') ? $('tfTemplateName').value : '').trim();
-        if (!name) { this.setStatus('请输入模板名称'); return; }
-        // 从回显字段刷新模板(名称/标签)
-        if (this.template) {
-            this.template.templateName = name;
-            this.template.templateTag = $('tfTemplateTag') ? $('tfTemplateTag').value.trim() : '';
-        }
-        this.syncModelFromUI();
-        const r = await window.qingframe.saveTemplate(name, this.cloneTemplate());
-        this.setStatus(r.ok ? `已保存模板「${name}」` : '保存失败：' + (r.error || ''));
-        this.refreshTemplates();
-    },
-
-    async loadTemplate() {
-        if (!this._savedTemplates || !this._savedTemplates.length) {
-            const names = (await window.qingframe.listTemplates()) || [];
-            this._savedTemplates = names;
-        }
-        if (!this._savedTemplates.length) { this.setStatus('暂无已存模板'); return; }
-        const opts = this._savedTemplates.map((n, i) => `${i + 1}. ${n}`).join('\n');
-        const choice = window.prompt('选择要加载的模板(输入序号或名称,留空取消):\n' + opts, '1');
-        if (!choice) { this.setStatus('已取消'); return; }
-        const idx = parseInt(choice, 10) - 1;
-        const name = this._savedTemplates[idx] || String(choice).trim();
-        if (!name) return;
-        await this.loadTemplateByName(name);
-    },
-
-    async loadTemplateByName(name) {
-        if (window.qingframe.loadTemplate) {
-            const data = await window.qingframe.loadTemplate(name);
-            if (!data) { this.setStatus('加载模板失败'); return; }
-            this.onSettingCommit();
-            this.template = JSON.parse(JSON.stringify(data));
-            this.normalizeTemplate();
-            this.saveCurrentTemplate();
-            this.refreshUI();
-            this.scheduleRender(true);
-            this.setStatus(`已应用模板「${name}」`);
-            return;
-        }
-    },
-
-    async exportTemplate() {
-        const name = (this.$('tfTemplateName') ? this.$('tfTemplateName').value : '').trim() || 'template';
-        this.syncModelFromUI();
-        const r = await window.qingframe.exportTemplate(name, this.cloneTemplate());
-        this.setStatus(r.ok ? '模板已导出' : (r.canceled ? '已取消' : '导出失败'));
-    },
-
-    async importTemplate() {
-        const r = await window.qingframe.importTemplate();
-        if (!r.ok) { this.setStatus(r.canceled ? '已取消' : '导入失败：' + (r.error || '')); return; }
-        this.onSettingCommit();
-        this.template = JSON.parse(JSON.stringify(r.data));
-        this.normalizeTemplate();
         this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus(`已导入模板「${r.name}」`);
-    },
-
-    applyQuickPreset(kind) {
-        if (!this.presets.length) { this.setStatus('预设库未加载'); return; }
-        this.onSettingCommit();
-        let p = null;
-        if (kind === 'film') p = this.presets.find(x => /胶片/i.test(x.templateName)) || this.presets[0];
-        else p = this.presets.find(x => /证件照/i.test(x.templateName)) || this.presets[0];
-        if (p) {
-            this.template = JSON.parse(JSON.stringify(p));
-            this.normalizeTemplate();
-            this.saveCurrentTemplate();
-            this.refreshUI();
-            this.scheduleRender(true);
-            this.setStatus(`已应用预设「${p.templateName}」`);
-        }
-    },
-
-    async autoColorBorder() {
-        if (!this.image) { this.setStatus('请先导入照片'); return; }
-        const color = window.EngineStyles && window.EngineStyles.extractDominant;
-        if (typeof color !== 'function') { this.setStatus('自动取色不可用'); return; }
-        try {
-            const c = await color(this.image.el);
-            this.onSettingCommit();
-            const layer = this.currentLayer();
-            layer.fillConfig.fillType = 'solid';
-            layer.fillConfig.fillHex = c.replace('#', '');
-            if (this.$('cpFillColor')) this.$('cpFillColor').value = c;
-            this.refreshUI();
-            this.scheduleRender(true);
-            this.setStatus(`已应用自动取色边框 #${c}`);
-        } catch (e) { this.setStatus('取色失败: ' + e.message); }
-    },
-
-    loadPresetFromList() {
-        const li = this.$('lvPresets');
-        const active = li && li.querySelector('.tpl-row span');
-        if (!this._savedTemplates || !this._savedTemplates.length) { this.setStatus('模板列表为空'); return; }
-        // 加载代码预设区:选择左侧预设树当前高亮
-        const activeItem = document.querySelector('.preset-item.active');
-        if (activeItem) { this.selectPresetFromTree(activeItem); return; }
-        this.setStatus('请在左侧预设树选择一个预设');
-    },
-
-    selectPresetFromTree(item) {
-        const label = item.querySelector('span:not(.dot)');
-        const name = label ? label.textContent.trim() : '';
-        const p = this.presets.find(x => x.templateName === name);
-        if (!p) { this.setStatus('未找到该预设'); return; }
-        this.onSettingCommit();
-        this.applyPreset(p);
-        this.refreshTemplates();
-        this.setStatus(`已应用预设「${p.templateName}」`);
-    },
-
-    /* ══ 拼图页签 ══ */
-    puzzleLayouts() {
-        return [
-            ['single', '单张'], ['h2', '2·左右'], ['v2', '2·上下'], ['as2', '一大一小'],
-            ['h3', '3·横排'], ['v3', '3·竖排'], ['grid4', '4·宫格'], ['as4', '1大3小'],
-            ['h4', '4·横排'], ['v4', '4·竖排'], ['grid6', '6·宫格'], ['grid9', '9·宫格'],
-        ];
-    },
-
-    layoutTypeOf(layout) {
-        const map = { single: 0, h2: 1, v2: 2, as2: 3, h3: 4, v3: 5, grid4: 6, as4: 7, h4: 8, v4: 9, grid6: 10, grid9: 11 };
-        return map[layout] != null ? map[layout] : 0;
-    },
-
-    layoutKeyOf(type) {
-        const keys = ['single', 'h2', 'v2', 'as2', 'h3', 'v3', 'grid4', 'as4', 'h4', 'v4', 'grid6', 'grid9'];
-        return (type >= 0 && type < keys.length) ? keys[type] : 'single';
-    },
-
-    buildPuzzleLayoutBtns() {
-        const box = this.$('puzzleLayouts');
-        if (!box) return;
-        box.innerHTML = '';
-        this.puzzleLayouts().forEach(([val, label]) => {
-            const b = document.createElement('button');
-            b.className = 'mini-btn';
-            b.textContent = label;
-            b.dataset.val = val;
-            b.addEventListener('click', () => {
-                this.onSettingCommit();
-                this.setPuzzleLayout(this.layoutTypeOf(val));
-                this.setStatus(`已启用拼图布局「${label}」`);
-            });
-            box.appendChild(b);
-        });
-    },
-
-    // 切换布局并尽量保留各照片槽位(imageIndex 不改)
-    setPuzzleLayout(layoutType) {
-        if (!this.template) return;
-        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
-        const oldAxes = pk.axisVals;
-        pk.layout = this.layoutKeyOf(layoutType);
-        pk.layoutType = layoutType;
-        pk.axisVals = oldAxes || {};
-        pk.enabled = 1;
-        this.migratePuzzle();
-        this.ensurePuzzleSlotsCount(pk);
-        this.reconcilePuzzleCaptions(pk);
-        this.autoFillPuzzleSlots();
-        this.saveCurrentTemplate();
-        this.switchTab('puzzle');
-        this.refreshPuzzleUI();
         this.scheduleRender(true);
     },
 
-    // 批量放图:勾选照片按勾选顺序填各格,勾选不够用当前打开的主图补位;
-    // 无勾选时只做布局几何更新(重算格子位置/大小),绝不改动已有格子内容
-    // (图片 / 平移 / 缩放 / 双击替换全部保留),即使重复点击当前布局也不重填
-    autoFillPuzzleSlots() {
-        const pk = this.template && this.template.puzzle;
-        if (!pk || !pk.enabled) return;
-        const n = this.puzzleSlotCount(pk.layout || 'single');
-        const main = this.image ? this.images.indexOf(this.image) : -1;
-        if (!this.batchSel.length) return;
-        // 按勾选顺序依次填格(不排序),不够用当前主图补位
-        const order = this.batchSel.slice();
-        for (let i = 0; i < n; i++) {
-            const idx = i < order.length ? order[i] : main;
-            const sc = pk.slots[i] || (pk.slots[i] = {});
-            if (idx >= 0) { sc.imageIndex = idx; sc.imagePath = undefined; }
-            else { sc.imageIndex = undefined; sc.imagePath = undefined; }
-        }
-        this.batchSel = [];
-        // 勾选已被填格消费,随后“导出图片”应回到导出当前单张,而不是残留的多选
-        this.selectedIdx = [];
-    },
 
-    // 兼容旧模型:补 layoutType/axisVals/gapCaptions,并把旧 slots 数组升级为 dict
-    migratePuzzle() {
-        const pk = this.template.puzzle;
-        if (!pk) return;
-        if (pk.layoutType == null) pk.layoutType = this.layoutTypeOf(pk.layout || 'single');
-        if (!pk.slots) pk.slots = {};
-        if (pk.axisVals == null) pk.axisVals = {};
-        if (!pk.gapCaptions) pk.gapCaptions = {};
-        if (Array.isArray(pk.slots)) {
-            const arr = pk.slots;
-            pk.slots = {};
-            arr.forEach((sc, i) => { if (sc) pk.slots[i] = sc; });
-        }
-    },
-
-    // 确保每个槽位有配置对象
-    ensurePuzzleSlotsCount(pk) {
-        const n = this.puzzleSlotCount(pk.layout || 'single');
-        this.migratePuzzle();
-        for (let i = 0; i < n; i++) {
-            if (!pk.slots[i]) pk.slots[i] = { fillMode: pk.slotFill || 'cover', zoom: pk.zoom || 100, offsetX: 0, offsetY: 0 };
-        }
-    },
-
-    // 布局切换巡检字幕:绑定的分割轴在新布局不存在的间隙字幕直接删;格子字幕仅在下标越界时删
-    reconcilePuzzleCaptions(pk) {
-        if (!pk) return;
-        const n = this.puzzleSlotCount(pk.layout || 'single');
-        if (pk.captions) {
-            for (const k in pk.captions) {
-                const idx = parseInt(k, 10);
-                if (!isNaN(idx) && idx >= n) delete pk.captions[k];
-            }
-        }
-        const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout || 'single', pk.axisVals) : { v: [], h: [] };
-        if (pk.gapCaptions) {
-            for (const key in pk.gapCaptions) {
-                const m = /^([vh])(\d+)$/.exec(key);
-                if (!m) continue;
-                // h 字幕按行计数(行数 = 横轴数 + 1,含底部字幕带);v 字幕按竖轴计数
-                const maxN = m[1] === 'h' ? ((axes.h || []).length + 1) : (axes.v || []).length;
-                if (parseInt(m[2], 10) >= maxN) delete pk.gapCaptions[key];
-            }
-        }
-    },
-
-    puzzleSlotCount(layout) {
-        const n = { single: 1, as2: 2, h2: 2, v2: 2, h3: 3, v3: 3, as4: 4, grid4: 4, h4: 4, v4: 4, grid6: 6, grid9: 9 };
-        return n[layout] || 1;
-    },
-
-    syncPuzzleFromUI() {
-        if (!this.template) return;
-        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
-        const $ = this.$;
-        pk.gap = $('slPuzzleGap') ? parseInt($('slPuzzleGap').value, 10) : pk.gap;
-        pk.bgMode = $('cbPuzzleBg') ? parseInt($('cbPuzzleBg').value, 10) : 0;
-        pk.canvasRatio = $('cbPuzzleCanvas') ? $('cbPuzzleCanvas').value : 'auto';
-        pk.borderColor = $('cpPuzzleBorder') ? $('cpPuzzleBorder').value.replace('#', '') : 'ffffff';
-        pk.slotFill = $('cbSlotFill') ? $('cbSlotFill').value : 'cover';
-        this.ensurePuzzleSlotsCount(pk);
-        // 选中槽位 per-slot 写回(整体偏移/缩放滑块 = 该槽配置)
-        if (typeof this._puzzleSlot === 'string' && this._puzzleSlot.charAt(0) === 's') {
-            const si = parseInt(this._puzzleSlot.substring(1), 10);
-            const sc = pk.slots[si] || (pk.slots[si] = {});
-            sc.offsetX = $('slSlotOffsetX') ? parseInt($('slSlotOffsetX').value, 10) : (sc.offsetX || 0);
-            sc.offsetY = $('slSlotOffsetY') ? parseInt($('slSlotOffsetY').value, 10) : (sc.offsetY || 0);
-            sc.zoom = $('slSlotZoom') ? parseInt($('slSlotZoom').value, 10) : (sc.zoom != null ? sc.zoom : 100);
-            sc.fillMode = pk.slotFill || 'cover';
-        }
-        // 间隙字幕捕获(v/h 键)
-        if (!this._skipPuzzleCapture && this._puzzleSlot != null) this.captureCaptionToModel(this._puzzleSlot);
-    },
-
-    // 槽位/间隙下拉改变:先把当前编辑字幕写回旧项,再提交/加载新项
-    onPuzzleSlotChange() {
-        const $ = this.$;
-        if (this._puzzleSlot != null) this.captureCaptionToModel(this._puzzleSlot);
-        this._skipPuzzleCapture = true;
-        try {
-            this.onSettingCommit();
-        } finally {
-            this._skipPuzzleCapture = false;
-        }
-        if ($('cbPuzzleGapPick')) this._puzzleSlot = $('cbPuzzleGapPick').value;
-        if (this._puzzleSlot === '') this._activePuzzleSlot = null;
-        if (/^s\d+$/.test(this._puzzleSlot)) {
-            const si = parseInt(this._puzzleSlot.substring(1), 10);
-            if (this._activePuzzleSlot !== si) { this._activePuzzleSlot = si; this.scheduleRender(); }
-        }
-        this.loadCaptionFromModel();
-        this.renderCaptionEditorVisibility();
-    },
-
-    refreshPuzzleUI() {
-        if (!this.template) return;
-        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
-        this.ensurePuzzleSlotsCount(pk);
-        this.reconcilePuzzleCaptions(pk);
-        // 「重拼(按序填满)」:拼图内存在图片内容时可用,拼图为空时置灰
-        const rep = this.$('btnPuzzleRepuzzle');
-        if (rep) {
-            const hasContent = pk.slots && Object.keys(pk.slots).some(k => {
-                const sc = pk.slots[k];
-                return sc && (sc.imageIndex != null || sc.imagePath != null);
-            });
-            rep.disabled = !hasContent;
-        }
-        const $ = this.$;
-        const n = this.puzzleSlotCount(pk.layout);
-        if ($('slPuzzleGap')) $('slPuzzleGap').value = pk.gap != null ? pk.gap : 6;
-        this.updateLabel('lblPuzzleGap', pk.gap != null ? pk.gap : 6);
-        if ($('cbPuzzleBg')) $('cbPuzzleBg').value = String(pk.bgMode || 0);
-        if ($('cbPuzzleCanvas')) $('cbPuzzleCanvas').value = pk.canvasRatio || 'auto';
-        if ($('cpPuzzleBorder')) $('cpPuzzleBorder').value = '#' + (pk.borderColor || 'ffffff');
-        if ($('cbSlotFill')) $('cbSlotFill').value = pk.slotFill || 'cover';
-        // 字幕门牌下拉:列出全部分割间隙与全部格子;已绑定字幕的项带圆点标记
-        const pick = $('cbPuzzleGapPick');
-        if (pick) {
-            pick.innerHTML = '';
-            const noneOpt = document.createElement('option');
-            noneOpt.value = '';
-            noneOpt.textContent = '不选中';
-            pick.appendChild(noneOpt);
-            const mark = (bound) => bound ? '● ' : '';
-            for (let i = 0; i < n; i++) {
-                const o = document.createElement('option');
-                o.value = 's' + i;
-                o.textContent = mark(!!(pk.captions && pk.captions[i])) + `格子 ${i + 1}`;
-                pick.appendChild(o);
-            }
-            const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout || 'single', pk.axisVals) : { v: [], h: [] };
-            const vAxes = axes.v || [], hAxes = axes.h || [];
-            // 横间隙:每行图片下方一条全宽字幕带(行数 = 横轴数 + 1,最末一条为底部字幕带)
-            const capRowN = hAxes.length + 1;
-            for (let i = 0; i < capRowN; i++) {
-                const o = document.createElement('option');
-                o.value = 'h' + i;
-                o.textContent = mark(!!(pk.gapCaptions && pk.gapCaptions['h' + i])) + `横间隙 ${i + 1}`;
-                pick.appendChild(o);
-            }
-            vAxes.forEach((_, i) => {
-                const o = document.createElement('option');
-                o.value = 'v' + i;
-                o.textContent = mark(!!(pk.gapCaptions && pk.gapCaptions['v' + i])) + `竖间隙 ${i + 1}`;
-                pick.appendChild(o);
-            });
-            const isNone = this._puzzleSlot == null || this._puzzleSlot === '';
-            if (isNone) {
-                pick.value = '';
-            } else if (typeof this._puzzleSlot === 'string' && pick.querySelector('option[value="' + this._puzzleSlot + '"]')) {
-                pick.value = this._puzzleSlot;
-            } else { this._puzzleSlot = 's0'; if (pick.querySelector('option[value="s0"]')) pick.value = 's0'; }
-            // 活跃槽位范围 + per-slot 滑块回读(未选中时跳过,避免自动回到槽位 0)
-            if (!isNone) {
-                if (this._activePuzzleSlot == null || this._activePuzzleSlot < 0 || this._activePuzzleSlot >= n) this._activePuzzleSlot = 0;
-                const sc = pk.slots[this._activePuzzleSlot] || {};
-                this.setSlotOffsetSliders(sc);
-                if ($('slSlotZoom')) $('slSlotZoom').value = sc.zoom != null ? sc.zoom : 100;
-                this.updateLabel('lblSlotZoom', (sc.zoom != null ? sc.zoom : 100) + '%');
-            }
-            const lbl = $('lblPuzzleSlot');
-            if (lbl) {
-                if (!pk.enabled) lbl.textContent = '当前槽位：无（未启用）';
-                else if (isNone) lbl.textContent = `当前槽位:未选中 (布局 ${pk.layout})`;
-                else {
-                    const ai = this._activePuzzleSlot != null ? this._activePuzzleSlot : 0;
-                    const nm = this.slotImageName(ai);
-                    lbl.textContent = `当前槽位:${ai + 1}/${n}${nm ? ` · ${nm}` : '（空）'} (布局 ${pk.layout})`;
-                    lbl.title = nm || '';
-                }
-            }
-        }
-        this.loadCaptionFromModel();
-        this.renderCaptionEditorVisibility();
-    },
-
-    // 将槽位偏移同步到滑块 + 标签(拖动/回读共用;松手 commit 从滑块回写,需先同步防止被旧值覆盖)
-    setSlotOffsetSliders(sc) {
-        const $ = this.$;
-        if ($('slSlotOffsetX')) $('slSlotOffsetX').value = clampNum((sc && sc.offsetX) || 0, -100, 100);
-        if ($('slSlotOffsetY')) $('slSlotOffsetY').value = clampNum((sc && sc.offsetY) || 0, -100, 100);
-        this.updateLabel('lblSlotOffsetX', (sc && sc.offsetX) || 0);
-        this.updateLabel('lblSlotOffsetY', (sc && sc.offsetY) || 0);
-    },
-
-    loadCaptionFromModel() {
-        const $ = this.$;
-        const pk = this.template.puzzle || {};
-        const key = $('cbPuzzleGapPick') ? $('cbPuzzleGapPick').value : 's0';
-        const isGap = /^[vh]\d+$/.test(key);
-        let cap = null;
-        if (isGap) cap = (pk.gapCaptions && pk.gapCaptions[key]) || null;
-        else if (key) { const idx = parseInt(key.substring(1), 10); cap = (pk.captions && pk.captions[idx]) || null; }
-        // 记录正在编辑的门牌号:仅当该位置已绑定字幕(或刚通过「添加/编辑字幕」显式新建)时打开编辑器,
-        // 仅在下拉里选择空位置不弹出空编辑器,避免误以为是添加字幕入口
-        this._editingGap = key && cap ? key.toUpperCase() : null;
-        const lblEdit = $('lblEditingCap');
-        if (lblEdit) {
-            const nLabel = isGap ? (key.charAt(0) === 'h' ? '横间隙 ' : '竖间隙 ') : (/^s\d+$/.test(key) ? '格子 ' : '');
-            lblEdit.textContent = this._editingGap ? `正在编辑：${nLabel}${this._editingGap}` : '';
-        }
-        const cbV = $('cbCapVertical');
-        if (cbV) { cbV.disabled = !isGap; cbV.checked = !!(isGap && cap && cap.direction === 'vertical'); }
-        const set = (id, v) => { const e = $(id); if (e) e.value = v == null ? '' : v; };
-        if (cap) {
-            set('tfCapLine1', cap.line1); set('tfCapLine2', cap.line2);
-            set('slCapSize1', cap.size1 || 28); set('slCapSize2', cap.size2 || 20);
-            set('cbCapFont1', cap.font1 || 'Microsoft YaHei'); set('cbCapFont2', cap.font2 || 'Microsoft YaHei');
-            if ($('cpCapColor')) $('cpCapColor').value = '#' + (cap.color || 'ffffff');
-            if ($('cbCapBgBar')) $('cbCapBgBar').checked = (cap.bgBar || 0) === 1;
-            set('slCapSpacing', cap.spacing != null ? cap.spacing : 0);
-            this.updateLabel('lblCapSize1', cap.size1 || 28); this.updateLabel('lblCapSize2', cap.size2 || 20);
-            this.updateLabel('lblCapSpacing', (cap.spacing != null ? cap.spacing : 0) + '%');
-        } else {
-            set('tfCapLine1', ''); set('tfCapLine2', '');
-            set('slCapSize1', 28); set('slCapSize2', 20);
-            set('cbCapFont1', 'Microsoft YaHei'); set('cbCapFont2', 'Microsoft YaHei');
-            if ($('cpCapColor')) $('cpCapColor').value = '#ffffff';
-            if ($('cbCapBgBar')) $('cbCapBgBar').checked = false;
-            set('slCapSpacing', 0);
-            this.updateLabel('lblCapSize1', 28); this.updateLabel('lblCapSize2', 20); this.updateLabel('lblCapSpacing', '0%');
-        }
-    },
-
-    // 字幕写入:槽位键 's0'.. → captions[数字];间隙键 'v0'/'h0'.. → gapCaptions[key]
-    captureCaptionToModel(key) {
-        if (!this.template || key == null) return;
-        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
-        const isGap = typeof key === 'string' && /^[vh]\d+$/.test(key);
-        if (isGap) return this.captureGapCaptionToModel(key);
-        const idx = typeof key === 'string' ? parseInt(key.substring(1), 10) : key;
-        if (isNaN(idx)) return;
-        if (!pk.captions) pk.captions = {};
-        const $ = this.$;
-        const line1 = $('tfCapLine1') ? $('tfCapLine1').value.trim() : '';
-        const line2 = $('tfCapLine2') ? $('tfCapLine2').value.trim() : '';
-        if (!line1 && !line2) { delete pk.captions[idx]; if (this._editingGap === ('S' + idx)) this._editingGap = null; return; }
-        pk.captions[idx] = {
-            line1, line2, gapId: 'S' + idx,
-            size1: $('slCapSize1') ? parseInt($('slCapSize1').value, 10) : 28,
-            size2: $('slCapSize2') ? parseInt($('slCapSize2').value, 10) : 20,
-            font1: $('cbCapFont1') ? $('cbCapFont1').value : 'Microsoft YaHei',
-            font2: $('cbCapFont2') ? $('cbCapFont2').value : 'Microsoft YaHei',
-            color: ($('cpCapColor') ? $('cpCapColor').value : '#ffffff').replace('#', ''),
-            bgBar: ($('cbCapBgBar') && $('cbCapBgBar').checked) ? 1 : 0,
-            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 0,
-        };
-    },
-
-    captureGapCaptionToModel(key) {
-        if (!this.template || key == null) return;
-        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
-        if (!pk.gapCaptions) pk.gapCaptions = {};
-        const $ = this.$;
-        const line1 = $('tfCapLine1') ? $('tfCapLine1').value.trim() : '';
-        const line2 = $('tfCapLine2') ? $('tfCapLine2').value.trim() : '';
-        if (!line1 && !line2) { delete pk.gapCaptions[key]; if (this._editingGap === key.toUpperCase()) this._editingGap = null; return; }
-        pk.gapCaptions[key] = {
-            line1, line2, gapId: key.toUpperCase(),
-            size1: $('slCapSize1') ? parseInt($('slCapSize1').value, 10) : 28,
-            size2: $('slCapSize2') ? parseInt($('slCapSize2').value, 10) : 20,
-            font1: $('cbCapFont1') ? $('cbCapFont1').value : 'Microsoft YaHei',
-            font2: $('cbCapFont2') ? $('cbCapFont2').value : 'Microsoft YaHei',
-            color: ($('cpCapColor') ? $('cpCapColor').value : '#ffffff').replace('#', ''),
-            bgBar: ($('cbCapBgBar') && $('cbCapBgBar').checked) ? 1 : 0,
-            spacing: $('slCapSpacing') ? parseInt($('slCapSpacing').value, 10) : 0,
-            direction: ($('cbCapVertical') && $('cbCapVertical').checked) ? 'vertical' : 'horizontal',
-        };
-    },
-
-    toggleCaptionEditor(show) {
-        const editor = this.$('vbCaptionEditor');
-        if (editor) editor.style.display = show ? 'block' : 'none';
-    },
-
-    renderCaptionEditorVisibility() {
-        this.toggleCaptionEditor(this._editingGap != null);
-    },
-
-    // 「添加/编辑字幕」:按选中项的门牌号到字幕列表找对应,没有则新建一条并绑定,然后打开编辑
-    addEditGapCaption() {
-        const $ = this.$;
-        const key = $('cbPuzzleGapPick') ? $('cbPuzzleGapPick').value : '';
-        if (!key) { this.setStatus('请先在上方选择一条分割间隙或格子'); return; }
-        const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
-        const isGap = /^[vh]\d+$/.test(key);
-        let cap = null;
-        if (isGap) { if (!pk.gapCaptions) pk.gapCaptions = {}; cap = pk.gapCaptions[key]; if (!cap) cap = pk.gapCaptions[key] = { size1: 28, size2: 20, color: 'ffffff', bgBar: 0, spacing: 0, direction: 'horizontal' }; }
-        else { if (!pk.captions) pk.captions = {}; const idx = parseInt(key.substring(1), 10); cap = pk.captions[idx]; if (!cap) cap = pk.captions[idx] = { size1: 28, size2: 20, color: 'ffffff', bgBar: 0, spacing: 0 }; }
-        if (cap && !cap.gapId) cap.gapId = key.toUpperCase();
-        this._editingGap = key.toUpperCase();
-        this.loadCaptionFromModel();
-        this.renderCaptionEditorVisibility();
-        this.setStatus(`已绑定字幕到 ${this._editingGap}，编辑输入即时生效`);
-    },
-
-    deleteCaption() {
-        const $ = this.$;
-        const key = $('cbPuzzleGapPick') ? $('cbPuzzleGapPick').value : 's0';
-        if (!key) { this.setStatus('请先在上方选择要删除的一条字幕'); return; }
-        this.onSettingCommit();
-        const pk = this.template.puzzle || {};
-        if (/^[vh]\d+$/.test(key)) { if (pk.gapCaptions) delete pk.gapCaptions[key]; }
-        else if (pk.captions) delete pk.captions[parseInt(key.substring(1), 10)];
-        if (this._editingGap === key.toUpperCase()) this._editingGap = null;
-        this.refreshPuzzleUI();
-        this.scheduleRender(true);
-        this.setStatus('已删除字幕 ' + key.toUpperCase());
-    },
-
-    clearCaption() {
-        this.deleteCaption();
-    },
-
-    // 清空全部格子图片(保留布局/间距/缩放,便于重新放入)
-    clearPuzzleSlots() {
-        const pk = this.template && this.template.puzzle;
-        if (!pk || Object.keys(pk.slots || {}).length === 0) { this.setStatus('格子已是空的'); return; }
-        this.onSettingCommit();
-        Object.keys(pk.slots).forEach(k => {
-            const sc = pk.slots[k];
-            if (sc) { sc.imageIndex = undefined; sc.imagePath = undefined; }
-        });
-        pk.offsetX = 0; pk.offsetY = 0; pk.zoom = 100;
-        this.saveCurrentTemplate();
-        this.refreshPuzzleUI();
-        this.scheduleRender(true);
-        this.setStatus('已清空全部格子图片，可重新勾选照片放图');
-    },
-
-    // 重拼:按胶片条中勾选的照片顺序填格(勾选不够用当前主图补位,无勾选用主图铺满),
-    // 同时重置全部格子的平移/缩放,恢复默认填充状态。会覆盖用户所有手工编辑。
-    rePuzzleFill() {
-        const pk = this.template && this.template.puzzle;
-        if (!pk || !pk.enabled) { this.setStatus('拼图未启用'); return; }
-        this.onSettingCommit();
-        this.ensurePuzzleSlotsCount(pk);
-        const n = this.puzzleSlotCount(pk.layout || 'single');
-        const main = this.image ? this.images.indexOf(this.image) : -1;
-        const order = this.batchSel.slice();
-        this.batchSel = [];
-        this.selectedIdx = this.batchSel.slice();
-        for (let i = 0; i < n; i++) {
-            const idx = i < order.length ? order[i] : main;
-            const sc = pk.slots[i] || (pk.slots[i] = {});
-            if (idx >= 0) { sc.imageIndex = idx; sc.imagePath = undefined; }
-            else { sc.imageIndex = undefined; sc.imagePath = undefined; }
-            sc.zoom = 100;
-            sc.offsetX = 0;
-            sc.offsetY = 0;
-        }
-        this.saveCurrentTemplate();
-        this.refreshPuzzleUI();
-        this.buildThumbnails();
-        this.scheduleRender(true);
-        this.setStatus(order.length ? `已按勾选照片顺序重新拼接${n} 个格子，平移/缩放已重置` : '无勾选照片，已用当前主图铺满 ' + n + ' 个格子，平移/缩放已重置');
-    },
-
-    // 只清空指定格子的图片(照片仍保留在胶片条,可再放)
-    clearSlotImage(i) {
-        const pk = this.tplPuzzle();
-        if (!pk) return;
-        this.onSettingCommit();
-        this.ensurePuzzleSlotsCount(pk);
-        const sc = pk.slots[i];
-        if (sc) { sc.imageIndex = undefined; sc.imagePath = undefined; }
-        this.saveCurrentTemplate();
-        this.refreshPuzzleUI();
-        this.scheduleRender(true);
-        this.setStatus('已清空槽位 ' + (i + 1) + '(照片仍保留在胶片条)');
-    },
-
-    // 完全退出拼图(回到单照片编辑)
-    disablePuzzle() {
-        if (!this.template || !this.template.puzzle) return;
-        this.onSettingCommit();
-        const pk = this.template.puzzle;
-        pk.enabled = 0;
-        this._puzzleSlot = 's0';
-        this._activePuzzleSlot = null;
-        this.saveCurrentTemplate();
-        this.refreshPuzzleUI();
-        this.toggleCaptionEditor(false);
-        this.scheduleRender(true);
-        this.setStatus('已退出拼图');
-    },
-
-    /* ══ 拼图画布交互(Canva/PicsArt 式:格内平移,拖出格=放下即互换) ══ */
-    tplPuzzle() {
-        const pk = this.template && this.template.puzzle;
-        return (pk && pk.enabled) ? pk : null;
-    },
-
-    // 屏幕坐标→画布像素坐标(计入 CSS zoom 与 pan)
-    puzzlePx(e) {
-        const canvas = this.dom.canvas;
-        const rect = canvas.getBoundingClientRect();
-        if (!rect.width || !rect.height) return { x: 0, y: 0 };
-        return {
-            x: (e.clientX - rect.left) / rect.width * canvas.width,
-            y: (e.clientY - rect.top) / rect.height * canvas.height,
-        };
-    },
-
-    // 命中:轴 / 槽位
-    puzzleHitTest(e) {
-        const pk = this.tplPuzzle();
-        if (!pk || !window.__buildPuzzleSlots) return null;
-        const p = this.puzzlePx(e);
-        const hit = this.puzzleSlotAtPx(p.x, p.y);
-        return hit != null ? { type: 'slot', slot: hit, x: p.x, y: p.y } : null;
-    },
-
-    // 画布像素→槽位索引(按引擎可见区域内缩 gap,间隙/边框处返回 null)
-    puzzleSlotAtPx(x, y) {
-        const pk = this.tplPuzzle();
-        if (!pk || !window.__buildPuzzleSlots) return null;
-        const W = this.dom.canvas.width, H = this.dom.canvas.height;
-        const layout = pk.layout || 'single';
-        const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(layout, pk.axisVals) : (pk.axisVals || {});
-        const rects = window.__buildPuzzleSlots(layout, axes);
-        const gapPx = Math.max(0, (pk.gap == null ? 6 : pk.gap) * (Math.min(W, H) / 1000) * 0.5);
-        const shiftX = gapPx / W, shiftY = gapPx / H;
-        const EPS = 1e-6;
-        for (let i = 0; i < rects.length; i++) {
-            const r = rects[i];
-            let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3];
-            if (x0 <= EPS) x0 += shiftX;
-            if (x1 >= 1 - EPS) x1 -= shiftX;
-            if (y0 <= EPS) y0 += shiftY;
-            if (y1 >= 1 - EPS) y1 -= shiftY;
-            const hx0 = x0 * W + gapPx, hy0 = y0 * H + gapPx;
-            const hx1 = x1 * W - gapPx, hy1 = y1 * H - gapPx;
-            if (x >= hx0 && x <= hx1 && y >= hy0 && y <= hy1) return i;
-        }
-        return null;
-    },
-
-    puzzleSlotAt(e) {
-        const p = this.puzzlePx(e);
-        return this.puzzleSlotAtPx(p.x, p.y);
-    },
-
-    // 该格的图片对象(严格按槽位配置解析;空格返回 null,不再按胶片条顺序兜底)
-    puzzleImageFor(pk, i) {
-        const srcs = (this.images && this.images.length) ? this.images : (this.image ? [this.image] : []);
-        if (!srcs.length) return null;
-        const sc = pk.slots[i] || {};
-        let im = null;
-        if (sc.imageIndex != null && srcs[sc.imageIndex]) im = srcs[sc.imageIndex];
-        else if (sc.imagePath) im = srcs.find(x => x.name === sc.imagePath) || null;
-        return (im && im.el) ? im : null;
-    },
-
-    puzzleImageAt(pk, i) {
-        const im = this.puzzleImageFor(pk, i);
-        return im ? { iw: im.el.naturalWidth || 1, ih: im.el.naturalHeight || 1 } : { iw: 1, ih: 1 };
-    },
-
-    // 该格"可平移余量"(画布像素)
-    slotSlackPx(pk, i) {
-        if (!window.__puzzleFit) return { x: 0, y: 0 };
-        const r = this.slotRectPx(pk, i);
-        if (!r) return { x: 0, y: 0 };
-        const sc = pk.slots[i] || (pk.slots[i] = {});
-        const gap = (this.template && this.template.puzzle && this.template.puzzle.gap) || 6;
-        const W = this.dom.canvas.width, H = this.dom.canvas.height;
-        const gapPx = Math.max(0, gap * (Math.min(W, H) / 1000) * 0.5);
-        const cw = Math.max(1, r.w - gapPx * 2), chh = Math.max(1, r.h - gapPx * 2);
-        const im = this.puzzleImageAt(pk, i);
-        const fillMode = sc.fillMode || (this.template.puzzle.slotFill) || 'cover';
-        const zoom = sc.zoom != null ? sc.zoom : 100;
-        const fit = window.__puzzleFit({ x: 0, y: 0, w: cw, h: chh }, im.iw, im.ih, fillMode, zoom, 0, 0);
-        if (!fit) return { x: 0, y: 0 };
-        return { x: cw - fit.dw, y: chh - fit.dh };
-    },
-
-    slotRectPx(pk, i) {
-        if (!window.__buildPuzzleSlots) return null;
-        const W = this.dom.canvas.width, H = this.dom.canvas.height;
-        const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout, pk.axisVals) : (pk.axisVals || {});
-        const rects = window.__buildPuzzleSlots(pk.layout, axes);
-        const r = rects[i];
-        if (!r) return null;
-        return { x: r[0] * W, y: r[1] * H, w: r[2] * W, h: r[3] * H };
-    },
-
-    // 拖拽:格内→图片精确跟随(anchor+余量换算);进入其他格→"放下即互换"预备态
-    puzzleDragMove(pk, d, e) {
-        const W = this.dom.canvas.width, H = this.dom.canvas.height;
-        this.ensurePuzzleSlotsCount(pk);
-        const src = d.slot;
-        const p = this.puzzlePx(e);
-        const sc = pk.slots[src] || (pk.slots[src] = {});
-        const im0 = this.puzzleImageFor(pk, src);
-        // 指针在另一格:冻结平移,标记互换目标,抓取预览;但位移过小或仅是蹭过格沿时仍按"格内平移"对待,
-        // 避免用户小幅拖动误触"放下即互换"(中途挪出格沿即被误判换图)
-        const j = this.puzzleSlotAtPx(p.x, p.y);
-        const rr0 = this.slotRectPx(pk, src);
-        const travel = Math.hypot(p.x - (d.x0 != null ? d.x0 : p.x), p.y - (d.y0 != null ? d.y0 : p.y));
-        const swapThresh = rr0 ? Math.min(rr0.w, rr0.h) * 0.5 : 60;
-        // "落入目标中心区"判定:指针需在目标格中央 60% 范围内才视为真正想放下
-        let deepIn = false;
-        if (j != null && j !== src) {
-            const W = this.dom.canvas.width, H = this.dom.canvas.height;
-            const rj = this.slotRectPx(pk, j);
-            if (rj) {
-                const nx = p.x / W, ny = p.y / H;
-                const jcx = rj.x / W + rj.w / W / 2, jcy = rj.y / H + rj.h / H / 2;
-                const hw = rj.w / W / 2, hh = rj.h / H / 2;
-                deepIn = Math.abs(nx - jcx) <= hw * 0.6 && Math.abs(ny - jcy) <= hh * 0.6;
-            }
-        }
-        if (j != null && j !== src && travel >= swapThresh && deepIn) {
-            if (d.swap !== j) { d.swap = j; this.dom.canvas.style.cursor = 'alias'; }
-            if (im0) {
-                const rr = this.slotRectPx(pk, src);
-                this._puzzlePick = {
-                    mode: 'target', target: j, el: im0.el,
-                    iw: im0.el.naturalWidth || 1, ih: im0.el.naturalHeight || 1,
-                    w0: rr ? Math.max(1, rr.w) : 1, h0: rr ? Math.max(1, rr.h) : 1,
-                };
-            }
-            return;
-        }
-        // 间隙/外沿:图片浮空跟手,不互换
-        if (j == null) {
-            if (d.swap != null) { d.swap = null; this.dom.canvas.style.cursor = 'move'; }
-            if (im0) {
-                const rr = this.slotRectPx(pk, src);
-                this._puzzlePick = {
-                    mode: 'float', x: p.x, y: p.y, el: im0.el,
-                    iw: im0.el.naturalWidth || 1, ih: im0.el.naturalHeight || 1,
-                    w0: rr ? Math.max(1, rr.w) : 1, h0: rr ? Math.max(1, rr.h) : 1,
-                };
-            }
-            return;
-        }
-        // 回源格:收起草图,重设锚点,继续平移
-        if (d.swap != null) { d.swap = null; this.dom.canvas.style.cursor = 'move'; d._anchored = false; }
-        this._puzzlePick = null;
-        if (!d._anchored) { d._anchored = true; d._ax = p.x; d._ay = p.y; d._oaX = sc.offsetX || 0; d._oaY = sc.offsetY || 0; }
-        const slack = this.slotSlackPx(pk, src);
-        const mdx = p.x - d._ax, mdy = p.y - d._ay;
-        if (Math.abs(slack.x) > 2) sc.offsetX = clampNum(d._oaX + (mdx / slack.x) * 100, -100, 100);
-        if (Math.abs(slack.y) > 2) sc.offsetY = clampNum(d._oaY + (mdy / slack.y) * 100, -100, 100);
-        // 拖动结果同步到滑块(松手 commit 时会从滑块回写,不同步则会被旧值覆盖)
-        this.setSlotOffsetSliders(sc);
-    },
-
-    // 互换两格图片(imageIndex/imagePath)
-    swapSlotImages(pk, a, b) {
-        const sa = pk.slots[a] || (pk.slots[a] = {}), sb = pk.slots[b] || (pk.slots[b] = {});
-        const tmpIdx = sa.imageIndex, tmpPath = sa.imagePath;
-        sa.imageIndex = sb.imageIndex;
-        sa.imagePath = sb.imagePath;
-        sb.imageIndex = tmpIdx;
-        sb.imagePath = tmpPath;
-        // 绑在格子上的字幕跟图:交换两个格子的字幕并更新其门牌号
-        if (pk.captions) {
-            const ka = String(a), kb = String(b);
-            const ta = pk.captions[ka], tb = pk.captions[kb];
-            if (tb !== undefined) { pk.captions[ka] = tb; tb.gapId = 'S' + a; } else delete pk.captions[ka];
-            if (ta !== undefined) { pk.captions[kb] = ta; ta.gapId = 'S' + b; } else delete pk.captions[kb];
-        }
-    },
-
-    // 点击画布选择当前编辑/渲染的槽位
-    setActivePuzzleSlot(i) {
-        this._activePuzzleSlot = i;
-        const oldKey = this._puzzleSlot;
-        if (typeof oldKey === 'string' && /^[vh]\d+$/.test(oldKey)) this.captureGapCaptionToModel(oldKey);
-        this._puzzleSlot = 's' + i;
-        const pick = this.$('cbPuzzleGapPick');
-        if (pick) pick.value = 's' + i;
-        this.refreshPuzzleUI();
-        this.scheduleRender();
-        this.setStatus(`已选中槽位 ${i + 1}`);
-    },
-
-    // 胶片条照片→当前选中槽(拼图模式下 buildThumbnails 点击调用)
-    assignSlotImage(pk, slotIdx, imgIdx) {
-        if (!this.images || this.images[imgIdx] == null) return;
-        this.onSettingCommit();
-        this.ensurePuzzleSlotsCount(pk);
-        const sc = pk.slots[slotIdx] || (pk.slots[slotIdx] = {});
-        sc.imageIndex = imgIdx;
-        sc.imagePath = undefined;
-        this.saveCurrentTemplate();
-        this.refreshPuzzleUI();
-        this.scheduleRender(true);
-        const im = this.images[imgIdx];
-        this.setStatus(`槽位 ${slotIdx + 1} 已使用「${im && im.name ? im.name : '照片' + (imgIdx + 1)}」`);
-    },
-
-    // 滚轮缩放该格图片(100%–400%,100% 即图片自然铺满格的"最小限度")
-    puzzleWheelSlot(i, factor) {
-        const pk = this.tplPuzzle();
-        if (!pk) return;
-        this.ensurePuzzleSlotsCount(pk);
-        const sc = pk.slots[i] || (pk.slots[i] = {});
-        const cur = sc.zoom != null ? sc.zoom : 100;
-        const z = clampNum(Math.round(cur * factor), 100, 400);
-        if (Math.abs(z - cur) < 1) return;
-        if (!this._wheelUndo) { this._wheelUndo = setTimeout(() => this._wheelUndo = null, 600); this.pushUndo(); }
-        sc.zoom = z;
-        const sl = this.$('slSlotZoom');
-        if (sl) { sl.value = String(z); this.updateLabel('lblSlotZoom', z + '%'); }
-        this.saveCurrentTemplate();
-        this.scheduleRender();
-    },
-
-    // 双击切换该格图片;Ctrl/Shift 双击与前一格交换
-    puzzleSwapSlotImage(pk, i, swapWithPrev) {
-        const srcs = (this.images && this.images.length) ? this.images : (this.image ? [this.image] : []);
-        if (!srcs.length) { this.setStatus('拼图:尚无胶片照片'); return; }
-        this.onSettingCommit();
-        this.ensurePuzzleSlotsCount(pk);
-        if (swapWithPrev) {
-            const j = Math.max(0, i - 1);
-            if (j !== i && pk.slots[j]) {
-                const a = pk.slots[i], b = pk.slots[j];
-                const tmp = a.imageIndex != null ? a.imageIndex : a.imagePath || null;
-                a.imageIndex = b.imageIndex != null ? b.imageIndex : (b.imagePath != null ? this.images.findIndex(x => x.name === b.imagePath) : null);
-                a.imagePath = undefined;
-                b.imageIndex = typeof tmp === 'number' ? tmp : (typeof tmp === 'string' ? this.images.findIndex(x => x.name === tmp) : null);
-                b.imagePath = undefined;
-            }
-        } else {
-            const sc = pk.slots[i] || (pk.slots[i] = {});
-            const cur = sc.imageIndex != null ? sc.imageIndex : (sc.imagePath != null ? this.images.findIndex(x => x.name === sc.imagePath) : 0);
-            sc.imageIndex = ((cur == null ? 0 : cur) + 1) % srcs.length;
-            sc.imagePath = undefined;
-        }
-        this.saveCurrentTemplate();
-        this.refreshPuzzleUI();
-        this.scheduleRender(true);
-    },
-
-    // 桌面右键菜单:画布槽位 / 胶片条缩略图共用
-    openCtx(x, y, items) {
-        this.closeCtx();
-        const m = document.createElement('div');
-        m.className = 'ctx-menu';
-        items.forEach(it => {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.textContent = it[0];
-            b.addEventListener('click', () => { this.closeCtx(); it[1](); });
-            m.appendChild(b);
-        });
-        document.body.appendChild(m);
-        const mw = m.offsetWidth || 0, mh = m.offsetHeight || 0;
-        m.style.left = Math.min(x, Math.max(8, window.innerWidth - mw - 8)) + 'px';
-        m.style.top = Math.min(y, Math.max(8, window.innerHeight - mh - 8)) + 'px';
-        this._ctx = m;
-    },
-
-    closeCtx() {
-        if (this._ctx) { this._ctx.remove(); this._ctx = null; }
-    },
-
-    async exportPuzzle() {
-        const exportPuzzleNow = () => {
-            if (!window.__renderPuzzle) { this.setStatus('拼图渲染不可用'); return Promise.resolve(false); }
-            const prev = this.displayMax;
-            this.displayMax = 4000;
-            return new Promise(res => requestAnimationFrame(() => {
-                window.__renderPuzzle(this, false, true);
-                const data = this.dom.canvas.toDataURL('image/png');
-                const base64 = data.split(',')[1];
-                if (prev === undefined) delete this.displayMax;
-                else this.displayMax = prev;
-                res(base64);
-            }));
-        };
-        const base64 = await exportPuzzleNow();
-        if (!base64) return;
-        const im0 = this.images && this.images.length ? this.images[this.currentIdx != null ? this.currentIdx : 0] : null;
-        const pzName = im0 ? (im0.name || 'photo').replace(/\.[^.]+$/, '') : '';
-        const filename = pzName ? `${pzName}_拼图.png` : '拼图.png';
-        const r = await window.qingframe.saveImage(base64, filename);
-        if (r) this.setStatus('拼图已导出');
-        else this.setStatus('导出失败');
-    },
-
-    /* ══ 预设加载 ══ */
-    async loadPresets() {
-        this.presets = await window.__loadAllPresets();
-        this.buildTree();
-        if (this.presets.length) this.selectPreset(this.presets[0]);
-    },
-
-    async loadLogos() {
-        try { this.logos = (await window.qingframe.listLogos()) || []; }
-        catch (e) { this.logos = []; }
-        if (this.dom.stRes) this.renderLogoPools();
-    },
-
-    async loadTextures() {
-        try { this.textures = (await window.qingframe.listTextures()) || []; }
-        catch (e) { this.textures = []; }
-    },
-
-    buildTree(filter) {
-        const tree = this.dom.presetTree;
-        tree.innerHTML = '';
-        const f = (filter || '').toLowerCase();
-        const order = ['潮流', '高级感', '极简', '胶片', '质感', '复古', '杂志', '水印', '氛围', '比例', '票根'];
-        const merge = { 创意: '潮流', 奢华: '高级感', 现代: '极简', 排版: '极简', 影院: '胶片', 星空: '氛围' };
-        const groupIcons = {
-            潮流: '🪩', 高级感: '💎', 极简: '⚪', 胶片: '🎞️', 质感: '🪵',
-            复古: '📻', 杂志: '📰', 水印: '💧', 氛围: '🌙', 比例: '📐',
-            票根: '🎫', 通用: '🖼️'
-        };
-        const iconFor = name => {
-            const kw = [
-                ['拼贴', '🧩'], ['霓虹', '🪩'], ['光环', '✨'], ['双', '📎'], ['星', '🌌'], ['极光', '🌈'],
-                ['渐变', '🌈'], ['边框', '🖼️'], ['白框', '🖼️'], ['卡片', '💳'], ['卡', '🔲'], ['票根', '🎫'],
-                ['相机', '📷'], ['胶片', '🎞️'], ['胶卷', '🎞️'], ['电影', '🎬'], ['银幕', '🎬'], ['宽银幕', '🎬'],
-                ['撕裂', '💥'], ['双重曝光', '📸'], ['曝光', '📸'], ['杂志', '📰'], ['大刊头', '📰'], ['页眉', '📰'],
-                ['封面', '📕'], ['报纸', '📰'], ['海报', '🖼️'], ['波普', '🌀'],
-                ['极简', '⚪'], ['简约', '🗒️'], ['细线', '➖'], ['编号', '🔢'], ['日期', '📅'],
-                ['复古', '📻'], ['登机牌', '🎫'], ['深色', '🌑'], ['身份卡', '🪪'], ['苹果', '🍎'],
-                ['小红', '❤️'], ['cream', '🍰'], ['奶油', '🍰'], ['醒图', '🍰'], ['琉璃', '🍯'],
-                ['牛仔', '👖'], ['布纹', '🧵'], ['磨砂', '🌫️'], ['毛玻璃', '🌫️'], ['玻璃', '🪟'],
-                ['晨雾', '🌫️'], ['金箔', '🥇'], ['奢华', '👑'], ['丝绒', '🧶'], ['参数', '🔤'],
-                ['logo', '🔤'], ['留白', '🌬️'], ['画廊', '🏛️'], ['画框', '🖼️'], ['分层', '🗂️'],
-                ['胶片条', '🎞️'], ['比例', '📐'], ['信息条', 'ℹ️'], ['背景模糊', '🌫️'], ['模糊', '🌸']
-            ];
-            const n = String(name || '');
-            for (const [k, ic] of kw) if (n.includes(k)) return ic;
-            return '💠';
-        };
-        const groups = new Map();
-        for (const p of this.presets) {
-            if (f && !p.templateName.toLowerCase().includes(f) && !(p.templateTag || '').toLowerCase().includes(f)) continue;
-            const grp = merge[p.templateTag] || p.templateTag || '通用';
-            if (!groups.has(grp)) groups.set(grp, []);
-            groups.get(grp).push(p);
-        }
-        const sorted = [...groups.keys()].sort((a, b) => {
-            const ia = order.indexOf(a), ib = order.indexOf(b);
-            return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'zh');
-        });
-        const curName = (this.template && this.template.templateName) || '';
-        const curGrp = curName ? [...sorted].find(g => (groups.get(g) || []).some(p => p.templateName === curName)) : null;
-        const defOpen = curGrp || sorted[0] || null;
-        for (const grp of sorted) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'preset-group' + ((f && groups.get(grp).length) || grp === defOpen ? ' open' : '');
-            const name = document.createElement('div');
-            name.className = 'group-name';
-            name.title = '点击展开/收起';
-            const caret = document.createElement('span');
-            caret.className = 'caret';
-            caret.textContent = '\u25B8';
-            name.appendChild(caret);
-            const gic = document.createElement('span');
-            gic.className = 'g-icon';
-            gic.textContent = groupIcons[grp] || '🖼️';
-            name.appendChild(gic);
-            const tag = document.createElement('span');
-            tag.textContent = `${grp} · ${groups.get(grp).length}`;
-            name.appendChild(tag);
-            name.addEventListener('click', () => {
-                groupEl.classList.toggle('open');
-            });
-            groupEl.appendChild(name);
-            tree.appendChild(groupEl);
-            for (const p of groups.get(grp)) {
-                const item = document.createElement('div');
-                item.className = 'preset-item';
-                const dot = document.createElement('span');
-                dot.className = 'dot';
-                dot.textContent = iconFor(p.templateName);
-                item.appendChild(dot);
-                const label = document.createElement('span');
-                label.textContent = p.templateName;
-                item.appendChild(label);
-                item.addEventListener('click', () => this.selectPreset(p, item));
-                item.dataset.grp = grp;
-                groupEl.appendChild(item);
-            }
-        }
-    },
-    filterTree(v) { this.buildTree(v); },
-
-    selectPreset(p, itemEl) {
-        this.pushUndo();
-        this.applyPreset(p);
-        document.querySelectorAll('.preset-item').forEach(el => el.classList.remove('active'));
-        if (itemEl) itemEl.classList.add('active');
-    },
-
-    applyPreset(p) {
-        this.template = JSON.parse(JSON.stringify(p));
-        this.normalizeTemplate();
-        this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
-    },
-
-    resetParams() {
-        if (!this.template) return;
-        this.pushUndo();
-        this.template = this.defaultTemplate();
-        this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus('参数已重置');
-    },
-
-    randomBorder() {
-        if (!this.presets.length) return;
-        this.pushUndo();
-        let p = this.presets[Math.floor(Math.random() * this.presets.length)];
-        this.template = JSON.parse(JSON.stringify(p));
-        this.normalizeTemplate();
-        this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus(`已应用随机边框：${p.templateName}`);
-    },
-
-    syncToSelected() {
-        if (this.selectedIdx.length <= 1) { this.setStatus('请先在胶片条中多选需要同步的照片(Ctrl/Shift+点击)'); return; }
-        const src = this.cloneTemplate();
-        this.selectedIdx.forEach(i => {
-            if (i === this.currentIdx) return;
-            const im = this.images[i];
-            im.customSettings = JSON.parse(JSON.stringify(src));
-            this.imageTemplates.set(im, JSON.parse(JSON.stringify(src)));
-        });
-        this.setStatus(`已将边框效果同步到 ${this.selectedIdx.length - 1} 张选中照片`);
-        this.scheduleRender(true);
-    },
 
     /* ══ 缩放 / 平移 / 状态栏 / 主题 ══ */
     zoomAt(e, stage, factor) {
@@ -3271,128 +2193,88 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         root.classList.toggle('dark');
     },
 
-    /* ── 导出 ── */
-    async exportImage() {
-        if (!this.image) { this.setStatus('请先导入照片'); return; }
-        const EXPORT_MAX = 8192;
-        const fmt = this.dom.selFormat.value;
-        const mime = fmt === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const ext = fmt === 'jpeg' ? 'jpg' : 'png';
-        const targets = this.selectedIdx.length > 1 ? this.selectedIdx : [this.currentIdx];
-        const originalIdx = this.currentIdx;
-        const baseTemplate = this.template;
-        const prevMax = this.displayMax;
-        const files = [];
-        const scaleElPix = (tpl, k) => {
-            if (k === 1) return false;
-            let any = false;
-            (tpl.logoElements || []).forEach(el => {
-                if (typeof el.x === 'number') {
-                    el.x *= k; el.y *= k; if (el.size) el.size *= k;
-                    if (el.offsetX) el.offsetX *= k;
-                    if (el.offsetY) el.offsetY *= k;
-                    any = true;
-                }
-            });
-            (tpl.decorConfig && tpl.decorConfig.stickers || []).forEach(s => {
-                s.x = (s.x || 0) * k; s.y = (s.y || 0) * k; s.scale = (s.scale || 1) * k;
-                any = true;
-            });
-            (tpl.decorConfig && tpl.decorConfig.textLines || []).forEach(l => {
-                if (l.align === 'free') { l.x = (l.x || 0) * k; l.y = (l.y || 0) * k; l.fontSize = (l.fontSize || 18) * k; any = true; }
-            });
-            return any;
-        };
+    /* ── 登录 / 用户 ── */
+    user: null,
+
+    async initLogin() {
         try {
-            for (let n = 0; n < targets.length; n++) {
-                const idx = targets[n];
-                const im = this.images[idx];
-                if (!im) continue;
-                this.image = im;
-                this.invalidateStyleCaches();
-                this.currentIdx = idx;
-                this.template = im.customSettings || baseTemplate;
-                this.normalizeTemplate();
-                const puzzle = !!(this.template && this.template.puzzle && this.template.puzzle.enabled);
-                // 先按 UI 默认尺寸渲染一次,取得元素坐标的"基准画布宽度"
-                const uiMaxSave = this.displayMax;
-                this.displayMax = undefined;
-                await new Promise(res => requestAnimationFrame(() => {
-                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
-                    else window.__render(this, false);
-                    res();
-                }));
-                const beforeW = Math.max(1, this.dom.canvas.width || 1);
-                this.displayMax = EXPORT_MAX;
-                await new Promise(res => requestAnimationFrame(() => {
-                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
-                    else window.__render(this, false);
-                    res();
-                }));
-                const afterW = Math.max(1, this.dom.canvas.width || 1);
-                const k = afterW / beforeW;
-                // 元素坐标为基准画布像素:导出画布变大时等比放大,避免缩到角落
-                if (!puzzle && k !== 1 && scaleElPix(this.template, k)) {
-                    await new Promise(res => requestAnimationFrame(() => {
-                        window.__render(this, false);
-                        res();
-                    }));
-                    scaleElPix(this.template, 1 / k);
-                }
-                this.displayMax = uiMaxSave;
-                const dataUrl = this.dom.canvas.toDataURL(mime, fmt === 'jpeg' ? 0.92 : 1);
-                const base64 = dataUrl.split(',')[1];
-                const baseName = (im.name || 'photo').replace(/\.[^.]+$/, '');
-                files.push({ data: base64, stem: `${baseName}${puzzle ? '_拼图' : '_边框'}`, ext });
-                const bar = document.getElementById('progressBar');
-                if (bar) bar.style.width = Math.round(((n + 1) / targets.length) * 100) + '%';
-            }
-        } finally {
-            this.currentIdx = originalIdx;
-            this.image = this.images[this.currentIdx];
-            this.invalidateStyleCaches();
-            this.template = (this.image && this.image.customSettings) || baseTemplate;
-            if (prevMax === undefined) delete this.displayMax;
-            else this.displayMax = prevMax;
+            const u = await window.qingframe.getUser();
+            this.user = u;
+        } catch (e) {
+            this.user = null;
         }
+        this.refreshLoginStatus();
+    },
 
-        if (this.image) this.scheduleRender(true);
-
-        this.dedupeExportNames(files);
-
-        let result;
-        if (files.length > 1 && window.qingframe.saveImagesBatch) {
-            result = await window.qingframe.saveImagesBatch(files);
-            if (result && result.canceled) { this.setStatus('已取消导出'); this.resetProgress(); return; }
-        } else if (files.length === 1) {
-            result = await window.qingframe.saveImage(files[0].data, files[0].filename) ? { ok: 1 } : { ok: 0 };
+    openLoginModal() {
+        const d = this.dom;
+        d.loginModal.style.display = 'flex';
+        if (this.user) {
+            d.loginFormView.style.display = 'none';
+            d.loginProfileView.style.display = 'block';
+            this.renderProfile();
         } else {
-            result = { ok: 0, fail: files.length };
+            d.loginFormView.style.display = 'block';
+            d.loginProfileView.style.display = 'none';
+            d.loginUsername.value = '';
+            d.loginNickname.value = '';
+            setTimeout(() => d.loginUsername.focus(), 60);
         }
-        const r = result || {};
-        this.setStatus(`导出完成：成功 ${r.ok || 0}${r.fail ? `，失败 ${r.fail}` : ''}`);
-        this.resetProgress();
-        this.updateStatusBar();
     },
 
-    // 导出文件名:按图片原有名称命名;同一名称重复时,首张保留原名,后续追加 _1、_2…
-    dedupeExportNames(files) {
-        const counts = new Map();
-        for (const f of files) counts.set(f.stem, (counts.get(f.stem) || 0) + 1);
-        const emitted = new Map();
-        files.forEach(f => {
-            const total = counts.get(f.stem);
-            const idx = emitted.get(f.stem) || 0;
-            emitted.set(f.stem, idx + 1);
-            f.filename = (total === 1 || idx === 0) ? `${f.stem}.${f.ext}` : `${f.stem}_${idx}.${f.ext}`;
-        });
-        return files;
+    closeLoginModal() {
+        this.dom.loginModal.style.display = 'none';
     },
 
-    resetProgress() {
-        const bar = document.getElementById('progressBar');
-        if (bar) setTimeout(() => bar.style.width = '0', 800);
+    renderProfile() {
+        const d = this.dom;
+        const name = (this.user.nickname || this.user.username).trim();
+        d.loginAvatar.textContent = name.charAt(0).toUpperCase();
+        d.loginDisplayName.textContent = name;
+        d.loginUsernameDisplay.textContent = '@' + this.user.username;
     },
+
+    async doLogin() {
+        const username = this.dom.loginUsername.value.trim();
+        if (!username) { this.setStatus('请输入用户名'); return; }
+        const nickname = this.dom.loginNickname.value.trim() || username;
+        this.user = { username, nickname, createdAt: Date.now() };
+        try {
+            await window.qingframe.saveUser(this.user);
+            this.closeLoginModal();
+            this.setStatus(`已登录「${nickname}」`);
+        } catch (e) {
+            this.setStatus('登录失败：' + e.message);
+        }
+        this.refreshLoginStatus();
+    },
+
+    async doLogout() {
+        try {
+            await window.qingframe.logoutUser();
+            this.user = null;
+            this.closeLoginModal();
+            this.setStatus('已退出登录');
+        } catch (e) {
+            this.setStatus('退出失败：' + e.message);
+        }
+        this.refreshLoginStatus();
+    },
+
+    refreshLoginStatus() {
+        const el = this.dom.loginStatus;
+        if (this.user) {
+            const name = (this.user.nickname || this.user.username).trim();
+            el.textContent = name;
+            el.classList.add('logged-in');
+            el.title = '@' + this.user.username + ' · 点击管理';
+        } else {
+            el.textContent = '未登录';
+            el.classList.remove('logged-in');
+            el.title = '点击登录';
+        }
+    },
+
 };
 
 /* 工具 */
