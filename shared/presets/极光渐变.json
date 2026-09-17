@@ -1,6 +1,6 @@
 {
   "templateName": "极光渐变",
-  "templateTag": "潮流",
+  "templateTag": "氛围",
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
@@ -29,12 +29,18 @@
         "gradientType": "linear",
         "gradientAngle": 0,
         "gradientStops": [
-          {"position": 0.0, "color": "#ffffff"},
-          {"position": 1.0, "color": "#cccccc"}
+          {
+            "position": 0,
+            "color": "#ffffff"
+          },
+          {
+            "position": 1,
+            "color": "#cccccc"
+          }
         ],
         "gradientOpacity": 100,
         "textureSrc": "",
-        "textureScale": 1.0,
+        "textureScale": 1,
         "textureOffsetX": 0,
         "textureOffsetY": 0,
         "textureOpacity": 100,
@@ -81,13 +87,22 @@
         "gradientType": "linear",
         "gradientAngle": 135,
         "gradientStops": [
-          {"position": 0.0, "color": "#22d3ee"},
-          {"position": 0.5, "color": "#a855f7"},
-          {"position": 1.0, "color": "#ec4899"}
+          {
+            "position": 0,
+            "color": "#22d3ee"
+          },
+          {
+            "position": 0.5,
+            "color": "#a855f7"
+          },
+          {
+            "position": 1,
+            "color": "#ec4899"
+          }
         ],
         "gradientOpacity": 100,
         "textureSrc": "",
-        "textureScale": 1.0,
+        "textureScale": 1,
         "textureOffsetX": 0,
         "textureOffsetY": 0,
         "textureOpacity": 100,

@@ -310,13 +310,13 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
         g.drawImage(img, size, railH);
     }
-    function stylePolaroid(img, size, g, iw, ih) {
-        const bottom = size * 3;
+    function stylePolaroid(img, size, g, iw, ih, S) {
+        const fs = Math.max(10, Math.round(autoExifSize(S.paramFs, iw)));
+        const bottom = Math.max(size * 3, Math.round(fs * 2.6));
         const w = iw + size * 2, h = ih + size + bottom;
         g.fillStyle = '#ffffff';
         g.fillRect(0, 0, w, h);
         g.drawImage(img, size, size);
-        const fs = Math.max(10, Math.floor(size / 3));
         const date = dateYMD();
         const m = measureText(g, date, fs, true);
         const tx = Math.floor((w - m.w) / 2);
@@ -389,9 +389,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleNoise(iw, ih, salt) { return javaRandom(iw * 7919 + ih * 104729 + salt); }
 
     function stampMatte(size) {
-        const m = Math.max(56, Math.floor(size * 2));
-        const d = Math.max(10, Math.floor(m / 4));
-        return { m, d };
+        const m = Math.max(72, Math.floor(size * 2.6));
+        const padX = Math.max(44, Math.round(m * 0.55));
+        const padY = Math.max(78, Math.round(m * 0.98));
+        const d = Math.max(10, Math.round(m / 5));
+        return { m, padX, padY, d };
     }
     // 邮票齿孔:沿四周外缘打半圆孔(destination-out,露出透明底)
     function stampPerforate(g, w, h, d) {
@@ -408,28 +410,27 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
         g.restore();
     }
-    function styleStampPostage(img, size, g, iw, ih) {
-        const { m, d } = stampMatte(size);
-        const w = iw + m * 2, h = ih + m * 2;
+    function styleStampPostage(img, size, g, iw, ih, S) {
+        const { padX, padY, d } = stampMatte(size);
+        const w = iw + padX * 2, h = ih + padY * 2;
         g.fillStyle = '#f6f3ea';
         g.fillRect(0, 0, w, h);
         stampPerforate(g, w, h, d);
-        const px = Math.max(6, Math.floor(d * 0.9));
-        g.drawImage(img, px, px, iw, ih);
+        g.drawImage(img, padX, padY, iw, ih);
         g.strokeStyle = 'rgba(120,110,88,0.5)';
         g.lineWidth = 1;
-        g.strokeRect(px - 0.5, px - 0.5, iw + 1, ih + 1);
+        g.strokeRect(padX - 0.5, padY - 0.5, iw + 1, ih + 1);
         const ink = 'rgba(66,58,120,0.62)';
-        const fs = Math.max(11, Math.floor(m / 5));
+        const fs = Math.max(11, Math.min(Math.round(autoExifSize(S.paramFs, iw)), Math.floor(padY / 3)));
         const fy = Math.floor(fs * 0.36);
-        drawTrackedTextL(g, '中国邮政', w / 2, Math.floor(px / 2) + fy, fs, ink, true, 0.55, null);
+        drawTrackedTextL(g, '中国邮政', w / 2, Math.floor(padY / 2) + fy, fs, ink, true, 0.55, null);
         const val = '¥ 0.80';
-        drawTrackedTextL(g, val, w / 2, h - Math.floor((px - fs) / 2) + fy, fs, ink, true, 0.55, null);
+        drawTrackedTextL(g, val, w / 2, h - Math.floor(padY / 2) + fy, fs, ink, true, 0.55, null);
         // 邮戳(右上,盖在照片上)
         const rnd = styleNoise(iw, ih, 9301);
         const pr0 = Math.max(16, Math.floor(Math.min(iw, ih) * 0.16));
         g.save();
-        g.translate(px + Math.floor(iw * 0.76), px + Math.floor(ih * 0.30));
+        g.translate(padX + Math.floor(iw * 0.76), padY + Math.floor(ih * 0.30));
         g.rotate(-0.14);
         g.strokeStyle = 'rgba(46,40,108,0.4)';
         g.lineWidth = 1.5;
@@ -1181,15 +1182,16 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const l1m = textMetrics(g, l1, f1, false, true, 0);
         drawTextL(g, l1, cx2(w, l1m.w), y1, 'rgb(25,25,25)', f1, false, true, 0);
         if (l2 && f2) {
-            drawTextL(g, l2, cx2(w, m2.w), y1 + gap + m2.height, 'rgb(130,130,130)', f2, true, false, 0);
+            setFont(g, f2, true, false);
+            const l2w = g.measureText(l2).width;
+            drawTextL(g, l2, cx2(w, l2w), y1 + gap + m2.height, 'rgb(130,130,130)', f2, true, false, 0);
         }
     }
     function styleCardPureLogo(img, size, g, iw, ih, S) {
-        const ref = Math.max(1, Math.min(iw, ih));
         const pad = Math.max(32, size);
         const arc = Math.max(14, Math.floor(size / 3));
         const brand = trim(S.cam.brand) || 'PHOTO';
-        const wf = fitFont(g, brand, false, true, Math.max(20, Math.min(96, Math.floor(ref / 22))), Math.max(80, iw - pad), 0);
+        const wf = fitFont(g, brand, false, true, Math.max(20, Math.min(96, Math.round(autoExifSize(S.paramFs, iw)))), Math.max(80, iw - pad), 0);
         const wm = textMetrics(g, brand, wf, false, true, Math.max(1, Math.round(wf * 0.45)));
         const extra = Math.max(wm.height * 3, size);
         const w = iw + pad * 2, h = ih + pad + extra;
@@ -1266,11 +1268,10 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
     }
     function styleOverlayLogo(img, size, g, iw, ih, S) {
-        const ref = Math.max(1, Math.min(iw, ih));
         const inset = Math.max(14, Math.floor(size * 2 / 5));
         let brand = trim(S.cam.brand);
         if (!brand) brand = 'PHOTO';
-        let fs = Math.max(16, Math.min(96, Math.floor(ref / 20)));
+        let fs = Math.max(16, Math.min(96, Math.round(autoExifSize(S.paramFs, iw))));
         let track = 1, tw = 0;
         for (; fs > 10; fs--) {
             track = Math.max(1, Math.round(fs * 0.45));
@@ -1332,7 +1333,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
     const COLOR_SWATCHES = ['rgb(220,80,60)', 'rgb(60,140,200)', 'rgb(240,200,50)', 'rgb(80,180,100)', 'rgb(180,100,180)'];
     function styleColorClassic(img, size, g, iw, ih, S) {
-        const barH = Math.max(40, size), pad = Math.max(8, Math.floor(size / 2));
+        const fs = Math.max(10, Math.round(autoExifSize(S.paramFs, iw)));
+        const barH = Math.max(40, size, Math.round(fs * 5 / 3)), pad = Math.max(8, Math.floor(size / 2));
         const w = iw + pad * 2, h = ih + pad + barH;
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
@@ -1340,7 +1342,6 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const cols = extractMultipleDominant(img, 5);
         const swatchH = barH, swW = Math.floor(w / cols.length);
         for (let i = 0; i < cols.length; i++) { g.fillStyle = cols[i]; g.fillRect(i * swW, barY, swW, swatchH); }
-        const fs = Math.max(10, Math.floor(size / 3));
         const label = S.cam.brand + ' ' + S.cam.model;
         g.fillStyle = '#ffffff';
         g.font = 'bold ' + fs + 'px sans-serif';
@@ -1362,14 +1363,14 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         drawTextL(g, line, 12, barY + swatchH + Math.floor((barH - swatchH + fm.ascent) / 2), 'rgb(60,60,60)', f, true, false, 0);
     }
     function styleArtCard(img, size, g, iw, ih, S) {
-        const barH = Math.max(36, size), pad = Math.max(8, Math.floor(size / 2));
+        const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
+        const barH = Math.max(36, size, Math.round(fs * 5 / 3)), pad = Math.max(8, Math.floor(size / 2));
         const w = iw + pad * 2, h = ih + pad + barH;
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
         const barY = ih + pad;
         const swatchH = Math.floor(barH * 2 / 3), swW = Math.floor(w / COLOR_SWATCHES.length);
         for (let i = 0; i < COLOR_SWATCHES.length; i++) { g.fillStyle = COLOR_SWATCHES[i]; g.fillRect(i * swW, barY, swW, swatchH); }
-        const fs = Math.max(11, Math.floor(size / 3));
         const model = 'GFX ' + S.cam.model;
         const mfw = textMetrics(g, model, fs, false, true, 0);
         drawTextL(g, model, w - pad - mfw.w, barY + swatchH + Math.floor((barH - swatchH + fs) / 2), 'rgb(60,60,60)', fs, false, true, 0);
@@ -1693,8 +1694,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const railH = Math.max(20, size);
                 return { w: iw + size * 2, h: ih + railH * 2 };
             }
-            case 'POLAROID':
-                return { w: iw + size * 2, h: ih + size + size * 3 };
+            case 'POLAROID': {
+                const pfs = Math.max(10, Math.round(autoExifSize((S ? S.paramFs : 12), iw)));
+                const pbottom = Math.max(size * 3, Math.round(pfs * 2.6));
+                return { w: iw + size * 2, h: ih + size + pbottom };
+            }
             case 'DROP_SHADOW': {
                 const offset = Math.max(8, Math.floor(size / 2));
                 return { w: iw + size * 2 + offset, h: ih + size * 2 + offset };
@@ -1737,13 +1741,13 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'CARD_LEICA': {
                 const pad = Math.max(24, Math.floor(size * 3 / 4));
-                const f1 = autoExifSize((S ? S.paramFs : 35), iw), f2 = Math.max(12, Math.floor(f1 * 2 / 3));
+                const f1 = autoExifSize((S ? S.paramFs : 12), iw), f2 = Math.max(12, Math.floor(f1 * 2 / 3));
                 const maxFs = Math.max(f1, f2);
                 return { w: iw + pad * 2, h: ih + pad + Math.max(52, Math.floor(maxFs * 5 / 2)) };
             }
             case 'CARD_LOGO_PARAM': {
                 const pad = Math.max(28, Math.floor(size * 3 / 5));
-                const f1 = autoExifSize((S ? S.paramFs : 35), iw), f2 = Math.max(12, Math.floor(f1 * 2 / 3));
+                const f1 = autoExifSize((S ? S.paramFs : 12), iw), f2 = Math.max(12, Math.floor(f1 * 2 / 3));
                 const h1 = Math.round(f1), h2 = Math.round(f2);
                 const gap = Math.max(8, Math.floor(h1 / 4));
                 const bandH = Math.max(56, Math.floor((h1 + gap + h2) + pad * 2 / 3));
@@ -1751,20 +1755,19 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'CARD_PURE_LOGO': {
                 const pad = Math.max(32, size);
-                const ref = Math.max(1, Math.min(iw, ih));
-                const wf = Math.max(20, Math.min(96, Math.floor(ref / 22)));
+                const wf = Math.max(20, Math.min(96, Math.round(autoExifSize((S ? S.paramFs : 12), iw))));
                 const extra = Math.max(Math.round(wf) * 3, size);
                 return { w: iw + pad * 2, h: ih + pad + extra };
             }
             case 'CARD_SIMPLE': {
                 const pad = Math.max(12, Math.floor(size / 2));
-                const fmH = Math.round(autoExifSize((S ? S.paramFs : 35), iw));
+                const fmH = Math.round(autoExifSize((S ? S.paramFs : 12), iw));
                 const capH = Math.floor(fmH * 5 / 3) + Math.max(6, Math.floor(pad / 4));
                 return { w: iw + pad * 2, h: ih + pad + capH + Math.max(10, Math.floor(pad / 2)) };
             }
             case 'CARD_IMMERSION': {
                 const pad = Math.max(20, Math.floor(size * 2 / 5));
-                const fmH = Math.round(autoExifSize((S ? S.paramFs : 35), iw));
+                const fmH = Math.round(autoExifSize((S ? S.paramFs : 12), iw));
                 const bandH = fmH * 2 + Math.max(10, Math.floor(pad / 2));
                 return { w: iw + pad * 2, h: ih + pad + bandH };
             }
@@ -1774,7 +1777,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'OVERLAY_LOGO_BOTTOM':
                 return { w: iw, h: ih };
             case 'COLOR_CLASSIC': {
-                const barH = Math.max(40, size), pad = pad2(8);
+                const pfs = Math.max(10, Math.round(autoExifSize((S ? S.paramFs : 12), iw)));
+                const barH = Math.max(40, size, Math.round(pfs * 5 / 3)), pad = pad2(8);
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
             case 'COLOR_REFINED': {
@@ -1783,12 +1787,13 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'ART_CARD':
             case 'FUJI_WHITE': {
-                const barH = Math.max(36, size), pad = pad2(8);
+                const af = Math.max(11, Math.round(autoExifSize((S ? S.paramFs : 12), iw)));
+                const barH = Math.max(36, size, Math.round(af * 5 / 3)), pad = pad2(8);
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
             case 'STAMP_POSTAGE': {
                 const sd = stampMatte(size);
-                return { w: iw + sd.m * 2, h: ih + sd.m * 2 };
+                return { w: iw + sd.padX * 2, h: ih + sd.padY * 2 };
             }
             case 'TEARED_PAPER': {
                 const tp = tornPaperParams(iw, ih, size);

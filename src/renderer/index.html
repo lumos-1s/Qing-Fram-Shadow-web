@@ -45,8 +45,8 @@
                 <div class="sep"></div>
                 <button id="btnSave" class="tbtn primary" title="导出当前图片">导出</button>
                 <select id="selFormat" class="inline-select" title="导出格式">
-                    <option value="png" selected>PNG</option>
-                    <option value="jpeg">JPEG</option>
+                    <option value="png">PNG</option>
+                    <option value="jpeg" selected>JPG</option>
                 </select>
                 <button id="btnSyncSel" class="tbtn" title="将当前边框效果应用到选中的照片">同步到选中</button>
             </div>
@@ -103,6 +103,7 @@
                         </svg>
                     </div>
                     <div class="ph-text">点击「导入照片」或将照片拖到此处<br/><span class="ph-sub">支持单个或批量导入</span></div>
+                    <button id="btnRestoreDraft" class="tbtn restore-draft-btn" style="display:none" title="恢复上次会话的照片和模板">继续上次会话</button>
                 </div>
                 <div id="thumbStrip" class="thumb-strip"></div>
                 <div id="dropOverlay" class="drop-overlay"><div>松手导入照片</div></div>

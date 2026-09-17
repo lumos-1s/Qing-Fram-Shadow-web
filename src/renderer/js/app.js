@@ -484,7 +484,7 @@ window.App = {
                 cornerDecorEnable: 0, cornerDecorType: 'line', cornerDecorSize: 30,
             },
             logoElements: [],
-            paramFontSize: 100, paramType: 0, paramPosition: 'CENTER',
+            paramFontSize: 33, paramType: 0, paramPosition: 'CENTER',
             puzzle: {
                 enabled: 0, layout: 'single', layoutType: 0, gap: 6, slotFill: 'cover', bgMode: 0,
                 canvasRatio: 'auto', borderColor: 'ffffff', offsetX: 0, offsetY: 0, zoom: 100,
@@ -525,7 +525,7 @@ window.App = {
         cc.cornerRadiusBR = num($('slCornerBR'), r);
 
         this.template.paramPosition = $('cbParamPosition') ? $('cbParamPosition').value : 'CENTER';
-        this.template.paramFontSize = $('slParamFontSize') ? parseInt($('slParamFontSize').value, 10) : 100;
+        this.template.paramFontSize = $('slParamFontSize') ? parseInt($('slParamFontSize').value, 10) : 33;
         this.template.paramType = $('cbParamType') ? parseInt($('cbParamType').value, 10) : 0;
         this.syncManualExif();
 
@@ -678,7 +678,7 @@ window.App = {
             this.updateLabel('lblCornerBL', cc.cornerRadiusBL || 0); this.updateLabel('lblCornerBR', cc.cornerRadiusBR || 0);
 
             if ($('cbParamPosition')) $('cbParamPosition').value = this.template.paramPosition || 'CENTER';
-            if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 100;
+            if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
             this.updateParamFontLabel();
             if ($('cbParamType')) $('cbParamType').value = String(this.template.paramType != null ? this.template.paramType : 0);
 
@@ -833,7 +833,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     },
 
     updateParamFontLabel() {
-        const v = this.template.paramFontSize != null ? this.template.paramFontSize : 100;
+        const v = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
         if (v <= 0) {
             const s = this.image ? Math.min(Math.max(Math.round(Math.min(this.image.w, this.image.h) / 45), 20), 64) : 24;
             this.updateLabel('lblParamFontSize', `自适应(≈${s}px)`);
@@ -947,6 +947,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (!this.image) return;
         this.dom.placeholder.style.display = 'none';
         this.dom.canvas.style.display = 'block';
+        const btn = document.getElementById('btnRestoreDraft');
+        if (btn) btn.style.display = 'none';
         const saved = this.imageTemplates.get(this.image);
         if (saved) this.template = saved;
         else this.normalizeTemplate();
@@ -1003,6 +1005,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             }
             if (loaded) {
                 this.buildThumbnails();
+                this.template = this.defaultTemplate();
+                this.normalizeTemplate();
                 this.selectImage(this.images.length - loaded);
                 this.setStatus(`已导入 ${loaded} 张图片${skipped ? '，跳过 ' + skipped + ' 个不支持的文件' : ''}`);
             } else if (skipped) this.setStatus('不支持的文件格式');
