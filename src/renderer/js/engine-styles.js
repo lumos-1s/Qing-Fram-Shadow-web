@@ -1185,54 +1185,76 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
     }
     function styleImpFrosted(img, size, g, iw, ih, S) {
-        // 横版构图:照片偏右,左侧留白放品牌名和参数
-        const leftW = Math.max(160, Math.round(iw * 0.32));
-        const rightPad = Math.max(60, Math.round(size * 1.5));
-        const topBotPad = Math.max(40, Math.round(size * 0.9));
+        // 横版构图:左侧文字区,右侧照片
+        const leftW = Math.max(180, Math.round(iw * 0.35));
+        const rightPad = Math.max(80, Math.round(size * 2));
+        const topBotPad = Math.max(50, Math.round(size * 1.2));
         const w = leftW + iw + rightPad;
         const h = ih + topBotPad * 2;
-        // 1. 照片 cover 铺满做模糊底
-        g.save();
-        g.fillStyle = '#2a3540'; g.fillRect(0, 0, w, h);
-        const scale = Math.max(w / iw, h / ih);
-        const dw = iw * scale, dh = ih * scale;
-        g.filter = 'blur(' + Math.max(18, Math.round(Math.min(w, h) / 22)) + 'px)';
-        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-        g.filter = 'none';
-        g.restore();
-        // 2. 压暗
-        g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, w, h);
-        // 3. 右侧放清晰照片(带白边和阴影)
-        const px = leftW, py = Math.round((h - ih) / 2);
+        // 1. 深蓝纯色背景
+        g.fillStyle = '#1a2a3a'; g.fillRect(0, 0, w, h);
+        // 2. 右侧照片(垂直居中,带圆角阴影)
+        const px = leftW;
+        const py = Math.round((h - ih) / 2);
         g.save();
         g.shadowColor = 'rgba(0,0,0,0.5)';
-        g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.04));
-        g.shadowOffsetY = Math.max(6, Math.round(Math.min(iw, ih) * 0.015));
+        g.shadowBlur = Math.max(20, Math.round(Math.min(iw, ih) * 0.05));
+        g.shadowOffsetY = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
         g.fillStyle = '#ffffff';
-        g.fillRect(px, py, iw, ih);
+        const r = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
+        if (typeof g.roundRect === 'function') {
+            g.beginPath(); g.roundRect(px, py, iw, ih, r); g.fill();
+        } else {
+            g.fillRect(px, py, iw, ih);
+        }
         g.restore();
+        g.save();
+        if (typeof g.roundRect === 'function') {
+            g.beginPath(); g.roundRect(px, py, iw, ih, r); g.clip();
+        }
         g.drawImage(img, px, py);
-        // 4. 左侧品牌名 + 参数
-        const cx = leftW / 2;
+        g.restore();
+        // 3. 左侧品牌名
+        const ml = Math.round(leftW * 0.25);
         const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-        const f1 = Math.max(18, Math.round(leftW * 0.13));
-        g.fillStyle = 'rgba(255,255,255,0.95)';
-        g.font = 'bold ' + f1 + 'px sans-serif';
-        g.textAlign = 'center';
+        const fBrand = Math.max(22, Math.round(leftW * 0.14));
+        g.fillStyle = '#ffffff';
+        g.font = 'bold ' + fBrand + 'px serif';
+        g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
-        g.fillText(brand, cx, Math.round(h * 0.32));
-        // 参数行
+        g.fillText(brand, ml, Math.round(h * 0.28));
+        // 4. 三行圆角方框参数
         if (S.useExif && S.cam) {
-            const f2 = Math.max(11, Math.round(leftW * 0.07));
-            g.font = f2 + 'px sans-serif';
-            g.fillStyle = 'rgba(255,255,255,0.7)';
-            const lines = [
-                'F ' + (S.cam.aperture || '1.8'),
-                (S.cam.iso || '100'),
-                (S.cam.shutter || '1/125')
+            const boxW = Math.round(leftW * 0.28);
+            const boxH = Math.round(boxW * 0.55);
+            const fBox = Math.max(11, Math.round(boxH * 0.45));
+            const fVal = Math.max(13, Math.round(leftW * 0.08));
+            const rows = [
+                { label: 'F', val: (S.cam.aperture || '6.3') },
+                { label: 'ISO', val: (S.cam.iso || '100') },
+                { label: 'S', val: (S.cam.shutter || '1/125') }
             ];
-            let ly = Math.round(h * 0.32) + f2 * 2.2;
-            lines.forEach(t => { g.fillText(t, cx, ly); ly += f2 * 1.9; });
+            let ry = Math.round(h * 0.48);
+            rows.forEach(row => {
+                // 圆角方框
+                g.strokeStyle = '#ffffff';
+                g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
+                g.beginPath();
+                if (typeof g.roundRect === 'function') g.roundRect(ml, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                else g.rect(ml, ry - boxH, boxW, boxH);
+                g.stroke();
+                // 框内标签
+                g.fillStyle = '#ffffff';
+                g.font = 'bold ' + fBox + 'px sans-serif';
+                g.textAlign = 'center';
+                g.textBaseline = 'middle';
+                g.fillText(row.label, ml + boxW / 2, ry - boxH / 2);
+                // 右侧数值
+                g.font = 'bold ' + fVal + 'px sans-serif';
+                g.textAlign = 'left';
+                g.fillText(row.val, ml + boxW + Math.round(leftW * 0.05), ry - boxH / 2);
+                ry += Math.round(boxH * 1.9);
+            });
         }
     }
     function styleImpClassic(img, size, g, iw, ih, S) {
