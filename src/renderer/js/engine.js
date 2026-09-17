@@ -1384,6 +1384,20 @@ function renderPuzzle(app, compare, noSelection) {
         // 格子圆角(用户可调,默认3%)
         const cornerPct = (pk.cornerRadius == null ? 3 : pk.cornerRadius) / 100;
         const cr = Math.max(0, Math.min(cw, chh) * cornerPct);
+        // 格子阴影(模糊模式下在clip之前画,只画投影不填色)
+        if (pk.bgMode === 1) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.45)';
+            ctx.shadowBlur = Math.max(12, Math.min(cw, chh) * 0.06);
+            ctx.shadowOffsetY = Math.max(4, Math.min(cw, chh) * 0.02);
+            ctx.fillStyle = 'rgba(255,255,255,1)';
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
+            else ctx.rect(cx, cy, cw, chh);
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.save();
+        ctx.beginPath();
         if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
         else ctx.rect(cx, cy, cw, chh);
         ctx.clip();
@@ -1392,18 +1406,6 @@ function renderPuzzle(app, compare, noSelection) {
         const offX = clamp(sc.offsetX != null ? sc.offsetX : (pk.offsetX || 0), -100, 100);
         const offY = clamp(sc.offsetY != null ? sc.offsetY : (pk.offsetY || 0), -100, 100);
         const fit = puzzleFit({ x: cx, y: cy, w: cw, h: chh }, im.el.naturalWidth, im.el.naturalHeight, fillMode, zoom, offX, offY);
-        // 格子阴影(模糊模式下加投影增强层次)
-        if (pk.bgMode === 1) {
-            ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.35)';
-            ctx.shadowBlur = Math.max(8, Math.min(cw, chh) * 0.04);
-            ctx.shadowOffsetY = Math.max(3, Math.min(cw, chh) * 0.015);
-            ctx.fillStyle = 'rgba(255,255,255,1)';
-            if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
-            else ctx.rect(cx, cy, cw, chh);
-            ctx.fill();
-            ctx.restore();
-        }
         // 格子内图片旋转(0/90/180/270)
         const rot = ((sc.rotate || 0) % 4 + 4) % 4;
         if (rot === 0) {
