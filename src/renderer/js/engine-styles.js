@@ -1203,7 +1203,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 压暗
         g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(0, 0, w, h);
         // 2. 右侧照片(垂直居中,带圆角阴影)
-        const px = leftW;
+        const px = leftW + 20;
         const py = Math.round((h - ih) / 2);
         g.save();
         g.shadowColor = 'rgba(0,0,0,0.5)';
@@ -1224,7 +1224,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.drawImage(img, px, py);
         g.restore();
         // 3. 左侧品牌名
-        const ml = Math.round(leftW * 0.25);
+        const ml = Math.round(leftW * 0.25) + 20;
         const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
         const fBrand = Math.max(22, Math.round(leftW * 0.14));
         g.fillStyle = '#ffffff';
@@ -1239,9 +1239,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             const fBox = Math.max(11, Math.round(boxH * 0.45));
             const fVal = Math.max(13, Math.round(leftW * 0.08));
             const rows = [
-                { label: 'F', val: (S.cam.aperture || '6.3') },
-                { label: 'ISO', val: (S.cam.iso || '100') },
-                { label: 'S', val: (S.cam.shutter || '1/125') }
+                { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
+                { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
+                { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '').replace(/^"/, '').replace(/"$/, '') }
             ];
             let ry = Math.round(h * 0.48);
             rows.forEach(row => {
