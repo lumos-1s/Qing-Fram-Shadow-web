@@ -1185,14 +1185,23 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
     }
     function styleImpFrosted(img, size, g, iw, ih, S) {
-        // 横版构图:左侧文字区,右侧照片
+        // 横版:左侧文字区,右侧照片
         const leftW = Math.max(180, Math.round(iw * 0.35));
         const rightPad = Math.max(80, Math.round(size * 2));
         const topBotPad = Math.max(50, Math.round(size * 1.2));
         const w = leftW + iw + rightPad;
         const h = ih + topBotPad * 2;
-        // 1. 深蓝纯色背景
+        // 1. 照片 cover 铺满做模糊底
+        g.save();
         g.fillStyle = '#1a2a3a'; g.fillRect(0, 0, w, h);
+        const scale = Math.max(w / iw, h / ih);
+        const dw = iw * scale, dh = ih * scale;
+        g.filter = 'blur(' + Math.max(18, Math.round(Math.min(w, h) / 20)) + 'px)';
+        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        g.filter = 'none';
+        g.restore();
+        // 压暗
+        g.fillStyle = 'rgba(20,35,55,0.55)'; g.fillRect(0, 0, w, h);
         // 2. 右侧照片(垂直居中,带圆角阴影)
         const px = leftW;
         const py = Math.round((h - ih) / 2);
@@ -1236,20 +1245,17 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             ];
             let ry = Math.round(h * 0.48);
             rows.forEach(row => {
-                // 圆角方框
                 g.strokeStyle = '#ffffff';
                 g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                 g.beginPath();
                 if (typeof g.roundRect === 'function') g.roundRect(ml, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
                 else g.rect(ml, ry - boxH, boxW, boxH);
                 g.stroke();
-                // 框内标签
                 g.fillStyle = '#ffffff';
                 g.font = 'bold ' + fBox + 'px sans-serif';
                 g.textAlign = 'center';
                 g.textBaseline = 'middle';
                 g.fillText(row.label, ml + boxW / 2, ry - boxH / 2);
-                // 右侧数值
                 g.font = 'bold ' + fVal + 'px sans-serif';
                 g.textAlign = 'left';
                 g.fillText(row.val, ml + boxW + Math.round(leftW * 0.05), ry - boxH / 2);
@@ -1897,8 +1903,12 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const pad = pad2(8);
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
-            case 'IMP_FROSTED':
-                return { w: Math.round(iw * 1.32) + 24, h: Math.round(ih * 1.18) + 40 };
+            case 'IMP_FROSTED': {
+                const lw = Math.max(180, Math.round(iw * 0.35));
+                const rp = Math.max(80, Math.round(size * 2));
+                const tbp = Math.max(50, Math.round(size * 1.2));
+                return { w: lw + iw + rp, h: ih + tbp * 2 };
+            }
             case 'IMP_CLASSIC':
                 return { w: iw + pad2(8) * 2, h: ih + pad2(8) * 2 };
             case 'XIAOMI_IMP': {
