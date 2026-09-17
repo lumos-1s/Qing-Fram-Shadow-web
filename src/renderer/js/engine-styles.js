@@ -1536,7 +1536,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.textAlign = 'left';
             g.textBaseline = 'alphabetic';
-            g.fillText(brand, tx, Math.round(h * 0.3));
+            g.fillText(brand, tx, Math.round(h * 0.28));
             // 三行圆角方框参数
             if (S.useExif && S.cam) {
                 const boxW = Math.round(rightW * 0.3);
