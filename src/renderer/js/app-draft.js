@@ -9,7 +9,24 @@ window.App = Object.assign(window.App || {}, {
         window.addEventListener('pagehide', () => this.saveDraftNow());
         document.addEventListener('visibilitychange', () => { if (document.hidden) this.saveDraftNow(); });
         setInterval(() => this.saveDraftNow(), 30000);
-        this.restoreDraft();
+        this.checkDraftRestore();
+    },
+
+    // 启动时仅提示"可恢复上次会话",不自动恢复(避免误以为出现默认图片)
+    checkDraftRestore() {
+        let draft = null;
+        try {
+            const raw = localStorage.getItem(this._draftKey);
+            if (raw) draft = JSON.parse(raw);
+        } catch (e) { draft = null; }
+        const btn = document.getElementById('btnRestoreDraft');
+        const hasRecoverable = !!(draft && Array.isArray(draft.images) && draft.images.length &&
+            draft.images.some(m => m && m.path));
+        if (btn) {
+            const showBtn = hasRecoverable && !(this.images && this.images.length);
+            btn.style.display = showBtn ? 'inline-block' : 'none';
+            if (showBtn) btn.onclick = () => this.restoreDraft();
+        }
     },
 
     scheduleDraft() {
@@ -75,6 +92,8 @@ window.App = Object.assign(window.App || {}, {
             this.afterImageSelect();
             this.refreshUI();
             this.scheduleRender(true);
+            const btn = document.getElementById('btnRestoreDraft');
+            if (btn) btn.style.display = 'none';
             this.setStatus('已恢复上次会话草稿（' + restored.length + ' 张照片）');
         } catch (e) { /* 恢复失败不阻塞启动 */ }
     },

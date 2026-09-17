@@ -1,6 +1,6 @@
 {
-  "templateName": "胶带贴片",
-  "templateTag": "手作",
+  "templateName": "徕卡黑卡",
+  "templateTag": "高级感",
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
@@ -62,7 +62,7 @@
   "paramFontSize": 33,
   "paramType": 0,
   "paramPosition": "CENTER",
-  "photoFrameStyle": "PINBOARD_TAPE",
-  "photoFrameBorderSize": 24,
+  "photoFrameStyle": "CARD_LEICA",
+  "photoFrameBorderSize": 70,
   "blurIntensity": 50
 }

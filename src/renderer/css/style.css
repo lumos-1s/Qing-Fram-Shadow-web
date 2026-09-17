@@ -304,6 +304,7 @@ html.dark #previewCanvas {
 }
 .ph-text { font-size: 14.5px; font-weight: 500; line-height: 1.8; color: var(--text-2); }
 .ph-sub { font-size: 12px; opacity: .75; }
+.restore-draft-btn { pointer-events: auto; margin-top: 4px; }
 
 /* 缩略图条 */
 .thumb-strip {
