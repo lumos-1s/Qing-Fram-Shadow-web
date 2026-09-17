@@ -2193,60 +2193,55 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
 
     
-    // 深色身份卡: 身份证风格
+    // 深色身份卡: 横版证件卡,小照片在左,右侧信息文字
     function styleIdCard(img, size, g, iw, ih, S) {
-        const pad = Math.max(30, Math.round(size * 1.2));
-        const w = iw + pad * 2;
-        const h = ih + pad * 2 + Math.round(ih * 0.25);
+        // 横版卡片: 宽 > 高
+        const photoW = Math.round(iw * 0.45);
+        const photoH = Math.round(photoW * ih / iw);
+        const cardH = Math.round(photoH * 1.25);
+        const cardW = Math.round(photoW * 2.4);
+        const pad = Math.round((cardW - photoW) * 0.15);
         // 深灰卡底
-        g.fillStyle = '#2a2a2e'; g.fillRect(0, 0, w, h);
-        // 照片在上方偏左
-        const r = Math.round(Math.min(iw, ih) * 0.04);
+        g.fillStyle = '#2d2d32'; g.fillRect(0, 0, cardW, cardH);
+        // 顶部银色条
+        g.fillStyle = '#c0c0c8'; g.fillRect(0, 0, cardW, Math.round(cardH * 0.08));
+        // 小照片在左
+        const px = pad, py = Math.round(cardH * 0.18);
         g.save();
-        g.shadowColor = 'rgba(0,0,0,0.5)';
-        g.shadowBlur = 20;
-        g.shadowOffsetY = 8;
-        g.fillStyle = '#fff';
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.fill(); }
-        else g.fillRect(pad, pad, iw, ih);
+        g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 8; g.shadowOffsetY = 3;
+        g.fillStyle = '#fff'; g.fillRect(px, py, photoW, photoH);
         g.restore();
-        g.save();
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
-        g.drawImage(img, pad, pad);
-        g.restore();
-        // 下方信息栏
-        const iy = pad + ih + 20;
-        g.fillStyle = '#555';
-        g.font = Math.max(14, Math.round(iw * 0.03)) + 'px sans-serif';
+        g.drawImage(img, px, py, photoW, photoH);
+        // 右侧文字
+        const tx = px + photoW + Math.round(pad * 1.5);
+        g.fillStyle = '#e0e0e0';
+        g.font = 'bold ' + Math.round(cardH * 0.08) + 'px sans-serif';
         g.textAlign = 'left';
-        g.fillText('姓名: PHOTO', pad + 10, iy + 24);
-        g.fillText('性别: 男    民族: 汉', pad + 10, iy + 52);
-        g.fillText('编号: 110101******0000', pad + 10, iy + 80);
+        g.fillText('PERSONAL ID', tx, Math.round(cardH * 0.25));
+        g.font = Math.round(cardH * 0.055) + 'px sans-serif';
+        g.fillStyle = '#aaa';
+        g.fillText('Name: PHOTO', tx, Math.round(cardH * 0.4));
+        g.fillText('Sex:  M    Ethnic:  Han', tx, Math.round(cardH * 0.52));
+        g.fillText('No.  110101******0000', tx, Math.round(cardH * 0.64));
         // 条形码
-        g.fillStyle = '#888';
-        for (let i = 0; i < 30; i++) {
+        g.fillStyle = '#666';
+        for (let i = 0; i < 25; i++) {
             const bw = (i * 7) % 3 === 0 ? 2 : 1;
-            g.fillRect(pad + i * 6, iy + 100, bw, 30);
+            g.fillRect(tx + i * 5, Math.round(cardH * 0.78), bw, Math.round(cardH * 0.12));
         }
     }
-    // 苹果圆角卡: 照片模糊底+中央圆角照片
+    // 苹果圆角卡: 纯色渐变底+居中照片+极简
     function styleAppleCard(img, size, g, iw, ih, S) {
-        const pad = Math.max(40, Math.round(size * 1.5));
+        const pad = Math.max(50, Math.round(size * 2));
         const w = iw + pad * 2, h = ih + pad * 2;
-        // 照片模糊底
+        // 渐变背景(灰蓝→灰紫)
+        const grad = g.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, '#e8e8ec'); grad.addColorStop(1, '#d8d8e0');
+        g.fillStyle = grad; g.fillRect(0, 0, w, h);
+        // 中央大圆角照片
+        const r = Math.round(Math.min(iw, ih) * 0.15);
         g.save();
-        g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
-        const sc = Math.max(w / iw, h / ih);
-        g.filter = 'blur(30px)';
-        g.drawImage(img, (w - iw * sc) / 2, (h - ih * sc) / 2, iw * sc, ih * sc);
-        g.filter = 'none';
-        g.restore();
-        // 中央圆角照片
-        const r = Math.round(Math.min(iw, ih) * 0.12);
-        g.save();
-        g.shadowColor = 'rgba(0,0,0,0.6)';
-        g.shadowBlur = 30;
-        g.shadowOffsetY = 10;
+        g.shadowColor = 'rgba(0,0,0,0.25)'; g.shadowBlur = 40; g.shadowOffsetY = 15;
         g.fillStyle = '#fff';
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.fill(); }
         else g.fillRect(pad, pad, iw, ih);
@@ -2256,18 +2251,45 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.drawImage(img, pad, pad);
         g.restore();
     }
-    // 赛博霓虹: 深色底+青色霓虹边框
+    // 赛博霓虹: 黑底+青色网格线+扫描线
     function styleCyberNeon(img, size, g, iw, ih, S) {
-        const pad = Math.max(30, Math.round(size * 1.2));
+        const pad = Math.max(40, Math.round(size * 1.5));
         const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#0a0a14'; g.fillRect(0, 0, w, h);
-        // 青色霓虹外发光
+        g.fillStyle = '#050510'; g.fillRect(0, 0, w, h);
+        // 青色网格线
+        g.strokeStyle = 'rgba(0,255,255,0.15)'; g.lineWidth = 1;
+        const grid = Math.round(w / 20);
+        for (let x = 0; x < w; x += grid) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+        for (let y = 0; y < h; y += grid) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+        // 照片
+        const r = Math.round(Math.min(iw, ih) * 0.02);
+        g.save();
+        g.shadowColor = '#00ffff'; g.shadowBlur = 25;
+        g.fillStyle = '#000';
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.fill(); }
+        else g.fillRect(pad, pad, iw, ih);
+        g.restore();
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
+        g.drawImage(img, pad, pad);
+        g.restore();
+        // 扫描线
+        g.fillStyle = 'rgba(0,255,255,0.08)';
+        for (let y = pad; y < pad + ih; y += 4) g.fillRect(pad, y, iw, 1);
+        // 左上角标签
+        g.fillStyle = '#00ffff'; g.font = 'bold ' + Math.round(w * 0.02) + 'px monospace';
+        g.textAlign = 'left'; g.fillText('// CYBER_2077', pad, pad - 10);
+    }
+    // 霓虹辉光: 黑底+粉色灯管文字
+    function styleNeonGlow(img, size, g, iw, ih, S) {
+        const pad = Math.max(40, Math.round(size * 1.5));
+        const w = iw + pad * 2, h = ih + pad * 2 + Math.round(ih * 0.15);
+        g.fillStyle = '#0a0510'; g.fillRect(0, 0, w, h);
+        // 照片
         const r = Math.round(Math.min(iw, ih) * 0.03);
         g.save();
-        g.shadowColor = '#00ffff';
-        g.shadowBlur = 30;
-        g.strokeStyle = '#00ffff';
-        g.lineWidth = 3;
+        g.shadowColor = '#ff44aa'; g.shadowBlur = 30;
+        g.strokeStyle = '#ff66bb'; g.lineWidth = 3;
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.stroke(); }
         else g.strokeRect(pad, pad, iw, ih);
         g.restore();
@@ -2275,25 +2297,13 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
         g.drawImage(img, pad, pad);
         g.restore();
-    }
-    // 霓虹辉光: 深色底+紫色霓虹边框
-    function styleNeonGlow(img, size, g, iw, ih, S) {
-        const pad = Math.max(30, Math.round(size * 1.2));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#1a0a20'; g.fillRect(0, 0, w, h);
-        const r = Math.round(Math.min(iw, ih) * 0.04);
+        // 底部霓虹文字
+        const ty = pad + ih + Math.round((h - pad - ih) * 0.5);
         g.save();
-        g.shadowColor = '#ff00ff';
-        g.shadowBlur = 35;
-        g.shadowOffsetY = 5;
-        g.strokeStyle = '#ff66ff';
-        g.lineWidth = 3;
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.stroke(); }
-        else g.strokeRect(pad, pad, iw, ih);
-        g.restore();
-        g.save();
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
-        g.drawImage(img, pad, pad);
+        g.shadowColor = '#ff44aa'; g.shadowBlur = 20;
+        g.fillStyle = '#ff88cc'; g.font = 'bold ' + Math.round(w * 0.05) + 'px cursive';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('✦ neon glow ✦', w / 2, ty);
         g.restore();
     }
     const draw = {
