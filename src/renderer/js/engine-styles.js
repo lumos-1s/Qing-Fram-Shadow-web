@@ -1187,7 +1187,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleImpFrosted(img, size, g, iw, ih, S) {
         // 横版构图:照片偏右,左侧留白放品牌名和参数
         const leftW = Math.max(160, Math.round(iw * 0.32));
-        const rightPad = Math.max(24, Math.round(size * 0.6));
+        const rightPad = Math.max(60, Math.round(size * 1.5));
         const topBotPad = Math.max(40, Math.round(size * 0.9));
         const w = leftW + iw + rightPad;
         const h = ih + topBotPad * 2;
@@ -1203,7 +1203,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 2. 压暗
         g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, w, h);
         // 3. 右侧放清晰照片(带白边和阴影)
-        const px = leftW, py = topBotPad;
+        const px = leftW, py = Math.round((h - ih) / 2);
         g.save();
         g.shadowColor = 'rgba(0,0,0,0.5)';
         g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.04));
