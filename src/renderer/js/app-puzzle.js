@@ -726,11 +726,13 @@ window.App = Object.assign(window.App || {}, {
         // 交换淡入动画
         const cv = this.dom.canvas;
         if (cv) {
-            cv.style.transition = 'opacity 0.22s ease-out';
-            cv.style.opacity = '0.4';
+            cv.style.transition = 'opacity 0.35s ease-out, filter 0.35s ease-out';
+            cv.style.opacity = '0.15';
+            cv.style.filter = 'blur(3px)';
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 cv.style.opacity = '1';
-                setTimeout(() => { cv.style.transition = ''; cv.style.opacity = ''; }, 240);
+                cv.style.filter = '';
+                setTimeout(() => { cv.style.transition = ''; cv.style.opacity = ''; cv.style.filter = ''; }, 400);
             }));
         }
     },
