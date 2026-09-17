@@ -1482,7 +1482,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
             if (S.useExif && S.cam) {
-                const boxW = Math.round(Math.max(140, Math.min(w * 0.2, 220)));
+                const boxW = Math.round(Math.max(280, Math.min(w * 0.35, 440)));
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
                 const fVal = Math.max(14, Math.round(boxH * 0.6));
