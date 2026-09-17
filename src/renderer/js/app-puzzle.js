@@ -392,6 +392,45 @@ window.App = Object.assign(window.App || {}, {
         this.setStatus('已删除字幕 ' + key.toUpperCase());
     },
 
+    // 旋转当前格子图片 90°
+    rotatePuzzleSlot(i) {
+        const pk = this.tplPuzzle();
+        if (!pk) return;
+        this.onSettingCommit();
+        const sc = pk.slots[i] || (pk.slots[i] = {});
+        sc.rotate = ((sc.rotate || 0) + 1) % 4;
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+        this.setStatus('格子旋转 90°');
+    },
+
+    // 重置单个格子的缩放/位置
+    resetPuzzleSlot(i) {
+        const pk = this.tplPuzzle();
+        if (!pk) return;
+        this.onSettingCommit();
+        const sc = pk.slots[i];
+        if (sc) { delete sc.zoom; delete sc.offsetX; delete sc.offsetY; }
+        this.saveCurrentTemplate();
+        this.setSlotOffsetSliders(sc);
+        this.scheduleRender(true);
+        this.setStatus('已重置格子 ' + (i + 1));
+    },
+
+    // 全部重置:所有格子的缩放/位置/旋转
+    resetAllSlots() {
+        const pk = this.tplPuzzle();
+        if (!pk) return;
+        this.onSettingCommit();
+        for (const k in pk.slots) {
+            const sc = pk.slots[k];
+            delete sc.zoom; delete sc.offsetX; delete sc.offsetY; delete sc.rotate;
+        }
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+        this.setStatus('已重置所有格子');
+    },
+
     // 清空全部格子图片(保留布局/间距/缩放,便于重新放入)
     clearPuzzleSlots() {
         const pk = this.template && this.template.puzzle;

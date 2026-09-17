@@ -294,6 +294,8 @@ window.App = {
             this.openCtx(e.clientX, e.clientY, [
                 ['替换照片(打开图片)', () => this.openSlotImage(hp.slot)],
                 ['在此位置插入照片', () => this.insertImageFromPick(hp.slot)],
+                ['旋转 90°', () => this.rotatePuzzleSlot(hp.slot)],
+                ['重置本格', () => this.resetPuzzleSlot(hp.slot)],
                 ['清空该格', () => this.clearSlotImage(hp.slot)],
             ]);
         });
@@ -1491,6 +1493,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnLoadPreset', () => this.loadPresetFromList());
         bindBtn('btnEditGapCaption', () => this.addEditGapCaption());
         bindBtn('btnDeleteGapCaption', () => this.deleteCaption());
+bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
         bindBtn('btnPuzzleDisable', () => this.disablePuzzle());
         bindBtn('btnExportPuzzle', () => this.exportPuzzle());

@@ -1392,7 +1392,34 @@ function renderPuzzle(app, compare, noSelection) {
         const offX = clamp(sc.offsetX != null ? sc.offsetX : (pk.offsetX || 0), -100, 100);
         const offY = clamp(sc.offsetY != null ? sc.offsetY : (pk.offsetY || 0), -100, 100);
         const fit = puzzleFit({ x: cx, y: cy, w: cw, h: chh }, im.el.naturalWidth, im.el.naturalHeight, fillMode, zoom, offX, offY);
-        ctx.drawImage(im.el, fit.dx, fit.dy, fit.dw, fit.dh);
+        // 格子阴影(模糊模式下加投影增强层次)
+        if (pk.bgMode === 1) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.35)';
+            ctx.shadowBlur = Math.max(8, Math.min(cw, chh) * 0.04);
+            ctx.shadowOffsetY = Math.max(3, Math.min(cw, chh) * 0.015);
+            ctx.fillStyle = 'rgba(255,255,255,1)';
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
+            else ctx.rect(cx, cy, cw, chh);
+            ctx.fill();
+            ctx.restore();
+        }
+        // 格子内图片旋转(0/90/180/270)
+        const rot = ((sc.rotate || 0) % 4 + 4) % 4;
+        if (rot === 0) {
+            ctx.drawImage(im.el, fit.dx, fit.dy, fit.dw, fit.dh);
+        } else {
+            ctx.save();
+            ctx.translate(cx + cw / 2, cy + chh / 2);
+            ctx.rotate(rot * Math.PI / 2);
+            const rw = (rot % 2 === 1) ? chh : cw;
+            const rh = (rot % 2 === 1) ? cw : chh;
+            const rscale = Math.max(rw / (im.el.naturalWidth || 1), rh / (im.el.naturalHeight || 1));
+            const rdw = (im.el.naturalWidth || 1) * rscale;
+            const rdh = (im.el.naturalHeight || 1) * rscale;
+            ctx.drawImage(im.el, -rdw / 2, -rdh / 2, rdw, rdh);
+            ctx.restore();
+        }
         ctx.restore();
         // 格子画面字幕:叠印在该格图片底部,宽度随格子自适应(门牌号 S<i>)
         const scap = (pk.captions && pk.captions[i]);
