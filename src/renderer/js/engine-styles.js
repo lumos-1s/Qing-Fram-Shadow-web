@@ -1487,7 +1487,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
         const barY = ih + pad;
-        const fs = Math.max(11, Math.floor(size / 3));
+        const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
         const line1 = 'FUJIFILM ' + S.cam.model;
         const m1 = textMetrics(g, line1, fs, false, true, 0);
         drawTextL(g, line1, cx2(w, m1.w), barY + fs, 'rgb(40,40,40)', fs, false, true, 0);
