@@ -1491,7 +1491,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
-                const gap = Math.round(boxW * 1.6);
+                const gap = Math.round(boxW * 2.8);
                 const totalW = rows.length * boxW + (rows.length - 1) * gap;
                 let bx = Math.round((w - totalW) / 2);
                 const ry = by + Math.round(bottomH * 0.4);
