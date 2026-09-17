@@ -2149,8 +2149,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             else if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
             else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); this.redo(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAllEls(); }
-            else if (e.ctrlKey && e.key.toLowerCase() === 'c') { this.copyElement(); }
-            else if (e.ctrlKey && e.key.toLowerCase() === 'v') { e.preventDefault(); this.pasteElement(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'c') { if (!typing) this.copyElement(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'v') { if (typing) return; e.preventDefault(); this.pasteElement(); }
             else if (e.key === 'Delete' && this.selectedEls.length) { e.preventDefault(); this.deleteElement(); }
             // 新增快捷键
             else if (e.ctrlKey && e.key.toLowerCase() === 'e') { e.preventDefault(); this.exportImage(); }
