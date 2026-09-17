@@ -1387,9 +1387,9 @@ function renderPuzzle(app, compare, noSelection) {
         // 格子阴影(模糊模式下在clip之前画,只画投影不填色)
         if (pk.bgMode === 1) {
             ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.45)';
-            ctx.shadowBlur = Math.max(12, Math.min(cw, chh) * 0.06);
-            ctx.shadowOffsetY = Math.max(4, Math.min(cw, chh) * 0.02);
+            ctx.shadowColor = 'rgba(0,0,0,0.65)';
+            ctx.shadowBlur = Math.max(20, Math.min(cw, chh) * 0.1);
+            ctx.shadowOffsetY = Math.max(8, Math.min(cw, chh) * 0.035);
             ctx.fillStyle = 'rgba(255,255,255,1)';
             if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
             else ctx.rect(cx, cy, cw, chh);
