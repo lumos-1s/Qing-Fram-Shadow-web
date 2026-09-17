@@ -2140,6 +2140,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
     setupShortcuts() {
         document.addEventListener('keydown', e => {
+            // 输入框/文本域聚焦时不触发快捷键(避免打字冲突)
+            const tag = (document.activeElement && document.activeElement.tagName) || '';
+            const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+            if (typing && !e.ctrlKey) return;
+
             if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openImages(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
             else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); this.redo(); }
@@ -2147,7 +2152,25 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             else if (e.ctrlKey && e.key.toLowerCase() === 'c') { this.copyElement(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'v') { e.preventDefault(); this.pasteElement(); }
             else if (e.key === 'Delete' && this.selectedEls.length) { e.preventDefault(); this.deleteElement(); }
+            // 新增快捷键
+            else if (e.ctrlKey && e.key.toLowerCase() === 'e') { e.preventDefault(); this.exportImage(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'd') { e.preventDefault(); this.applyBorderToSelected(); }
+            else if (e.ctrlKey && e.key === '0') { e.preventDefault(); this.fitZoom(); }
+            else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.saveTemplate(); }
+            else if (e.key === 'ArrowLeft' && this.images && this.images.length > 1) { e.preventDefault(); this.selectImage((this.currentIdx - 1 + this.images.length) % this.images.length); }
+            else if (e.key === 'ArrowRight' && this.images && this.images.length > 1) { e.preventDefault(); this.selectImage((this.currentIdx + 1) % this.images.length); }
         });
+    },
+
+    // 把当前边框参数应用到所有勾选的照片
+    applyBorderToSelected() {
+        if (!this.image) { this.setStatus('请先打开一张照片'); return; }
+        const targets = (this.batchSel && this.batchSel.length) ? this.batchSel.slice() : [this.currentIdx];
+        let n = 0;
+        targets.forEach(i => {
+            if (i !== this.currentIdx) { this.syncBorderTo(i); n++; }
+        });
+        this.setStatus(n ? `已把当前边框同步到 ${n} 张选中照片` : '没有需要同步的选中照片(仅当前张)');
     },
 
     selectAllEls() {
