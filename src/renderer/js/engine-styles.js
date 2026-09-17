@@ -674,7 +674,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ── 阶段二基设:风格序号 / Java Random(原件 cameraFor 的 seed RNG)──
     const ORD = { NONE:0,SIMPLE:1,POLAROID:2,FILM_STRIP:3,ROUNDED:4,DOUBLE_LINE:5,VINTAGE:6,GRADIENT:7,DROP_SHADOW:8,
-        BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,
+        BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,IDCARD:44,APPLECARD:45,CYBERNEON:46,NEONGLOW:47,
         XIAOMI_IMP:17,CARD_LEICA:18,CARD_LOGO_PARAM:19,CARD_PURE_LOGO:20,CARD_SIMPLE:21,CARD_IMMERSION:22,
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
@@ -2192,7 +2192,111 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             return;
         }
 
-        const draw = {
+    
+    // 深色身份卡: 身份证风格
+    function styleIdCard(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(size * 1.2));
+        const w = iw + pad * 2;
+        const h = ih + pad * 2 + Math.round(ih * 0.25);
+        // 深灰卡底
+        g.fillStyle = '#2a2a2e'; g.fillRect(0, 0, w, h);
+        // 照片在上方偏左
+        const r = Math.round(Math.min(iw, ih) * 0.04);
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)';
+        g.shadowBlur = 20;
+        g.shadowOffsetY = 8;
+        g.fillStyle = '#fff';
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.fill(); }
+        else g.fillRect(pad, pad, iw, ih);
+        g.restore();
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
+        g.drawImage(img, pad, pad);
+        g.restore();
+        // 下方信息栏
+        const iy = pad + ih + 20;
+        g.fillStyle = '#555';
+        g.font = Math.max(14, Math.round(iw * 0.03)) + 'px sans-serif';
+        g.textAlign = 'left';
+        g.fillText('姓名: PHOTO', pad + 10, iy + 24);
+        g.fillText('性别: 男    民族: 汉', pad + 10, iy + 52);
+        g.fillText('编号: 110101******0000', pad + 10, iy + 80);
+        // 条形码
+        g.fillStyle = '#888';
+        for (let i = 0; i < 30; i++) {
+            const bw = (i * 7) % 3 === 0 ? 2 : 1;
+            g.fillRect(pad + i * 6, iy + 100, bw, 30);
+        }
+    }
+    // 苹果圆角卡: 照片模糊底+中央圆角照片
+    function styleAppleCard(img, size, g, iw, ih, S) {
+        const pad = Math.max(40, Math.round(size * 1.5));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        // 照片模糊底
+        g.save();
+        g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
+        const sc = Math.max(w / iw, h / ih);
+        g.filter = 'blur(30px)';
+        g.drawImage(img, (w - iw * sc) / 2, (h - ih * sc) / 2, iw * sc, ih * sc);
+        g.filter = 'none';
+        g.restore();
+        // 中央圆角照片
+        const r = Math.round(Math.min(iw, ih) * 0.12);
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.6)';
+        g.shadowBlur = 30;
+        g.shadowOffsetY = 10;
+        g.fillStyle = '#fff';
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.fill(); }
+        else g.fillRect(pad, pad, iw, ih);
+        g.restore();
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
+        g.drawImage(img, pad, pad);
+        g.restore();
+    }
+    // 赛博霓虹: 深色底+青色霓虹边框
+    function styleCyberNeon(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(size * 1.2));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#0a0a14'; g.fillRect(0, 0, w, h);
+        // 青色霓虹外发光
+        const r = Math.round(Math.min(iw, ih) * 0.03);
+        g.save();
+        g.shadowColor = '#00ffff';
+        g.shadowBlur = 30;
+        g.strokeStyle = '#00ffff';
+        g.lineWidth = 3;
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.stroke(); }
+        else g.strokeRect(pad, pad, iw, ih);
+        g.restore();
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
+        g.drawImage(img, pad, pad);
+        g.restore();
+    }
+    // 霓虹辉光: 深色底+紫色霓虹边框
+    function styleNeonGlow(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(size * 1.2));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#1a0a20'; g.fillRect(0, 0, w, h);
+        const r = Math.round(Math.min(iw, ih) * 0.04);
+        g.save();
+        g.shadowColor = '#ff00ff';
+        g.shadowBlur = 35;
+        g.shadowOffsetY = 5;
+        g.strokeStyle = '#ff66ff';
+        g.lineWidth = 3;
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.stroke(); }
+        else g.strokeRect(pad, pad, iw, ih);
+        g.restore();
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(pad, pad, iw, ih, r); g.clip(); }
+        g.drawImage(img, pad, pad);
+        g.restore();
+    }
+    const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
             DOUBLE_LINE: styleDoubleLine, VINTAGE: styleVintage,
@@ -2205,6 +2309,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             OVERLAY_PARAM_LEFT: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 0),
             OVERLAY_PARAM_RIGHT: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 1),
             OVERLAY_PARAM_BOTTOM: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 2),
+        IDCARD: styleIdCard, APPLECARD: styleAppleCard, CYBERNEON: styleCyberNeon, NEONGLOW: styleNeonGlow,
             OVERLAY_LOGO_BOTTOM: styleOverlayLogo,
             COLOR_CLASSIC: styleColorClassic, COLOR_REFINED: styleColorRefined, ART_CARD: styleArtCard,
             FUJI_WHITE: styleFujiWhite, SIMPLE_FILM: styleSimpleFilm,

@@ -130,5 +130,6 @@
     "cornerDecorType": "none",
     "cornerDecorSize": 30,
     "exifAutoText": 1
-  }
+  },
+  "photoFrameStyle": "IDCARD"
 }

@@ -139,5 +139,6 @@
     "cornerDecorType": "none",
     "cornerDecorSize": 30,
     "exifAutoText": 0
-  }
+  },
+  "photoFrameStyle": "NEONGLOW"
 }
