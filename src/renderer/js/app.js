@@ -274,6 +274,19 @@ window.App = {
             }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
         });
+        // 鼠标移出窗口/窗口失焦时,强制清理所有拖动态(防止卡住)
+        const cancelDrags = () => {
+            if (this._dragPz) {
+                this._puzzlePick = null;
+                this._dragPzInitOff = null;
+                this._dragPz = null;
+                canvas.style.cursor = '';
+            }
+            if (this._dragEl) { this._dragEl = null; }
+            if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
+        };
+        window.addEventListener('blur', cancelDrags);
+        canvas.addEventListener('mouseleave', cancelDrags);
         canvas.addEventListener('dblclick', e => {
             const pk = this.tplPuzzle();
             if (!pk) return;
