@@ -1333,8 +1333,11 @@ function renderPuzzle(app, compare, noSelection) {
         if (y1 >= 1 - EPS) { y1 -= shiftY; ch = true; }
         return ch ? [x0, y0, x1 - x0, y1 - y0] : r;
     });
-    // 字幕字号存储为相对 4000 长边的像素基准值,按实际画布等比缩放
-    const capFs = Math.max(Wn, Hn) / 4000;
+    // 字幕字号:画布长边基准 + 受字幕带高度(gth)约束,gap 小则字号自动缩小,避免行间重叠
+    const gthBase = Math.max(2, gapPx * 2);
+    const capFsRaw = Math.max(Wn, Hn) / 4000;
+    // 字号上限:字幕带高度的 0.45(单行)/0.75(双行),保证文字在带内不溢出
+    const capFs = Math.min(capFsRaw, gthBase / 28 * 0.9);
 
     if (pk.bgMode === 1 && used[0]) {
         drawDetailBlurBackground(ctx, used, rawSlots, Wn, Hn);
