@@ -1410,7 +1410,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             'slParamFontSize', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
             'slShadowX', 'slShadowY', 'slShadowBlur', 'slShadowSpread', 'slShadowOpacity', 'slGlowBlur', 'slGlowOpacity',
             'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
-            'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap',
+            'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap', 'slPuzzleCorner',
             'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
         ]);
@@ -1678,7 +1678,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             slVignetteStrength: ['lblVignetteStrength', v + '%'], slVignetteFeather: ['lblVignetteFeather', v],
             slLeakOpacity: ['lblLeakOpacity', v + '%'], slLeakAngle: ['lblLeakAngle', v + '°'],
             slCornerDecorSize: ['lblCornerDecorSize', v], slTextSize: ['lblTextSize', v],
-            slPuzzleGap: ['lblPuzzleGap', v], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
+            slPuzzleGap: ['lblPuzzleGap', v], slPuzzleCorner: ['lblPuzzleCorner', v + '%'], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
             slCapSpacing: ['lblCapSpacing', v + '%'], slSlotOffsetX: ['lblSlotOffsetX', v], slSlotOffsetY: ['lblSlotOffsetY', v],
             slSlotZoom: ['lblSlotZoom', v + '%'],
         };
@@ -1690,7 +1690,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
         if (id === 'slTextSize') { this.previewDraftText(); return; }
-        if (id === 'slPuzzleGap' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
+        if (id === 'slPuzzleGap' || id === 'slPuzzleCorner' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
             this.syncPuzzleFromUI(); this.onSettingChanged(); return;
         }
         this.onSettingChanged();

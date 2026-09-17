@@ -134,6 +134,7 @@ window.App = Object.assign(window.App || {}, {
         const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
         const $ = this.$;
         pk.gap = $('slPuzzleGap') ? parseInt($('slPuzzleGap').value, 10) : pk.gap;
+        pk.cornerRadius = $('slPuzzleCorner') ? parseInt($('slPuzzleCorner').value, 10) : (pk.cornerRadius == null ? 3 : pk.cornerRadius);
         pk.bgMode = $('cbPuzzleBg') ? parseInt($('cbPuzzleBg').value, 10) : 0;
         pk.canvasRatio = $('cbPuzzleCanvas') ? $('cbPuzzleCanvas').value : 'auto';
         pk.borderColor = $('cpPuzzleBorder') ? $('cpPuzzleBorder').value.replace('#', '') : 'ffffff';
@@ -190,6 +191,8 @@ window.App = Object.assign(window.App || {}, {
         const n = this.puzzleSlotCount(pk.layout);
         if ($('slPuzzleGap')) $('slPuzzleGap').value = pk.gap != null ? pk.gap : 6;
         this.updateLabel('lblPuzzleGap', pk.gap != null ? pk.gap : 6);
+        if ($('slPuzzleCorner')) $('slPuzzleCorner').value = pk.cornerRadius != null ? pk.cornerRadius : 3;
+        this.updateLabel('lblPuzzleCorner', (pk.cornerRadius != null ? pk.cornerRadius : 3) + '%');
         if ($('cbPuzzleBg')) $('cbPuzzleBg').value = String(pk.bgMode || 0);
         if ($('cbPuzzleCanvas')) $('cbPuzzleCanvas').value = pk.canvasRatio || 'auto';
         if ($('cpPuzzleBorder')) $('cpPuzzleBorder').value = '#' + (pk.borderColor || 'ffffff');
