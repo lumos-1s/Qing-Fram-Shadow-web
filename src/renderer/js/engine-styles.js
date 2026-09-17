@@ -1185,24 +1185,55 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
     }
     function styleImpFrosted(img, size, g, iw, ih, S) {
-        const pad = Math.max(20, Math.floor(size * 0.8));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        // 1. 照片 cover 铺满整画布做模糊底
+        // 横版构图:照片偏右,左侧留白放品牌名和参数
+        const leftW = Math.max(160, Math.round(iw * 0.32));
+        const rightPad = Math.max(24, Math.round(size * 0.6));
+        const topBotPad = Math.max(40, Math.round(size * 0.9));
+        const w = leftW + iw + rightPad;
+        const h = ih + topBotPad * 2;
+        // 1. 照片 cover 铺满做模糊底
         g.save();
-        g.fillStyle = '#1a1a1e'; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#2a3540'; g.fillRect(0, 0, w, h);
         const scale = Math.max(w / iw, h / ih);
         const dw = iw * scale, dh = ih * scale;
-        g.filter = 'blur(' + Math.max(16, Math.round(Math.min(w, h) / 25)) + 'px)';
+        g.filter = 'blur(' + Math.max(18, Math.round(Math.min(w, h) / 22)) + 'px)';
         g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
         g.filter = 'none';
         g.restore();
-        // 2. 压暗一点让前景照片突出
-        g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, w, h);
-        // 3. 中央放清晰照片(带细白边)
-        g.fillStyle = 'rgba(255,255,255,0.9)';
-        g.fillRect(pad - 2, pad - 2, iw + 4, ih + 4);
-        g.drawImage(img, pad, pad);
-        if (S.useExif) drawParamMask(g, g.canvas, w, h, S.cam, S.position, Math.max(11, S.paramFs));
+        // 2. 压暗
+        g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, w, h);
+        // 3. 右侧放清晰照片(带白边和阴影)
+        const px = leftW, py = topBotPad;
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)';
+        g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.04));
+        g.shadowOffsetY = Math.max(6, Math.round(Math.min(iw, ih) * 0.015));
+        g.fillStyle = '#ffffff';
+        g.fillRect(px, py, iw, ih);
+        g.restore();
+        g.drawImage(img, px, py);
+        // 4. 左侧品牌名 + 参数
+        const cx = leftW / 2;
+        const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+        const f1 = Math.max(18, Math.round(leftW * 0.13));
+        g.fillStyle = 'rgba(255,255,255,0.95)';
+        g.font = 'bold ' + f1 + 'px sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'alphabetic';
+        g.fillText(brand, cx, Math.round(h * 0.32));
+        // 参数行
+        if (S.useExif && S.cam) {
+            const f2 = Math.max(11, Math.round(leftW * 0.07));
+            g.font = f2 + 'px sans-serif';
+            g.fillStyle = 'rgba(255,255,255,0.7)';
+            const lines = [
+                'F ' + (S.cam.aperture || '1.8'),
+                (S.cam.iso || '100'),
+                (S.cam.shutter || '1/125')
+            ];
+            let ly = Math.round(h * 0.32) + f2 * 2.2;
+            lines.forEach(t => { g.fillText(t, cx, ly); ly += f2 * 1.9; });
+        }
     }
     function styleImpClassic(img, size, g, iw, ih, S) {
         const pad = Math.max(8, Math.floor(size / 2));
