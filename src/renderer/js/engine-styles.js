@@ -567,8 +567,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
     // ── 四格创新边框:VHS录像带 / 老相册角贴 / 撕边电影票 / 水彩晕染 ──
     function styleVhsTape(img, size, g, iw, ih) {
-        const sidePad = Math.max(16, Math.floor(size / 2));
-        const barH = Math.max(56, Math.floor(size * 2.4));
+        const sidePad = Math.max(12, Math.floor(size / 3));
+        const barH = Math.max(44, Math.floor(size * 1.5));
         const w = iw + sidePad * 2, h = ih + barH * 2;
         g.fillStyle = '#0a0a0a';
         g.fillRect(0, 0, w, h);
@@ -647,9 +647,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#ffffff';
         g.fillRect(0, 0, w, h);
         const palettes = [
-            ['rgba(90,150,210,0.55)', 'rgba(165,135,210,0.45)', 'rgba(210,145,170,0.45)'],
-            ['rgba(110,185,145,0.55)', 'rgba(230,195,125,0.45)', 'rgba(185,165,210,0.45)'],
-            ['rgba(220,150,135,0.55)', 'rgba(160,190,225,0.45)', 'rgba(185,210,165,0.45)']
+            ['rgba(70,130,200,0.70)', 'rgba(150,120,200,0.60)', 'rgba(200,130,160,0.60)'],
+            ['rgba(90,170,130,0.70)', 'rgba(225,185,110,0.60)', 'rgba(175,155,200,0.60)'],
+            ['rgba(210,135,120,0.70)', 'rgba(145,180,220,0.60)', 'rgba(175,205,155,0.60)']
         ];
         const rnd = styleNoise(iw, ih, 777);
         const pal = palettes[rnd(palettes.length)];
@@ -657,11 +657,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         for (let i = 0; i < 20; i++) {
             const edge = rnd(4);
             let px, py;
-            if (edge === 0) { px = px0 + rnd(iw); py = py0 - Math.floor(bleed * 0.1) + rnd(Math.floor(bleed * 0.7)); }
-            else if (edge === 1) { px = px0 + rnd(iw); py = py0 + ih - Math.floor(bleed * 0.1) + rnd(Math.floor(bleed * 0.7)); }
-            else if (edge === 2) { px = px0 - Math.floor(bleed * 0.1) + rnd(Math.floor(bleed * 0.7)); py = py0 + rnd(ih); }
-            else { px = px0 + iw - Math.floor(bleed * 0.1) + rnd(Math.floor(bleed * 0.7)); py = py0 + rnd(ih); }
-            const pr = Math.max(30, Math.floor(bleed * (0.6 + rnd(80) / 100)));
+            if (edge === 0) { px = px0 + rnd(iw); py = py0 - Math.floor(bleed * 0.05) + rnd(Math.floor(bleed * 0.5)); }
+            else if (edge === 1) { px = px0 + rnd(iw); py = py0 + ih - Math.floor(bleed * 0.05) + rnd(Math.floor(bleed * 0.5)); }
+            else if (edge === 2) { px = px0 - Math.floor(bleed * 0.05) + rnd(Math.floor(bleed * 0.5)); py = py0 + rnd(ih); }
+            else { px = px0 + iw - Math.floor(bleed * 0.05) + rnd(Math.floor(bleed * 0.5)); py = py0 + rnd(ih); }
+            const pr = Math.max(40, Math.floor(bleed * (0.8 + rnd(100) / 100)));
             const col = pal[rnd(pal.length)];
             const grad = g.createRadialGradient(px, py, 0, px, py, pr);
             grad.addColorStop(0, col); grad.addColorStop(0.7, col.replace(/0.45|0.55/, '0.15')); grad.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1909,8 +1909,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'PINBOARD_TAPE':
                 return { w: iw + size * 2, h: ih + size * 2 };
             case 'VHS_TAPE': {
-                const sidePad = Math.max(16, Math.floor(size / 2));
-                const barH = Math.max(52, Math.floor(size * 2.2));
+                const sidePad = Math.max(12, Math.floor(size / 3));
+                const barH = Math.max(44, Math.floor(size * 1.5));
                 return { w: iw + sidePad * 2, h: ih + barH * 2 };
             }
             case 'ALBUM_CORNER': {
