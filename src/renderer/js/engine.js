@@ -1343,12 +1343,7 @@ function renderPuzzle(app, compare, noSelection) {
     }
 
     if (pk.bgMode === 1 && used[0]) {
-        // 模糊照片底:边框只框住每张图显示区域,背景从缝隙中透出
-        ctx.fillStyle = rgba(border);
-        slots0.forEach(r => {
-            const frw = Math.max(1, pw(r[2]) - gapPx * 2), frh = Math.max(1, ph(r[3]) - gapPx * 2);
-            ctx.fillRect(px(r[0]) + gapPx - b, py(r[1]) + gapPx - b, frw + b * 2, frh + b * 2);
-        });
+        // 模糊照片底:不画细边框,照片直接贴在虚化背景上
     } else {
         // 白色背景:保持原有边框铺满(整格外扩 b)
         ctx.fillStyle = rgba(border);
