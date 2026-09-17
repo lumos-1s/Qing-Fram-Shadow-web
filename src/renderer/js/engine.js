@@ -1462,7 +1462,7 @@ function renderPuzzle(app, compare, noSelection) {
     app.applyZoomStyle();
 }
 
-// 重虚化照片底:把多格照片缩到极小再放大,产生强烈虚化
+// 重虚化照片底:把照片 cover 铺满整画布再强模糊,产生柔和虚化背景
 function drawDetailBlurBackground(ctx, used, slots0, Wn, Hn) {
     const avail = used.filter(x => x && x.el);
     if (!avail.length) { ctx.fillStyle = '#eeeeee'; ctx.fillRect(0, 0, Wn, Hn); return; }
@@ -1472,11 +1472,12 @@ function drawDetailBlurBackground(ctx, used, slots0, Wn, Hn) {
     const tmp = document.createElement('canvas');
     tmp.width = tw; tmp.height = th;
     const tctx = tmp.getContext('2d');
-    slots0.forEach((r, i) => {
-        const im = avail[i % avail.length];
-        if (!im) return;
-        tctx.drawImage(im.el, r[0] * tw, r[1] * th, r[2] * tw, r[3] * th);
-    });
+    // 把第一张照片 cover 铺满整个小画布
+    const im = avail[0];
+    const iw = im.el.naturalWidth, ih = im.el.naturalHeight;
+    const scale = Math.max(tw / iw, th / ih);
+    const dw = iw * scale, dh = ih * scale;
+    tctx.drawImage(im.el, (tw - dw) / 2, (th - dh) / 2, dw, dh);
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'medium';
