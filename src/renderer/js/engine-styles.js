@@ -1417,6 +1417,102 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         else g.fillRect(0, h - band, w, band);
     }
     function styleOverlayParams(img, size, g, iw, ih, S, pos) {
+        // LEFT(pos=0): 白底+照片在右+左侧品牌名和参数
+        if (pos === 0) {
+            const leftW = Math.max(160, Math.round(iw * 0.35));
+            const sidePad = Math.max(30, Math.round(size * 0.8));
+            const w = leftW + iw + sidePad;
+            const h = Math.round(ih * 1.08) + sidePad;
+            g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            const px = leftW + Math.round(sidePad * 0.3);
+            const py = Math.round((h - ih) / 2);
+            g.drawImage(img, px, py);
+            const tx = Math.round(leftW * 0.2);
+            const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+            const fBrand = Math.max(22, Math.round(leftW * 0.16));
+            g.fillStyle = '#1a1a1a';
+            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+            g.fillText(brand, tx, Math.round(h * 0.3));
+            if (S.useExif && S.cam) {
+                const boxW = Math.round(leftW * 0.3);
+                const boxH = Math.round(boxW * 0.55);
+                const fBox = Math.max(11, Math.round(boxH * 0.45));
+                const fVal = Math.max(13, Math.round(leftW * 0.09));
+                const rows = [
+                    { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
+                    { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
+                    { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
+                ];
+                let ry = Math.round(h * 0.3) + fBox * 2.5;
+                rows.forEach(row => {
+                    g.strokeStyle = '#333333';
+                    g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
+                    g.beginPath();
+                    if (typeof g.roundRect === 'function') g.roundRect(tx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                    else g.rect(tx, ry - boxH, boxW, boxH);
+                    g.stroke();
+                    g.fillStyle = '#333333';
+                    g.font = 'bold ' + fBox + 'px sans-serif';
+                    g.textAlign = 'center'; g.textBaseline = 'middle';
+                    g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
+                    g.font = 'bold ' + fVal + 'px sans-serif';
+                    g.textAlign = 'left';
+                    g.fillText(row.val, tx + boxW + Math.round(leftW * 0.06), ry - boxH / 2);
+                    ry += Math.round(boxH * 1.9);
+                });
+            }
+            return;
+        }
+        // BOTTOM(pos=2): 白底+照片在上+底部品牌名和参数
+        if (pos === 2) {
+            const bottomH = Math.max(120, Math.round(ih * 0.25));
+            const sidePad = Math.max(30, Math.round(size * 0.8));
+            const w = Math.round(iw * 1.05) + sidePad * 2;
+            const h = ih + bottomH + sidePad;
+            g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            const px = Math.round((w - iw) / 2);
+            const py = Math.round(sidePad * 0.5);
+            g.drawImage(img, px, py);
+            const by = py + ih + Math.round(bottomH * 0.3);
+            const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+            const fBrand = Math.max(18, Math.round(bottomH * 0.2));
+            g.fillStyle = '#1a1a1a';
+            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+            g.fillText(brand, w / 2, by);
+            if (S.useExif && S.cam) {
+                const boxW = Math.round(Math.min(w * 0.08, 70));
+                const boxH = Math.round(boxW * 0.55);
+                const fBox = Math.max(10, Math.round(boxH * 0.45));
+                const fVal = Math.max(12, Math.round(boxH * 0.55));
+                const rows = [
+                    { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
+                    { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
+                    { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
+                ];
+                const gap = Math.round(boxW * 1.6);
+                const totalW = rows.length * boxW + (rows.length - 1) * gap;
+                let bx = Math.round((w - totalW) / 2);
+                const ry = by + Math.round(bottomH * 0.35);
+                rows.forEach(row => {
+                    g.strokeStyle = '#333333';
+                    g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
+                    g.beginPath();
+                    if (typeof g.roundRect === 'function') g.roundRect(bx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                    else g.rect(bx, ry - boxH, boxW, boxH);
+                    g.stroke();
+                    g.fillStyle = '#333333';
+                    g.font = 'bold ' + fBox + 'px sans-serif';
+                    g.textAlign = 'center'; g.textBaseline = 'middle';
+                    g.fillText(row.label, bx + boxW / 2, ry - boxH / 2);
+                    g.font = 'bold ' + fVal + 'px sans-serif';
+                    g.fillText(row.val, bx + boxW + Math.round(boxW * 0.15), ry - boxH / 2);
+                    bx += boxW + gap;
+                });
+            }
+            return;
+        }
         // RIGHT(pos=1): 白底+照片在左+右侧品牌名和参数(印象右留白)
         if (pos === 1) {
             const rightW = Math.max(160, Math.round(iw * 0.35));
@@ -2004,10 +2100,16 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 return { w: iw + pad * 2, h: ih + pad + bandH };
             }
             case 'OVERLAY_PARAM_LEFT':
+            case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
                 const rw = Math.max(160, Math.round(iw * 0.35));
                 const sp = Math.max(30, Math.round(size * 0.8));
                 return { w: iw + rw + sp, h: Math.round(ih * 1.08) + sp };
+            };
+            case 'OVERLAY_PARAM_BOTTOM': {
+                const bh = Math.max(120, Math.round(ih * 0.25));
+                const sp = Math.max(30, Math.round(size * 0.8));
+                return { w: Math.round(iw * 1.05) + sp * 2, h: ih + bh + sp };
             };
             case 'COLOR_CLASSIC': {
                 const pfs = Math.max(10, Math.round(autoExifSize((S ? S.paramFs : 12), iw)));
