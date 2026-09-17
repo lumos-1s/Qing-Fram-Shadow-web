@@ -1312,6 +1312,7 @@ function renderPuzzle(app, compare, noSelection) {
 
     const axes = clampPuzzleAxes(layout, pk.axisVals);
     let slots0 = buildPuzzleSlots(layout, axes);
+    const rawSlots = slots0.slice(); // 未加间隙的原始格子位置,给模糊背景用
     const Wn = W || 1, Hn = H || 1;
     const border = parseColor(pk.borderColor || 'ffffff', 100);
     const b = Math.max(1, Math.round(Wn * 0.003));
@@ -1336,7 +1337,7 @@ function renderPuzzle(app, compare, noSelection) {
     const capFs = Math.max(Wn, Hn) / 4000;
 
     if (pk.bgMode === 1 && used[0]) {
-        drawDetailBlurBackground(ctx, used, slots0, Wn, Hn);
+        drawDetailBlurBackground(ctx, used, rawSlots, Wn, Hn);
     } else {
         ctx.fillStyle = rgba(border);
         ctx.fillRect(0, 0, Wn, Hn);
@@ -1462,8 +1463,8 @@ function renderPuzzle(app, compare, noSelection) {
     app.applyZoomStyle();
 }
 
-// 重虚化照片底:把照片 cover 铺满整画布再强模糊,产生柔和虚化背景
-function drawDetailBlurBackground(ctx, used, slots0, Wn, Hn) {
+// 重虚化照片底:多格照片按格子位置无缝铺满再强模糊
+function drawDetailBlurBackground(ctx, used, rawSlots, Wn, Hn) {
     const avail = used.filter(x => x && x.el);
     if (!avail.length) { ctx.fillStyle = '#eeeeee'; ctx.fillRect(0, 0, Wn, Hn); return; }
     // 用 1/4 输出尺寸的中间画布绘制照片,再以强模糊上采样,得到柔和可辨的模糊照片底
@@ -1472,12 +1473,16 @@ function drawDetailBlurBackground(ctx, used, slots0, Wn, Hn) {
     const tmp = document.createElement('canvas');
     tmp.width = tw; tmp.height = th;
     const tctx = tmp.getContext('2d');
-    // 把第一张照片 cover 铺满整个小画布
-    const im = avail[0];
-    const iw = im.el.naturalWidth, ih = im.el.naturalHeight;
-    const scale = Math.max(tw / iw, th / ih);
-    const dw = iw * scale, dh = ih * scale;
-    tctx.drawImage(im.el, (tw - dw) / 2, (th - dh) / 2, dw, dh);
+    // 按原始格子位置(无间隙)把每张照片 cover 填满对应格子
+    rawSlots.forEach((r, i) => {
+        const im = avail[i % avail.length];
+        if (!im) return;
+        const dx = r[0] * tw, dy = r[1] * th, dw = r[2] * tw, dh = r[3] * th;
+        const iw = im.el.naturalWidth, ih = im.el.naturalHeight;
+        const scale = Math.max(dw / iw, dh / ih);
+        const cw = iw * scale, ch = ih * scale;
+        tctx.drawImage(im.el, dx + (dw - cw) / 2, dy + (dh - ch) / 2, cw, ch);
+    });
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'medium';
