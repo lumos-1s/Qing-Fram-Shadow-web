@@ -1228,7 +1228,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
         const fBrand = Math.max(22, Math.round(leftW * 0.14));
         g.fillStyle = '#ffffff';
-        g.font = 'bold ' + fBrand + 'px serif';
+        g.font = 'bold ' + fBrand + 'px sans-serif';
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
         g.fillText(brand, ml, Math.round(h * 0.28));
