@@ -1437,18 +1437,35 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.textAlign = 'left';
             g.textBaseline = 'alphabetic';
             g.fillText(brand, tx, Math.round(h * 0.3));
-            // 三行参数
+            // 三行圆角方框参数
             if (S.useExif && S.cam) {
-                const fParam = Math.max(13, Math.round(rightW * 0.09));
-                g.font = 'bold ' + fParam + 'px sans-serif';
-                g.fillStyle = '#333333';
+                const boxW = Math.round(rightW * 0.3);
+                const boxH = Math.round(boxW * 0.55);
+                const fBox = Math.max(11, Math.round(boxH * 0.45));
+                const fVal = Math.max(13, Math.round(rightW * 0.09));
                 const rows = [
-                    'F ' + String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, ''),
-                    'ISO ' + String(S.cam.iso || '100').replace(/^iso/i, ''),
-                    'S ' + String(S.cam.shutter || '1/125').replace(/s$/i, '')
+                    { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
+                    { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
+                    { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
-                let ry = Math.round(h * 0.3) + fParam * 2.5;
-                rows.forEach(t => { g.fillText(t, tx, ry); ry += fParam * 1.9; });
+                let ry = Math.round(h * 0.3) + fBox * 2.5;
+                rows.forEach(row => {
+                    g.strokeStyle = '#333333';
+                    g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
+                    g.beginPath();
+                    if (typeof g.roundRect === 'function') g.roundRect(tx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                    else g.rect(tx, ry - boxH, boxW, boxH);
+                    g.stroke();
+                    g.fillStyle = '#333333';
+                    g.font = 'bold ' + fBox + 'px sans-serif';
+                    g.textAlign = 'center';
+                    g.textBaseline = 'middle';
+                    g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
+                    g.font = 'bold ' + fVal + 'px sans-serif';
+                    g.textAlign = 'left';
+                    g.fillText(row.val, tx + boxW + Math.round(rightW * 0.06), ry - boxH / 2);
+                    ry += Math.round(boxH * 1.9);
+                });
             }
             return;
         }
