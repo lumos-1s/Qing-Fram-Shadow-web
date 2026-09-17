@@ -1338,7 +1338,7 @@ function renderPuzzle(app, compare, noSelection) {
     if (pk.bgMode === 1 && used[0]) {
         drawDetailBlurBackground(ctx, used, slots0, Wn, Hn);
     } else {
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = rgba(border);
         ctx.fillRect(0, 0, Wn, Hn);
     }
 
