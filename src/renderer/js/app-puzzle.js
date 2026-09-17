@@ -488,8 +488,47 @@ window.App = Object.assign(window.App || {}, {
         const pk = this.tplPuzzle();
         if (!pk || !window.__buildPuzzleSlots) return null;
         const p = this.puzzlePx(e);
+        // 先检测是否在分隔线附近(±10px)
+        const axisHit = this.puzzleAxisAtPx(p.x, p.y);
+        if (axisHit) return { type: 'axis', dim: axisHit.dim, idx: axisHit.idx, x: p.x, y: p.y };
         const hit = this.puzzleSlotAtPx(p.x, p.y);
         return hit != null ? { type: 'slot', slot: hit, x: p.x, y: p.y } : null;
+    },
+
+    // 检测鼠标是否在分隔线(轴线)附近,返回 {dim, idx} 或 null
+    puzzleAxisAtPx(x, y) {
+        const pk = this.tplPuzzle();
+        if (!pk || !pk.layout || pk.layout === 'single') return null;
+        const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout, pk.axisVals) : (pk.axisVals || {});
+        const tol = 10; // 像素容差
+        // 竖轴(v):垂直线,检测 x
+        const vList = (axes.v || []);
+        for (let i = 0; i < vList.length; i++) {
+            const ax = vList[i] * W;
+            if (Math.abs(x - ax) <= tol && y > 0 && y < H) return { dim: 'v', idx: i };
+        }
+        // 横轴(h):水平线,检测 y
+        const hList = (axes.h || []);
+        for (let i = 0; i < hList.length; i++) {
+            const ay = hList[i] * H;
+            if (Math.abs(y - ay) <= tol && x > 0 && x < W) return { dim: 'h', idx: i };
+        }
+        return null;
+    },
+
+    // 拖拽分隔线:更新轴位
+    puzzleDragAxis(pk, d, e) {
+        const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        const p = this.puzzlePx(e);
+        if (!pk.axisVals) pk.axisVals = {};
+        if (d.dim === 'v') {
+            if (!pk.axisVals.v) pk.axisVals.v = [];
+            pk.axisVals.v[d.idx] = Math.max(0.12, Math.min(0.88, p.x / W));
+        } else {
+            if (!pk.axisVals.h) pk.axisVals.h = [];
+            pk.axisVals.h[d.idx] = Math.max(0.12, Math.min(0.88, p.y / H));
+        }
     },
 
     // 画布像素→槽位索引(按引擎可见区域内缩 gap,间隙/边框处返回 null)
@@ -569,6 +608,8 @@ window.App = Object.assign(window.App || {}, {
     // 拖拽:格内→图片精确跟随(anchor+余量换算);进入其他格→"放下即互换"预备态
     puzzleDragMove(pk, d, e) {
         const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        // 拖拽分隔线
+        if (d.type === 'axis') { this.puzzleDragAxis(pk, d, e); return; }
         this.ensurePuzzleSlotsCount(pk);
         const src = d.slot;
         const p = this.puzzlePx(e);

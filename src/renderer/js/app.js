@@ -155,6 +155,12 @@ window.App = {
                     e.preventDefault();
                     this.selectedEls = [];
                     this.refreshElList();
+                    // 拖拽分隔线调轴位
+                    if (hp.type === 'axis') {
+                        this._dragPz = { type: 'axis', dim: hp.dim, idx: hp.idx, sx: e.screenX, sy: e.screenY, moved: false };
+                        canvas.style.cursor = (hp.dim === 'v') ? 'col-resize' : 'row-resize';
+                        return;
+                    }
                     // 只有"已选中"的格图才能被移动:第一次点击仅选中(并清掉旧拖动态),
                     // 已经选中时按下才进入该格图片的移动
                     if (this._activePuzzleSlot !== hp.slot) {

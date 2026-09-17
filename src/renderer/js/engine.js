@@ -1381,7 +1381,10 @@ function renderPuzzle(app, compare, noSelection) {
         // 底部行图片让出等宽字幕带,字幕不叠到图上
         let chh = Math.max(1, rh - gapPx * 2);
         if (hasBottomCap && r[1] + 1e-6 >= (rowsN > 1 ? (hAxRow[rowsN - 2] || 1) : 0)) chh = Math.max(1, chh - gth);
-        ctx.rect(cx, cy, cw, chh);
+        // 格子圆角(跟随格子尺寸比例,约3%)
+        const cr = Math.max(2, Math.min(cw, chh) * 0.03);
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
+        else ctx.rect(cx, cy, cw, chh);
         ctx.clip();
         const fillMode = sc.fillMode || pk.slotFill || 'cover';
         const zoom = sc.zoom != null ? sc.zoom : (pk.zoom != null ? pk.zoom : 100);
