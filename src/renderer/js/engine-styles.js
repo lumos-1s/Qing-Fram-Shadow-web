@@ -567,8 +567,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
     // ── 四格创新边框:VHS录像带 / 老相册角贴 / 撕边电影票 / 水彩晕染 ──
     function styleVhsTape(img, size, g, iw, ih) {
-        const sidePad = Math.max(12, Math.floor(size / 3));
-        const barH = Math.max(44, Math.floor(size * 1.5));
+        const sidePad = Math.max(8, Math.floor(size / 4));
+        const barH = Math.max(28, Math.floor(size * 0.75));
         const w = iw + sidePad * 2, h = ih + barH * 2;
         g.fillStyle = '#0a0a0a';
         g.fillRect(0, 0, w, h);
@@ -1909,8 +1909,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'PINBOARD_TAPE':
                 return { w: iw + size * 2, h: ih + size * 2 };
             case 'VHS_TAPE': {
-                const sidePad = Math.max(12, Math.floor(size / 3));
-                const barH = Math.max(44, Math.floor(size * 1.5));
+                const sidePad = Math.max(8, Math.floor(size / 4));
+                const barH = Math.max(28, Math.floor(size * 0.75));
                 return { w: iw + sidePad * 2, h: ih + barH * 2 };
             }
             case 'ALBUM_CORNER': {
