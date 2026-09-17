@@ -1876,6 +1876,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
             case 'IMP_FROSTED':
+                return { w: Math.round(iw * 1.32) + 24, h: Math.round(ih * 1.18) + 40 };
             case 'IMP_CLASSIC':
                 return { w: iw + pad2(8) * 2, h: ih + pad2(8) * 2 };
             case 'XIAOMI_IMP': {
