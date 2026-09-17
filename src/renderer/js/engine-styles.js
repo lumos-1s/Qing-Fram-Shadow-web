@@ -564,6 +564,101 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         drawTape(g, w - size - Math.floor(len * 0.35), size - Math.floor(th * 0.3), len, th, 0.16, 'rgba(156,178,208,0.55)');
         drawTape(g, w / 2, h - size + Math.floor(th * 0.3), Math.floor(len * 0.7), th, 0.04, 'rgba(190,168,190,0.5)');
     }
+    // ── 四格创新边框:VHS录像带 / 老相册角贴 / 撕边电影票 / 水彩晕染 ──
+    function styleVhsTape(img, size, g, iw, ih) {
+        const sidePad = Math.max(16, Math.floor(size / 2));
+        const barH = Math.max(52, Math.floor(size * 2.2));
+        const w = iw + sidePad * 2, h = ih + barH * 2;
+        g.fillStyle = '#0a0a0a';
+        g.fillRect(0, 0, w, h);
+        g.drawImage(img, sidePad, barH);
+        const fs = Math.max(12, Math.floor(barH * 0.34));
+        const cyTop = Math.floor(barH / 2), cyBot = barH + ih + Math.floor(barH / 2);
+        const dotR = Math.max(5, Math.floor(fs * 0.36));
+        g.fillStyle = '#e63229';
+        g.beginPath(); g.arc(sidePad + dotR + 4, cyTop, dotR, 0, 6.2832); g.fill();
+        drawTextL(g, 'SP 12:34:56', sidePad + dotR * 2 + 12, cyTop + Math.floor(fs * 0.36), '#7fffb0', fs, true, false, 0);
+        drawTextL(g, 'PLAY \u25B6', w - sidePad - 70, cyTop + Math.floor(fs * 0.36), '#cccccc', fs, true, false, 0);
+        drawTextL(g, 'SP 0:00:00', sidePad + 4, cyBot + Math.floor(fs * 0.36), '#7fffb0', fs, true, false, 0);
+        drawTextL(g, 'Hi-Fi STEREO', w - sidePad - 96, cyBot + Math.floor(fs * 0.36), '#888888', fs, true, false, 0);
+    }
+    function styleAlbumCorner(img, size, g, iw, ih) {
+        const pad = Math.max(40, Math.floor(size * 1.2));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#3d3a35';
+        g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad);
+        const cs = Math.max(28, Math.floor(Math.min(iw, ih) * 0.07));
+        const paper = '#d9c39a';
+        const corners = [[pad, pad, 1, 1], [pad + iw, pad, -1, 1], [pad, pad + ih, 1, -1], [pad + iw, pad + ih, -1, -1]];
+        for (const [cx, cy, sx, sy] of corners) {
+            g.fillStyle = 'rgba(0,0,0,0.18)';
+            g.beginPath();
+            g.moveTo(cx + 2, cy + 2); g.lineTo(cx + sx * cs + 2, cy + 2); g.lineTo(cx + 2, cy + sy * cs + 2);
+            g.closePath(); g.fill();
+            g.fillStyle = paper;
+            g.beginPath();
+            g.moveTo(cx, cy); g.lineTo(cx + sx * cs, cy); g.lineTo(cx, cy + sy * cs);
+            g.closePath(); g.fill();
+            g.strokeStyle = 'rgba(90,70,40,0.35)'; g.lineWidth = 1; g.stroke();
+        }
+    }
+    function styleMovieTicket(img, size, g, iw, ih) {
+        const topBot = Math.max(30, Math.floor(size * 0.8));
+        const sidePad = Math.max(20, Math.floor(size * 0.6));
+        const stubW = Math.max(100, Math.floor(iw * 0.18));
+        const w = iw + sidePad * 2 + stubW, h = ih + topBot * 2;
+        g.fillStyle = '#f5f0e6';
+        g.fillRect(0, 0, w, h);
+        g.drawImage(img, sidePad, topBot);
+        const sx = sidePad + iw;
+        const r = Math.max(6, Math.floor(size * 0.22));
+        const pitch = Math.max(r * 2.2, r * 2 + 2);
+        g.save();
+        g.globalCompositeOperation = 'destination-out';
+        for (let y = topBot + r; y < topBot + ih; y += pitch) { g.beginPath(); g.arc(sx, y, r, 0, 6.2832); g.fill(); }
+        g.restore();
+        const cx = sx + r + Math.floor((stubW - r) / 2);
+        const fs = Math.max(11, Math.floor(size * 0.32));
+        g.save();
+        g.translate(cx, topBot + Math.floor(ih / 2));
+        g.rotate(-Math.PI / 2);
+        drawTextL(g, 'ADMIT ONE', -Math.floor(ih * 0.18), Math.floor(fs * 0.35), '#999', fs, false, true, 0);
+        g.restore();
+        drawTextL(g, 'ROW 12', sx + r + 10, topBot + Math.floor(ih * 0.30), '#555', fs, true, false, 0);
+        drawTextL(g, 'SEAT 08', sx + r + 10, topBot + Math.floor(ih * 0.45), '#555', fs, true, false, 0);
+        drawTextL(g, 'SCREEN 7', sx + r + 10, topBot + Math.floor(ih * 0.60), '#555', fs, true, false, 0);
+    }
+    function styleWatercolorBleed(img, size, g, iw, ih) {
+        const bleed = Math.max(50, Math.floor(size * 1.5));
+        const w = iw + bleed * 2, h = ih + bleed * 2;
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, w, h);
+        const palettes = [
+            ['rgba(110,165,215,0.32)', 'rgba(175,145,215,0.28)', 'rgba(215,155,175,0.28)'],
+            ['rgba(130,195,155,0.32)', 'rgba(235,205,135,0.28)', 'rgba(195,175,215,0.28)'],
+            ['rgba(225,160,145,0.32)', 'rgba(170,195,225,0.28)', 'rgba(195,215,175,0.28)']
+        ];
+        const rnd = styleNoise(iw, ih, 777);
+        const pal = palettes[rnd(palettes.length)];
+        const px0 = bleed, py0 = bleed;
+        for (let i = 0; i < 16; i++) {
+            const edge = rnd(4);
+            let px, py;
+            if (edge === 0) { px = px0 + rnd(iw); py = py0 - Math.floor(bleed * 0.3) + rnd(Math.floor(bleed * 0.9)); }
+            else if (edge === 1) { px = px0 + rnd(iw); py = py0 + ih - Math.floor(bleed * 0.2) + rnd(Math.floor(bleed * 0.9)); }
+            else if (edge === 2) { px = px0 - Math.floor(bleed * 0.3) + rnd(Math.floor(bleed * 0.9)); py = py0 + rnd(ih); }
+            else { px = px0 + iw - Math.floor(bleed * 0.2) + rnd(Math.floor(bleed * 0.9)); py = py0 + rnd(ih); }
+            const pr = Math.max(20, Math.floor(bleed * (0.45 + rnd(60) / 100)));
+            const col = pal[rnd(pal.length)];
+            const grad = g.createRadialGradient(px, py, 0, px, py, pr);
+            grad.addColorStop(0, col); grad.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = grad;
+            g.beginPath(); g.arc(px, py, pr, 0, 6.2832); g.fill();
+        }
+        g.drawImage(img, px0, py0);
+    }
+
 
     // ── 阶段二基设:风格序号 / Java Random(原件 cameraFor 的 seed RNG)──
     const ORD = { NONE:0,SIMPLE:1,POLAROID:2,FILM_STRIP:3,ROUNDED:4,DOUBLE_LINE:5,VINTAGE:6,GRADIENT:7,DROP_SHADOW:8,
@@ -572,7 +667,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
         PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35,
-        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39 };
+        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -1797,6 +1892,25 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'FOLD_CORNER':
             case 'PINBOARD_TAPE':
                 return { w: iw + size * 2, h: ih + size * 2 };
+            case 'VHS_TAPE': {
+                const sidePad = Math.max(16, Math.floor(size / 2));
+                const barH = Math.max(52, Math.floor(size * 2.2));
+                return { w: iw + sidePad * 2, h: ih + barH * 2 };
+            }
+            case 'ALBUM_CORNER': {
+                const pad = Math.max(40, Math.floor(size * 1.2));
+                return { w: iw + pad * 2, h: ih + pad * 2 };
+            }
+            case 'MOVIE_TICKET': {
+                const topBot = Math.max(30, Math.floor(size * 0.8));
+                const sidePad = Math.max(20, Math.floor(size * 0.6));
+                const stubW = Math.max(100, Math.floor(iw * 0.18));
+                return { w: iw + sidePad * 2 + stubW, h: ih + topBot * 2 };
+            }
+            case 'WATERCOLOR_BLEED': {
+                const bleed = Math.max(50, Math.floor(size * 1.5));
+                return { w: iw + bleed * 2, h: ih + bleed * 2 };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
@@ -1848,6 +1962,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             PARAM_TOP_LEFT: styleParamTopLeft, PARAM_BOTTOM_LEFT: styleParamBottomLeft, PARAM_BOTTOM_SINGLE: styleParamBottomSingle,
             STAMP_POSTAGE: styleStampPostage, TEARED_PAPER: styleTornPaper,
             FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape,
+            VHS_TAPE: styleVhsTape, ALBUM_CORNER: styleAlbumCorner,
+            MOVIE_TICKET: styleMovieTicket, WATERCOLOR_BLEED: styleWatercolorBleed,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
