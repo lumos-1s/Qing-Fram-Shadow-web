@@ -1494,7 +1494,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const gap = Math.round(boxW * 1.6);
                 const totalW = rows.length * boxW + (rows.length - 1) * gap;
                 let bx = Math.round((w - totalW) / 2);
-                const ry = by + Math.round(bottomH * 0.17);
+                const ry = by + Math.round(bottomH * 0.4);
                 rows.forEach(row => {
                     g.strokeStyle = '#333333';
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
@@ -1507,7 +1507,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                     g.textAlign = 'center'; g.textBaseline = 'middle';
                     g.fillText(row.label, bx + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
-                    g.fillText(row.val, bx + boxW + Math.round(boxW * 0.15), ry - boxH / 2);
+                    g.fillText(row.val, bx + boxW + Math.round(boxW * 0.25), ry - boxH / 2);
                     bx += boxW + gap;
                 });
             }
