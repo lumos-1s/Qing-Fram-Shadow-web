@@ -1548,7 +1548,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
-                let ry = Math.round(h * 0.3) + fBox * 3.5;
+                let ry = Math.round(h * 0.68);
                 rows.forEach(row => {
                     g.strokeStyle = '#333333';
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
