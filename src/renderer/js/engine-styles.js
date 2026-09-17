@@ -1185,14 +1185,22 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
     }
     function styleImpFrosted(img, size, g, iw, ih, S) {
-        const pad = Math.max(8, Math.floor(size / 2));
+        const pad = Math.max(20, Math.floor(size * 0.8));
         const w = iw + pad * 2, h = ih + pad * 2;
-        const grad = g.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, 'rgb(26,26,30)'); grad.addColorStop(1, 'rgb(60,62,68)');
-        g.fillStyle = grad; g.fillRect(0, 0, w, h);
-        const inset = Math.max(2, Math.floor(pad / 12));
-        g.fillStyle = 'rgb(235,235,240)';
-        g.fillRect(pad - inset, pad - inset, iw + inset * 2, ih + inset * 2);
+        // 1. 照片 cover 铺满整画布做模糊底
+        g.save();
+        g.fillStyle = '#1a1a1e'; g.fillRect(0, 0, w, h);
+        const scale = Math.max(w / iw, h / ih);
+        const dw = iw * scale, dh = ih * scale;
+        g.filter = 'blur(' + Math.max(16, Math.round(Math.min(w, h) / 25)) + 'px)';
+        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        g.filter = 'none';
+        g.restore();
+        // 2. 压暗一点让前景照片突出
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, w, h);
+        // 3. 中央放清晰照片(带细白边)
+        g.fillStyle = 'rgba(255,255,255,0.9)';
+        g.fillRect(pad - 2, pad - 2, iw + 4, ih + 4);
         g.drawImage(img, pad, pad);
         if (S.useExif) drawParamMask(g, g.canvas, w, h, S.cam, S.position, Math.max(11, S.paramFs));
     }
