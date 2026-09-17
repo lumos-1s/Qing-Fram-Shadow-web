@@ -4,10 +4,10 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 100,
-    "marginBottom": 100,
-    "marginLeft": 100,
-    "marginRight": 100,
+    "marginTop": 80,
+    "marginBottom": 80,
+    "marginLeft": 80,
+    "marginRight": 80,
     "imgScale": 0.9,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
@@ -77,7 +77,7 @@
   ],
   "cornerConfig": {
     "cornerLock": 1,
-    "cornerRadiusAll": 14,
+    "cornerRadiusAll": 10,
     "cornerRadiusTL": 14,
     "cornerRadiusTR": 14,
     "cornerRadiusBL": 14,

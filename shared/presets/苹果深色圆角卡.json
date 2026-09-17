@@ -5,10 +5,10 @@
   "canvasRatio": "original",
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 150,
-    "marginBottom": 150,
-    "marginLeft": 150,
-    "marginRight": 150,
+    "marginTop": 120,
+    "marginBottom": 120,
+    "marginLeft": 120,
+    "marginRight": 120,
     "imgScale": 0.9,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
@@ -25,7 +25,7 @@
       "marginRight": 0,
       "fillConfig": {
         "fillType": "solid",
-        "fillHex": "#0a0a0c",
+        "fillHex": "#ffffff",
         "fillOpacity": 100,
         "gradientType": "linear",
         "gradientAngle": 0,
@@ -87,7 +87,7 @@
   ],
   "cornerConfig": {
     "cornerLock": 1,
-    "cornerRadiusAll": 60,
+    "cornerRadiusAll": 80,
     "cornerRadiusTL": 60,
     "cornerRadiusTR": 60,
     "cornerRadiusBL": 60,

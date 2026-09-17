@@ -24,23 +24,23 @@
       "marginRight": 0,
       "fillConfig": {
         "fillType": "solid",
-        "fillHex": "#0d0d11",
+        "fillHex": "#1a0a20",
         "fillOpacity": 100,
         "gradientType": "linear",
         "gradientAngle": 0,
         "gradientStops": [
           {
-            "position": 0.0,
+            "position": 0,
             "color": "#ffffff"
           },
           {
-            "position": 1.0,
+            "position": 1,
             "color": "#cccccc"
           }
         ],
         "gradientOpacity": 100,
         "textureSrc": "",
-        "textureScale": 1.0,
+        "textureScale": 1,
         "textureOffsetX": 0,
         "textureOffsetY": 0,
         "textureOpacity": 100,
@@ -58,11 +58,11 @@
         "strokeGradientAngle": 0,
         "strokeGradientStops": [
           {
-            "position": 0.0,
+            "position": 0,
             "color": "#22d3ee"
           },
           {
-            "position": 1.0,
+            "position": 1,
             "color": "#a855f7"
           }
         ]
@@ -86,7 +86,7 @@
   ],
   "cornerConfig": {
     "cornerLock": 1,
-    "cornerRadiusAll": 22,
+    "cornerRadiusAll": 28,
     "cornerRadiusTL": 18,
     "cornerRadiusTR": 18,
     "cornerRadiusBL": 18,
