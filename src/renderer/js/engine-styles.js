@@ -1187,7 +1187,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleImpFrosted(img, size, g, iw, ih, S) {
         // 横版:左侧文字区,右侧照片
         const leftW = Math.max(180, Math.round(iw * 0.35));
-        const rightPad = Math.max(100, Math.round(size * 2) + 20);
+        const rightPad = Math.round(leftW / 2);
         const topBotPad = Math.max(50, Math.round(size * 1.2));
         const w = leftW + iw + rightPad;
         const h = ih + topBotPad * 2;
@@ -1224,7 +1224,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.drawImage(img, px, py);
         g.restore();
         // 3. 左侧品牌名
-        const ml = Math.round(leftW * 0.25) + 20;
+        const ml = Math.round(leftW * 0.25) + 40;
         const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
         const fBrand = Math.max(22, Math.round(leftW * 0.14));
         g.fillStyle = '#ffffff';
@@ -1905,7 +1905,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'IMP_FROSTED': {
                 const lw = Math.max(180, Math.round(iw * 0.35));
-                const rp = Math.max(100, Math.round(size * 2) + 20);
+                const rp = Math.round(lw / 2);
                 const tbp = Math.max(50, Math.round(size * 1.2));
                 return { w: lw + iw + rp, h: ih + tbp * 2 };
             }
