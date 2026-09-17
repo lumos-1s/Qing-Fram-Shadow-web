@@ -1482,17 +1482,20 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
             if (S.useExif && S.cam) {
-                const boxW = Math.round(Math.max(200, Math.min(w * 0.3, 560)));
+                const boxW = Math.round(Math.max(70, Math.min(w * 0.1, 110)));
                 const boxH = Math.round(boxW * 0.55);
-                const fBox = Math.max(10, Math.round(boxH * 0.45));
-                const fVal = Math.max(12, Math.round(boxH * 0.55));
+                const fBox = Math.max(11, Math.round(boxH * 0.45));
+                const fVal = Math.max(14, Math.round(boxH * 0.6));
                 const rows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
-                const gap = Math.round(boxW * 2.8);
-                const totalW = rows.length * boxW + (rows.length - 1) * gap;
+                const valGap = Math.round(boxW * 0.3);
+                const estValW = Math.round(boxW * 0.9);
+                const itemW = boxW + valGap + estValW;
+                const between = Math.round(itemW * 0.5);
+                const totalW = rows.length * itemW + (rows.length - 1) * between;
                 let bx = Math.round((w - totalW) / 2);
                 const ry = by + Math.round(bottomH * 0.4);
                 rows.forEach(row => {
@@ -1507,8 +1510,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                     g.textAlign = 'center'; g.textBaseline = 'middle';
                     g.fillText(row.label, bx + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
-                    g.fillText(row.val, bx + boxW + Math.round(boxW * 0.25), ry - boxH / 2);
-                    bx += boxW + gap;
+                    g.textAlign = 'left';
+                    g.fillText(row.val, bx + boxW + valGap, ry - boxH / 2);
+                    bx += itemW + between;
                 });
             }
             return;
