@@ -723,6 +723,16 @@ window.App = Object.assign(window.App || {}, {
             if (tb !== undefined) { pk.captions[ka] = tb; tb.gapId = 'S' + a; } else delete pk.captions[ka];
             if (ta !== undefined) { pk.captions[kb] = ta; ta.gapId = 'S' + b; } else delete pk.captions[kb];
         }
+        // 交换淡入动画
+        const cv = this.dom.canvas;
+        if (cv) {
+            cv.style.transition = 'opacity 0.22s ease-out';
+            cv.style.opacity = '0.4';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                cv.style.opacity = '1';
+                setTimeout(() => { cv.style.transition = ''; cv.style.opacity = ''; }, 240);
+            }));
+        }
     },
 
     // 点击画布选择当前编辑/渲染的槽位
