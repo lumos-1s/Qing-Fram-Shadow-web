@@ -1187,7 +1187,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleImpFrosted(img, size, g, iw, ih, S) {
         // 横版:左侧文字区,右侧照片
         const leftW = Math.max(180, Math.round(iw * 0.35));
-        const rightPad = Math.max(80, Math.round(size * 2));
+        const rightPad = Math.max(100, Math.round(size * 2) + 20);
         const topBotPad = Math.max(50, Math.round(size * 1.2));
         const w = leftW + iw + rightPad;
         const h = ih + topBotPad * 2;
@@ -1201,7 +1201,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.filter = 'none';
         g.restore();
         // 压暗
-        g.fillStyle = 'rgba(20,35,55,0.55)'; g.fillRect(0, 0, w, h);
+        g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(0, 0, w, h);
         // 2. 右侧照片(垂直居中,带圆角阴影)
         const px = leftW;
         const py = Math.round((h - ih) / 2);
@@ -1905,7 +1905,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'IMP_FROSTED': {
                 const lw = Math.max(180, Math.round(iw * 0.35));
-                const rp = Math.max(80, Math.round(size * 2));
+                const rp = Math.max(100, Math.round(size * 2) + 20);
                 const tbp = Math.max(50, Math.round(size * 1.2));
                 return { w: lw + iw + rp, h: ih + tbp * 2 };
             }
