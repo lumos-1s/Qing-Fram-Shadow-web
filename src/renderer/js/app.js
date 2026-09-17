@@ -958,6 +958,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         const saved = this.imageTemplates.get(this.image);
         if (saved) this.template = saved;
         else this.normalizeTemplate();
+        // 拼图模式下:如果当前已启用拼图,切换照片时保持拼图配置不丢失
+        if (this.template && this.template.puzzle && this.template.puzzle.enabled) {
+            // 确保 puzzle.enabled 保持(新照片的 normalizeTemplate 可能把它设为0)
+            this.template.puzzle.enabled = 1;
+        }
         this.selectedEls = [];
         this.updateStatusBar();
         this.refreshUI();
