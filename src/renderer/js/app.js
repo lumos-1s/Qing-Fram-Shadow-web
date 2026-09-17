@@ -1486,8 +1486,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnLoadPreset', () => this.loadPresetFromList());
         bindBtn('btnEditGapCaption', () => this.addEditGapCaption());
         bindBtn('btnDeleteGapCaption', () => this.deleteCaption());
-        bindBtn('btnClearCapSlot', () => this.clearCaption());
-        bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
+                bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
         bindBtn('btnPuzzleDisable', () => this.disablePuzzle());
         bindBtn('btnExportPuzzle', () => this.exportPuzzle());
         bindBtn('btnPuzzleAddImg', () => this.openImage());
@@ -2157,7 +2156,15 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             else if (e.ctrlKey && e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAllEls(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'c') { if (!typing) this.copyElement(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'v') { if (typing) return; e.preventDefault(); this.pasteElement(); }
-            else if (e.key === 'Delete' && this.selectedEls.length) { e.preventDefault(); this.deleteElement(); }
+            else if (e.key === 'Delete' && !typing) {
+                e.preventDefault();
+                // 优先删拼图字幕(字幕面板打开时)
+                if (this.template && this.template.puzzle && $('cbPuzzleGapPick') && $('cbPuzzleGapPick').value) {
+                    this.deleteCaption();
+                } else if (this.selectedEls.length) {
+                    this.deleteElement();
+                }
+            }
             // 新增快捷键
             else if (e.ctrlKey && e.key.toLowerCase() === 'e') { e.preventDefault(); this.exportImage(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'd') { e.preventDefault(); this.applyBorderToSelected(); }

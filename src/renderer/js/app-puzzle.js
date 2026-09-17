@@ -389,10 +389,6 @@ window.App = Object.assign(window.App || {}, {
         this.setStatus('已删除字幕 ' + key.toUpperCase());
     },
 
-    clearCaption() {
-        this.deleteCaption();
-    },
-
     // 清空全部格子图片(保留布局/间距/缩放,便于重新放入)
     clearPuzzleSlots() {
         const pk = this.template && this.template.puzzle;
