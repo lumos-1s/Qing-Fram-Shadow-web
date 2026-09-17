@@ -1482,7 +1482,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
             if (S.useExif && S.cam) {
-                const boxW = Math.round(Math.min(w * 0.1, 100));
+                const boxW = Math.round(Math.max(80, Math.min(w * 0.12, 140)));
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(10, Math.round(boxH * 0.45));
                 const fVal = Math.max(12, Math.round(boxH * 0.55));
@@ -1494,7 +1494,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const gap = Math.round(boxW * 1.6);
                 const totalW = rows.length * boxW + (rows.length - 1) * gap;
                 let bx = Math.round((w - totalW) / 2);
-                const ry = by + Math.round(bottomH * 0.35);
+                const ry = by + Math.round(bottomH * 0.5);
                 rows.forEach(row => {
                     g.strokeStyle = '#333333';
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
