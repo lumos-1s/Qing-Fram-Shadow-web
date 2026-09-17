@@ -1444,7 +1444,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
-                let ry = Math.round(h * 0.3) + fBox * 2.5;
+                let ry = Math.round(h * 0.3) + fBox * 3.5;
                 rows.forEach(row => {
                     g.strokeStyle = '#333333';
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
@@ -1482,7 +1482,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
             if (S.useExif && S.cam) {
-                const boxW = Math.round(Math.min(w * 0.08, 70));
+                const boxW = Math.round(Math.min(w * 0.1, 100));
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(10, Math.round(boxH * 0.45));
                 const fVal = Math.max(12, Math.round(boxH * 0.55));
@@ -1544,7 +1544,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
-                let ry = Math.round(h * 0.3) + fBox * 2.5;
+                let ry = Math.round(h * 0.3) + fBox * 3.5;
                 rows.forEach(row => {
                     g.strokeStyle = '#333333';
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
