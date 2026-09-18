@@ -1871,10 +1871,8 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         const cats = { brandIconBox: [], photoDecorBox: [], simpleIconBox: [], weatherIconBox: [], customIconBox: [] };
         this.logos.forEach(l => {
             const n = l.name || '';
-            if (/brand|logo|品牌/i.test(n)) cats.brandIconBox.push(l);
-            else if (/weather|天/i.test(n)) cats.weatherIconBox.push(l);
-            else if (/deco|decor|装饰|花/i.test(n)) cats.photoDecorBox.push(l);
-            else cats.simpleIconBox.push(l);
+            // 所有相机/品牌logo都归到品牌Logo池
+            cats.brandIconBox.push(l);
         });
         pools.forEach((boxId, pi) => {
             const box = $(boxId);
@@ -1904,38 +1902,8 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
     armLogoPlacement(logo) {
-        // 进入放置模式:点画布就放那里
-        this._pendingLogo = logo;
-        const canvas = this.dom.canvas;
-        if (!canvas) { this.addLogoElement(logo); return; }
-        canvas.style.cursor = 'crosshair';
-        this.setStatus('点画布任意位置放置 ' + logo.name + '(右键取消)');
-        const onDown = (e) => {
-            if (e.button === 2) {
-                cleanup();
-                this.setStatus('已取消放置');
-                e.preventDefault();
-                return;
-            }
-            if (e.button !== 0) return;
-            const rect = canvas.getBoundingClientRect();
-            // canvas显示尺寸 -> 画布内坐标
-            const sx = canvas.width / rect.width;
-            const sy = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * sx;
-            const y = (e.clientY - rect.top) * sy;
-            cleanup();
-            this.addLogoElement(this._pendingLogo, Math.round(x), Math.round(y));
-        };
-        const onRight = (e) => { e.preventDefault(); cleanup(); this.setStatus('已取消放置'); };
-        const cleanup = () => {
-            canvas.removeEventListener('mousedown', onDown, true);
-            canvas.removeEventListener('contextmenu', onRight);
-            canvas.style.cursor = '';
-            this._pendingLogo = null;
-        };
-        canvas.addEventListener('mousedown', onDown, true);
-        canvas.addEventListener('contextmenu', onRight);
+        // 直接加到画布中央,然后用户可拖动
+        this.addLogoElement(logo);
     },
 
     async addLogoElement(logo, px, py) {
