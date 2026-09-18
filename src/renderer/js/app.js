@@ -164,6 +164,64 @@ window.App = {
             img.src = saved;
         }
     },
+    openAvatarCrop(dataUrl) {
+        const modal = document.getElementById('avatarCropModal');
+        const img = document.getElementById('cropImg');
+        if (!modal || !img) { this.saveUserAvatar(dataUrl); return; }
+        modal.style.display = 'flex';
+        img.src = dataUrl;
+        this._cropScale = 1;
+        this._cropX = 0;
+        this._cropY = 0;
+        const apply = () => {
+            const wrap = img.parentElement;
+            const w = wrap.clientWidth;
+            // 图片按cover填,初始scale按宽度
+            const iw = img.naturalWidth || 300;
+            const ih = img.naturalHeight || 300;
+            const s = Math.max(w / iw, w / ih);
+            this._cropScale = s;
+            this._cropX = 0; this._cropY = 0;
+            img.style.width = iw * s + 'px';
+            img.style.height = ih * s + 'px';
+            img.style.left = (w - iw * s) / 2 + 'px';
+            img.style.top = (w - ih * s) / 2 + 'px';
+        };
+        if (img.complete) apply(); else img.onload = apply;
+        // 拖动
+        let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+        img.onmousedown = (e) => { dragging = true; sx = e.clientX; sy = e.clientY; ox = this._cropX; oy = this._cropY; e.preventDefault(); };
+        window.onmousemove = (e) => { if (!dragging) return; this._cropX = ox + e.clientX - sx; this._cropY = oy + e.clientY - sy; img.style.left = this._cropX + 'px'; img.style.top = this._cropY + 'px'; };
+        window.onmouseup = () => { dragging = false; };
+        // 滚轮缩放
+        img.onwheel = (e) => {
+            e.preventDefault();
+            const old = this._cropScale;
+            this._cropScale *= (e.deltaY < 0 ? 1.1 : 0.9);
+            this._cropScale = Math.max(old, Math.min(this._cropScale, old * 4));
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            img.style.width = iw * this._cropScale + 'px';
+            img.style.height = ih * this._cropScale + 'px';
+        };
+        // 确认
+        document.getElementById('cropOk').onclick = () => {
+            const wrap = img.parentElement;
+            const size = wrap.clientWidth;
+            const c = document.createElement('canvas');
+            c.width = 200; c.height = 200;
+            const ctx = c.getContext('2d');
+            // 从img位置映射到canvas
+            const imgX = -parseFloat(img.style.left);
+            const imgY = -parseFloat(img.style.top);
+            const imgW = parseFloat(img.style.width);
+            const imgH = parseFloat(img.style.height);
+            ctx.drawImage(img, imgX, imgY, imgW, imgH, 0, 0, 200, 200);
+            const out = c.toDataURL('image/jpeg', 0.85);
+            modal.style.display = 'none';
+            this.saveUserAvatar(out);
+        };
+        document.getElementById('cropCancel').onclick = () => { modal.style.display = 'none'; };
+    },
     saveUserAvatar(dataUrl) {
         // 先压缩到200x200再存,避免localStorage配额超限
         const img = new Image();
@@ -195,7 +253,7 @@ window.App = {
         const readFile = (f) => {
             if (!f) return;
             const reader = new FileReader();
-            reader.onload = (ev) => this.saveUserAvatar(ev.target.result);
+            reader.onload = (ev) => this.openAvatarCrop(ev.target.result);
             reader.readAsDataURL(f);
         };
         if (pick && file1) { pick.addEventListener('click', () => file1.click()); file1.addEventListener('change', (e) => readFile(e.target.files[0])); }
