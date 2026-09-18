@@ -680,7 +680,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
         PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35,
         STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56,SIGNATURE:57,SIGN_PARAM:58,AVATAR_MEMO:59,
-SIGN_BLUR:60 };
+SIGN_BLUR:60,
+SIG_BLUR:61,
+AV_BLUR:62 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -2234,6 +2236,16 @@ SIGN_BLUR:60 };
                 const bh = Math.round(iw * 0.14);
                 return { w: iw + p * 2, h: ih + p + bh };
             }
+            case 'SIG_BLUR': {
+                const p = Math.max(30, Math.round(iw * 0.04));
+                const bh = Math.round(iw * 0.10);
+                return { w: iw + p * 2, h: ih + p + bh };
+            }
+            case 'AV_BLUR': {
+                const p = Math.max(30, Math.round(iw * 0.05));
+                const bh = Math.round(iw * 0.11);
+                return { w: iw + p * 2, h: ih + p * 2 + bh };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
@@ -2786,6 +2798,77 @@ SIGN_BLUR:60 };
         g.textAlign = 'center';
     }
 
+    // ══ 签名·模糊:只签名居中,模糊背景 ══
+    function styleSigBlur(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(iw * 0.04));
+        const bottomH = Math.round(iw * 0.10);
+        const w = iw + pad * 2, h = ih + pad + bottomH;
+        g.save();
+        g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+        g.filter = 'blur(40px) brightness(0.6)';
+        const bs = Math.max(w / iw, h / ih);
+        g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+        g.filter = 'none';
+        g.restore();
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
+        g.drawImage(img, pad, pad, iw, ih);
+        g.restore();
+        const barY = pad + ih;
+        g.fillStyle = '#fff';
+        g.font = 'italic ' + Math.round(iw * 0.05 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.save();
+        g.translate(w / 2, barY + bottomH / 2);
+        g.rotate(-0.015);
+        g.fillText(S.userSignature || '— my memory —', 0, 0);
+        g.restore();
+        g.textBaseline = 'alphabetic';
+    }
+
+    // ══ 头像·模糊:头像+签名,模糊背景 ══
+    function styleAvBlur(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(iw * 0.05));
+        const bottomH = Math.round(iw * 0.11);
+        const w = iw + pad * 2, h = ih + pad * 2 + bottomH;
+        g.save();
+        g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+        g.filter = 'blur(40px) brightness(0.6)';
+        const bs = Math.max(w / iw, h / ih);
+        g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+        g.filter = 'none';
+        g.restore();
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
+        g.drawImage(img, pad, pad, iw, ih);
+        g.restore();
+        const barY = pad + ih;
+        const avatarR = Math.round(bottomH * 0.35 * (S.avatarScale || 0.85));
+        const ax = pad + avatarR + 8, ay = barY + bottomH / 2;
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
+            g.restore();
+            g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+        }
+        g.fillStyle = '#fff';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillText(S.userSignature || '— my memory —', ax + avatarR + 16, ay);
+        g.textBaseline = 'alphabetic';
+        g.textAlign = 'right';
+        g.fillStyle = 'rgba(255,255,255,0.6)';
+        g.font = Math.round(iw * 0.018) + 'px sans-serif';
+        g.fillText(new Date().toLocaleDateString('zh-CN'), w - pad, barY + bottomH * 0.7);
+        g.textAlign = 'center';
+    }
+
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2816,6 +2899,8 @@ SIGN_BLUR:60 };
             SIGNATURE: styleSignature, SIGN_PARAM: styleSignParam,
             AVATAR_MEMO: styleAvatarMemo,
             SIGN_BLUR: styleSignBlur,
+            SIG_BLUR: styleSigBlur,
+            AV_BLUR: styleAvBlur,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
