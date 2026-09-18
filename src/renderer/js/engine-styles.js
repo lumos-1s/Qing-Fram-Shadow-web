@@ -2332,18 +2332,19 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
         g.drawImage(img, cx, cy, iw, ih);
         g.restore();
-        // 底部文字
+        // 底部文字(画在图片上)
         const fParam = Math.max(16, Math.round(iw * 0.035));
         g.textAlign = 'center';
         g.textBaseline = 'alphabetic';
-        let ty = cy + ih + Math.round(bottomH * 0.65);
+        let ty = cy + ih - Math.round(bottomH * 0.3);
         if (withBrand && S.cam) {
             const fBrand = Math.max(20, Math.round(iw * 0.045));
             g.font = 'bold ' + fBrand + 'px sans-serif';
+            g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 6;
             g.fillStyle = '#ffffff';
             const brand = (S.cam.brand || 'FUJIFILM').toUpperCase();
-            g.fillText(brand, w / 2, ty - Math.round(bottomH * 0.15));
-            ty += Math.round(fParam * 1.2);
+            g.fillText(brand, w / 2, ty - Math.round(bottomH * 0.55));
+            g.shadowBlur = 0;
         }
         if (S.useExif && S.cam) {
             const fLen = String(S.cam.focal || '450').replace(/mm$/i, '');
