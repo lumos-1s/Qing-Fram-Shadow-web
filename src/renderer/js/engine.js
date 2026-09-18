@@ -1004,21 +1004,23 @@ function drawLogoElements(ctx, elements, cw, ch) {
         const img = getElementBitmap(el.dataUrl);
         if (!img || !img.complete || !img.naturalWidth) continue;
         const size = Math.max(2, el.size || 60);
+        // 按原图宽高比缩放(size为宽度,高度按比例)
+        const ratio = img.naturalHeight / img.naturalWidth || 1;
+        const dw = size, dh = size * ratio;
         let cx, cy;
         if (typeof el.x === 'number' && typeof el.y === 'number') {
             cx = el.x; cy = el.y;
         } else {
-            // 传统锚点对齐(相对画布)
             const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
             const ox = el.offsetX || 20, oy = el.offsetY || 20;
-            cx = hAlign === 'left' ? ox + size / 2 : hAlign === 'center' ? cw / 2 : cw - ox - size / 2;
-            cy = vAlign === 'top' ? oy + size / 2 : vAlign === 'center' ? ch / 2 : ch - oy - size / 2;
+            cx = hAlign === 'left' ? ox + dw / 2 : hAlign === 'center' ? cw / 2 : cw - ox - dw / 2;
+            cy = vAlign === 'top' ? oy + dh / 2 : vAlign === 'center' ? ch / 2 : ch - oy - dh / 2;
         }
         ctx.save();
         ctx.globalAlpha = clamp((el.opacity == null ? 100 : el.opacity) / 100, 0, 1);
         ctx.translate(cx, cy);
         if (el.rotation) ctx.rotate(el.rotation * Math.PI / 180);
-        ctx.drawImage(img, -size / 2, -size / 2, size, size);
+        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
         ctx.restore();
     }
 }

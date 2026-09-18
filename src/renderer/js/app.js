@@ -1977,10 +1977,12 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         }
         if (!this.template.logoElements) this.template.logoElements = [];
         const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
+        // 以宽度为基准,按原图比例
         const size = Math.max(48, Math.round(Math.min(cw, ch) * 0.07));
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
             x: px != null ? px : Math.round(cw / 2), y: py != null ? py : Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
+            ratio: bmp.naturalHeight / bmp.naturalWidth || 1,
         };
         this.template.logoElements.push(el);
         this.selectedEls = [{ kind: 'logo', obj: el }];
