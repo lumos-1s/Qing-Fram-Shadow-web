@@ -2347,7 +2347,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const fParam = Math.max(16, Math.round(iw * 0.035));
         g.textAlign = 'center';
         g.textBaseline = 'alphabetic';
-        let ty = cy + ih + Math.round(bottomH * 0.6);
+        let ty = cy + ih + Math.round(bottomH * 0.65);
         if (withBrand && S.cam) {
             const fBrand = Math.max(20, Math.round(iw * 0.045));
             g.font = 'bold ' + fBrand + 'px sans-serif';
@@ -2357,10 +2357,10 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             ty += Math.round(fParam * 1.2);
         }
         if (S.useExif && S.cam) {
-            const fLen = S.cam.focal || '450';
-            const apt = S.cam.aperture || 'F6.3';
-            const shut = S.cam.shutter || '1/125';
-            const iso = S.cam.iso || '100';
+            const fLen = String(S.cam.focal || '450').replace(/mm$/i, '');
+            const apt = String(S.cam.aperture || 'F6.3').replace(/^f\//i, 'F');
+            const shut = String(S.cam.shutter || '1/125').replace(/s$/i, '');
+            const iso = String(S.cam.iso || '100').replace(/^iso/i, '');
             const line = fLen + 'mm   ' + apt + '   ' + shut + 's   ISO' + iso;
             g.font = 'italic bold ' + fParam + 'px sans-serif';
             g.fillStyle = '#ffffff';
