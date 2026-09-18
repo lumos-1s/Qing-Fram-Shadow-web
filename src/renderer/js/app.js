@@ -129,7 +129,8 @@ window.App = {
         d.btnCompare.addEventListener('mousedown', () => this.setCompare(true));
         d.btnCompare.addEventListener('mouseup', () => this.setCompare(false));
         d.btnCompare.addEventListener('mouseleave', () => this.setCompare(false));
-        d.loginStatus.addEventListener('click', () => this.openLoginModal());
+        this.updateTopBar();
+            d.loginStatus.addEventListener('click', () => this.openLoginModal());
         d.loginModalClose.addEventListener('click', () => this.closeLoginModal());
         d.loginModal.addEventListener('mousedown', e => { if (e.target === d.loginModal) this.closeLoginModal(); });
         d.loginSubmit.addEventListener('click', () => this.doLogin());
@@ -156,7 +157,19 @@ window.App = {
         this.bindInteractive();
     },
 
+    updateTopBar() {
+        const name = localStorage.getItem('qfs_username') || localStorage.getItem('qfs_nickname') || '';
+        const topName = document.getElementById('topUserName');
+        const topAv = document.getElementById('topAvatar');
+        if (topName) topName.textContent = name || '未登录';
+        if (topAv) {
+            const av = localStorage.getItem('qfs_user_avatar');
+            if (av) { topAv.style.background = 'url(' + av + ') center/cover'; topAv.textContent = ''; }
+            else { topAv.style.background = '#444'; topAv.textContent = '头'; }
+        }
+    },
     loadUserAvatar() {
+        this.updateTopBar();
         const saved = localStorage.getItem('qfs_user_avatar');
         if (saved) {
             const img = new Image();
@@ -212,11 +225,11 @@ window.App = {
             c.width = 200; c.height = 200;
             const ctx = c.getContext('2d');
             // 从img位置映射到canvas
-            const imgX = -parseFloat(img.style.left);
-            const imgY = -parseFloat(img.style.top);
-            const imgW = parseFloat(img.style.width);
-            const imgH = parseFloat(img.style.height);
-            ctx.drawImage(img, imgX, imgY, imgW, imgH, 0, 0, 200, 200);
+            const scale = this._cropScale;
+            const imgX = -parseFloat(img.style.left) / scale;
+            const imgY = -parseFloat(img.style.top) / scale;
+            const cropSize = wrap.clientWidth / scale;
+            ctx.drawImage(img, imgX, imgY, cropSize, cropSize, 0, 0, 200, 200);
             const out = c.toDataURL('image/jpeg', 0.85);
             modal.style.display = 'none';
             this.saveUserAvatar(out);
@@ -245,6 +258,7 @@ window.App = {
             if (pv) { pv.style.background = 'url(' + compressed + ') center/cover'; pv.textContent = ''; }
             const la = document.getElementById('loginAvatar');
             if (la) { la.style.background = 'url(' + compressed + ') center/cover'; }
+            this.updateTopBar();
         };
         img.src = dataUrl;
     },
