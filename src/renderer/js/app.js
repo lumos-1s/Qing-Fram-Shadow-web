@@ -335,22 +335,12 @@ window.App = {
                 // 背景板/分割间隙:保持当前图片选择不取消,继续走右侧命中/画布平移
             }
             const pt = this.screenToCanvas(e);
-            // 头像纪念:点头像可拖动
-            if (this.template.photoFrameStyle === 'AVATAR_MEMO') {
-                const img = this.image; if (!img) return;
-                const iw = img.width, ih = img.height;
-                const pad = Math.max(30, Math.round(iw * 0.05));
-                const bottomH = Math.round(iw * 0.16);
-                const avatarR = Math.round(bottomH * 0.32);
-                const offX = this.template.avatarOffX || 0, offY = this.template.avatarOffY || 0;
-                const ax = pad + avatarR + 8 + offX, ay = pad + ih + bottomH / 2 + offY;
-                const dx = pt.x - ax, dy = pt.y - ay;
-                if (dx*dx + dy*dy <= (avatarR + 10) * (avatarR + 10)) {
-                    e.preventDefault();
-                    this._dragAv = { sx: e.screenX, sy: e.screenY, offX, offY };
-                    canvas.style.cursor = 'move';
-                    return;
-                }
+            // 头像纪念:点画布直接拖头像
+            if (this.template.photoFrameStyle === 'AVATAR_MEMO' && this.image) {
+                e.preventDefault();
+                this._dragAv = { sx: e.screenX, sy: e.screenY, offX: this.template.avatarOffX || 0, offY: this.template.avatarOffY || 0 };
+                canvas.style.cursor = 'move';
+                return;
             }
             const el = this.pickElement(pt);
             if (el) {
