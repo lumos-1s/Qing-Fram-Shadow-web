@@ -423,12 +423,15 @@ window.App = {
 
     rebindSelectedEls() {
         if (!this.selectedEls || !this.selectedEls.length) return;
-        const t = this.template;
+        // saveCurrentTemplate 后 customSettings 已是新快照,以它为准
+        const t = (this.image && this.image.customSettings) || this.template;
         if (!t || !t.logoElements) return;
         this.selectedEls = this.selectedEls.map(sel => {
             if (sel.kind !== 'logo') return sel;
-            // 按名字和当前位置匹配新对象
-            const fresh = t.logoElements.find(e => e && e.name === sel.obj.name && e.x === sel.obj.x && e.y === sel.obj.y);
+            const old = sel.obj;
+            // 按名字+x+y匹配(改size/rotation不改x/y/name)
+            const fresh = t.logoElements.find(e => e &&
+                e.name === old.name && e.x === old.x && e.y === old.y);
             return fresh ? { kind: 'logo', obj: fresh } : sel;
         });
     },
