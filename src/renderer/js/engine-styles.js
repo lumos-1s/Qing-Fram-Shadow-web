@@ -2066,8 +2066,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'FUJI_WM':
             case 'FUJI_WM_BRAND': {
                 const op = Math.max(15, Math.round(size * 0.5));
-                const bh = Math.max(50, Math.round(ih * 0.1));
-                return { w: iw + op * 2, h: ih + bh + op * 2 };
+                return { w: iw + op * 2, h: ih + op * 2 };
             }
             case 'IMP_CLASSIC':
                 return { w: iw + pad2(8) * 2, h: ih + pad2(8) * 2 };
@@ -2316,12 +2315,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     // 富士水印: 深色圆角卡片+照片cover+底部品牌名+参数
     function styleFujifilm(img, size, g, iw, ih, S, withBrand) {
         const outerPad = Math.max(15, Math.round(size * 0.5));
-        const bottomH = Math.max(50, Math.round(ih * 0.1));
         const w = iw + outerPad * 2;
-        const h = ih + bottomH + outerPad * 2;
+        const h = ih + outerPad * 2;
         // 白外底
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-        // 深色圆角卡片(只覆盖照片区域)
+        // 深色圆角卡片
         const cx = outerPad, cy = outerPad, cw = iw, ch = ih;
         const r = Math.round(Math.min(cw, ch) * 0.03);
         g.fillStyle = '#0d1b2a';
@@ -2332,18 +2330,19 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
         g.drawImage(img, cx, cy, iw, ih);
         g.restore();
-        // 底部文字(画在图片上)
-        const fParam = Math.max(16, Math.round(iw * 0.035));
+        // 文字大小(从面板参数)
+        const fParam = Math.max(12, Math.round(S.paramFontSize || iw * 0.035));
+        const fBrand = Math.max(16, Math.round(fParam * 1.3));
         g.textAlign = 'center';
         g.textBaseline = 'alphabetic';
-        let ty = cy + ih - Math.round(bottomH * 0.3);
+        const bottomPad = Math.max(20, Math.round(ih * 0.06));
+        let ty = cy + ih - bottomPad;
         if (withBrand && S.cam) {
-            const fBrand = Math.max(20, Math.round(iw * 0.045));
             g.font = 'bold ' + fBrand + 'px sans-serif';
             g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 6;
             g.fillStyle = '#ffffff';
             const brand = (S.cam.brand || 'FUJIFILM').toUpperCase();
-            g.fillText(brand, w / 2, ty - Math.round(bottomH * 0.55));
+            g.fillText(brand, w / 2, ty - fParam * 1.5);
             g.shadowBlur = 0;
         }
         if (S.useExif && S.cam) {
