@@ -1895,7 +1895,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 const img = document.createElement('img');
                 img.src = l.dataUrl;
                 c.appendChild(img);
-                c.addEventListener('click', () => this.addLogoElement(l));
+                c.addEventListener('click', () => this.armLogoPlacement(l));
                 box.appendChild(c);
             });
             const cnt = this.$({ brandIconBox: 'brandCnt', photoDecorBox: 'photoDecorCnt', simpleIconBox: 'simpleIconCnt', weatherIconBox: 'weatherIconCnt', customIconBox: 'customIconCnt' }[boxId]);
@@ -1903,7 +1903,36 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         });
     },
 
-    async addLogoElement(logo) {
+    armLogoPlacement(logo) {
+        // 进入放置模式:鼠标移到画布变十字,点画布就放那里
+        this._pendingLogo = logo;
+        const stage = this.dom.stage;
+        if (!stage) return;
+        stage.style.cursor = 'crosshair';
+        this.setStatus('点画布任意位置放置 ' + logo.name + '(右键取消)');
+        const onClick = (e) => {
+            const rect = stage.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / (this.zoom || 1);
+            const y = (e.clientY - rect.top) / (this.zoom || 1);
+            stage.removeEventListener('click', onClick);
+            stage.style.cursor = '';
+            const pending = this._pendingLogo;
+            this._pendingLogo = null;
+            this.addLogoElement(pending, Math.round(x), Math.round(y));
+        };
+        const onRight = (e) => {
+            e.preventDefault();
+            stage.removeEventListener('click', onClick);
+            stage.removeEventListener('contextmenu', onRight);
+            stage.style.cursor = '';
+            this._pendingLogo = null;
+            this.setStatus('已取消放置');
+        };
+        stage.addEventListener('click', onClick);
+        stage.addEventListener('contextmenu', onRight);
+    },
+
+    async addLogoElement(logo, px, py) {
         if (!logo) return;
         this.onSettingCommit();
         if (!this.template) return;
@@ -1918,7 +1947,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         const size = Math.max(48, Math.round(Math.min(cw, ch) * 0.07));
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
-            x: Math.round(cw / 2), y: Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
+            x: px != null ? px : Math.round(cw / 2), y: py != null ? py : Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
         };
         this.template.logoElements.push(el);
         this.selectedEls = [{ kind: 'logo', obj: el }];
