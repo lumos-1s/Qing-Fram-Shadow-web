@@ -2662,20 +2662,24 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
         g.textBaseline = 'alphabetic';
 
-        // ══ 右侧:品牌+参数 ══
+        // ══ 右侧:品牌+参数,以参数行居中 ══
         const rx = w - pad;
-        g.textAlign = 'right';
-        // 品牌
+        // 先测参数行宽度
+        const paramStr = (S.exif.focal||'') + '  ' + (S.exif.aperture||'') + '  ' + (S.exif.iso||'') + '  ' + (S.exif.shutter||'');
+        g.font = fs + 'px sans-serif';
+        const pw = g.measureText(paramStr).width;
+        const cxRight = rx - pw / 2; // 参数行中心x
+        // 品牌居中在参数行上方
         g.fillStyle = '#333';
         g.font = 'bold ' + Math.round(iw * 0.028) + 'px sans-serif';
+        g.textAlign = 'center';
         g.textBaseline = 'top';
-        g.fillText((S.exif.make || 'Camera').toUpperCase(), rx, barY + Math.round(bottomH * 0.15));
-        // 参数
+        g.fillText((S.exif.make || 'Camera').toUpperCase(), cxRight, barY + Math.round(bottomH * 0.15));
+        // 参数行
         g.fillStyle = '#999';
         g.font = fs + 'px sans-serif';
         g.textBaseline = 'middle';
-        const paramStr = (S.exif.focal||'') + '  ' + (S.exif.aperture||'') + '  ' + (S.exif.iso||'') + '  ' + (S.exif.shutter||'');
-        g.fillText(paramStr, rx, barY + Math.round(bottomH * 0.65));
+        g.fillText(paramStr, cxRight, barY + Math.round(bottomH * 0.65));
         g.textBaseline = 'alphabetic';
         g.textAlign = 'center';
     }
