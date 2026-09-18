@@ -2180,9 +2180,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 return { w: iw + border * 2, h: ih + border + bottomPad };
             }
             case 'CARD_3D': {
-                const padX = Math.round(iw * 0.08);
-                const padTop = Math.round(iw * 0.06);
-                const padBottom = Math.round(iw * 0.1);
+                const padX = Math.round(iw * 0.1);
+                const padTop = Math.round(iw * 0.08);
+                const padBottom = Math.round(iw * 0.12);
                 return { w: iw + padX * 2, h: ih + padTop + padBottom };
             }
             case 'COMIC_PANEL': {
