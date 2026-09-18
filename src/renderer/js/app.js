@@ -1904,44 +1904,38 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
     armLogoPlacement(logo) {
-        // 进入放置模式:鼠标移到画布变十字,点画布就放那里
+        // 进入放置模式:点画布就放那里
         this._pendingLogo = logo;
-        const stage = this.dom.stage;
-        if (!stage) return;
-        stage.style.cursor = 'crosshair';
+        const canvas = this.dom.canvas;
+        if (!canvas) { this.addLogoElement(logo); return; }
+        canvas.style.cursor = 'crosshair';
         this.setStatus('点画布任意位置放置 ' + logo.name + '(右键取消)');
         const onDown = (e) => {
             if (e.button === 2) {
-                stage.removeEventListener('mousedown', onDown);
-                stage.removeEventListener('contextmenu', onRight);
-                stage.style.cursor = '';
-                this._pendingLogo = null;
+                cleanup();
                 this.setStatus('已取消放置');
                 e.preventDefault();
                 return;
             }
             if (e.button !== 0) return;
-            const rect = stage.getBoundingClientRect();
-            const z = this.zoom || 1;
-            const x = (e.clientX - rect.left) / z;
-            const y = (e.clientY - rect.top) / z;
-            stage.removeEventListener('mousedown', onDown);
-            stage.removeEventListener('contextmenu', onRight);
-            stage.style.cursor = '';
-            const pending = this._pendingLogo;
-            this._pendingLogo = null;
-            this.addLogoElement(pending, Math.round(x), Math.round(y));
+            const rect = canvas.getBoundingClientRect();
+            // canvas显示尺寸 -> 画布内坐标
+            const sx = canvas.width / rect.width;
+            const sy = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * sx;
+            const y = (e.clientY - rect.top) * sy;
+            cleanup();
+            this.addLogoElement(this._pendingLogo, Math.round(x), Math.round(y));
         };
-        const onRight = (e) => {
-            e.preventDefault();
-            stage.removeEventListener('mousedown', onDown);
-            stage.removeEventListener('contextmenu', onRight);
-            stage.style.cursor = '';
+        const onRight = (e) => { e.preventDefault(); cleanup(); this.setStatus('已取消放置'); };
+        const cleanup = () => {
+            canvas.removeEventListener('mousedown', onDown, true);
+            canvas.removeEventListener('contextmenu', onRight);
+            canvas.style.cursor = '';
             this._pendingLogo = null;
-            this.setStatus('已取消放置');
         };
-        stage.addEventListener('mousedown', onDown);
-        stage.addEventListener('contextmenu', onRight);
+        canvas.addEventListener('mousedown', onDown, true);
+        canvas.addEventListener('contextmenu', onRight);
     },
 
     async addLogoElement(logo, px, py) {
