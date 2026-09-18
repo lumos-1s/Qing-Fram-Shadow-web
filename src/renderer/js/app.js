@@ -358,7 +358,13 @@ window.App = {
             canvas.style.cursor = 'grabbing';
         });
         window.addEventListener('mousemove', e => {
-            if (this._dragAv) { this._dragAv = null; canvas.style.cursor = 'default'; return; }
+            if (this._dragAv) {
+                const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
+                this.template.avatarOffX = Math.round(this._dragAv.offX + dx);
+                this.template.avatarOffY = Math.round(this._dragAv.offY + dy);
+                this.scheduleRender();
+                return;
+            }
             if (this._dragPz) {
                 const pk = this.tplPuzzle();
                 if (pk) {
@@ -368,13 +374,6 @@ window.App = {
                     this.puzzleDragMove(pk, this._dragPz, e);
                     this.scheduleRender();
                 }
-                return;
-            }
-            if (this._dragAv) {
-                const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
-                this.template.avatarOffX = Math.round(this._dragAv.offX + dx);
-                this.template.avatarOffY = Math.round(this._dragAv.offY + dy);
-                this.scheduleRender();
                 return;
             }
             if (this._dragEl) {
@@ -393,6 +392,7 @@ window.App = {
             this.applyZoomStyle();
         });
         window.addEventListener('mouseup', () => {
+            if (this._dragAv) { this._dragAv = null; canvas.style.cursor = 'default'; return; }
             if (this._dragPz) {
                 const d = this._dragPz;
                 const pk = this.tplPuzzle();
