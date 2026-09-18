@@ -679,7 +679,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
         PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35,
-        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56,SIGNATURE:57,SIGN_PARAM:58,AVATAR_MEMO:59 };
+        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56,SIGNATURE:57,SIGN_PARAM:58,AVATAR_MEMO:59,
+SIGN_BLUR:60 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -2719,6 +2720,67 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.textAlign = 'center';
     }
 
+    // ══ 签名+背景模糊:模糊照片铺满背景,清晰照片+底部条 ══
+    function styleSignBlur(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(iw * 0.04));
+        const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
+        const bottomH = Math.round(iw * 0.18);
+        const w = iw + pad * 2, h = ih + pad + bottomH;
+        // 模糊背景:把照片放大铺满画布
+        g.save();
+        g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+        g.filter = 'blur(40px) brightness(0.6)';
+        const bs = Math.max(w / iw, h / ih);
+        g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+        g.filter = 'none';
+        g.restore();
+        // 清晰照片居中
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
+        g.drawImage(img, pad, pad, iw, ih);
+        g.restore();
+        const barY = pad + ih;
+        const midY = barY + bottomH / 2;
+
+        // 左侧头像+签名
+        const avatarR = Math.round(bottomH * 0.3 * (S.avatarScale || 0.85));
+        const ax = pad + avatarR + 6, ay = midY;
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
+            g.restore();
+            g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+        }
+        g.fillStyle = '#fff';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
+        g.textBaseline = 'alphabetic';
+
+        // 右侧品牌+参数
+        const rx = w - pad;
+        const paramStr = (S.exif.focal||'') + '  ' + (S.exif.aperture||'') + '  ' + (S.exif.iso||'') + '  ' + (S.exif.shutter||'');
+        g.font = fs + 'px sans-serif';
+        const pw = g.measureText(paramStr).width;
+        const cxRight = rx - pw / 2;
+        g.fillStyle = '#fff';
+        g.font = 'bold ' + Math.round(iw * 0.028) + 'px sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'top';
+        g.fillText((S.exif.make || 'Camera').toUpperCase(), cxRight, barY + Math.round(bottomH * 0.15));
+        g.fillStyle = 'rgba(255,255,255,0.7)';
+        g.font = fs + 'px sans-serif';
+        g.textBaseline = 'middle';
+        g.fillText(paramStr, cxRight, barY + Math.round(bottomH * 0.65));
+        g.textBaseline = 'alphabetic';
+        g.textAlign = 'center';
+    }
+
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2748,6 +2810,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             COMIC_PANEL: styleComicPanel, NEWSPAPER: styleNewspaper,
             SIGNATURE: styleSignature, SIGN_PARAM: styleSignParam,
             AVATAR_MEMO: styleAvatarMemo,
+            SIGN_BLUR: styleSignBlur,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 

@@ -1,0 +1,11 @@
+{
+  "name": "签名·背景模糊",
+  "category": "个性",
+  "style": "SIGN_BLUR",
+  "useExif": true,
+  "userSignature": "",
+  "signFont": "cursive",
+  "signColor": "#ffffff",
+  "avatarScale": 0.85,
+  "signSize": 1
+}
