@@ -1935,12 +1935,16 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             box.innerHTML = '';
             const list = pi === 4 ? [] : cats[boxId];
             if (!list.length) {
-                const e = document.createElement('div');
-                e.className = 'icon-cell empty';
-                e.textContent = pi === 4 ? '点击下方添加' : '无';
-                box.appendChild(e);
+                // 空池隐藏整个组
+                const title = box.previousElementSibling;
+                if (title) title.style.display = 'none';
+                box.style.display = 'none';
                 return;
             }
+            // 有数据则显示
+            const title = box.previousElementSibling;
+            if (title) title.style.display = '';
+            box.style.display = '';
             list.forEach(l => {
                 const c = document.createElement('div');
                 c.className = 'icon-cell';
