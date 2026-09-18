@@ -416,6 +416,20 @@ window.App = {
         }
         this.syncSliderFromEl(el);
         this.onSettingChanged();
+        // saveCurrentTemplate 会克隆 template,selectedEls 里的旧引用会失效,重新绑定
+        this.rebindSelectedEls();
+    },
+
+    rebindSelectedEls() {
+        if (!this.selectedEls || !this.selectedEls.length) return;
+        const t = this.template;
+        if (!t || !t.logoElements) return;
+        this.selectedEls = this.selectedEls.map(sel => {
+            if (sel.kind !== 'logo') return sel;
+            // 按名字和当前位置匹配新对象
+            const fresh = t.logoElements.find(e => e && e.name === sel.obj.name && e.x === sel.obj.x && e.y === sel.obj.y);
+            return fresh ? { kind: 'logo', obj: fresh } : sel;
+        });
     },
 
     moveElement(drag, x, y) {
