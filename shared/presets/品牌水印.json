@@ -1,5 +1,5 @@
 {
-  "templateName": "深蓝品牌水印",
+  "templateName": "品牌水印",
   "templateTag": "Logo参数",
   "exportDpi": 300,
   "baseMargin": {
@@ -62,7 +62,7 @@
   "paramFontSize": 150,
   "paramType": 0,
   "paramPosition": "BOTTOM",
-  "photoFrameStyle": "FUJI_WM_BRAND",
+  "photoFrameStyle": "DARK_BRAND_ONLY",
   "photoFrameBorderSize": 60,
   "blurIntensity": 50
 }
