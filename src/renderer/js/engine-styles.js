@@ -2628,12 +2628,24 @@ AV_BLUR:62 };
     // ══ 签名纪念 ══
     function styleSignature(img, size, g, iw, ih, S) {
         const pad = Math.max(30, Math.round(iw * 0.04));
-        const bottomH = Math.round(iw * 0.12);
+        const bottomH = Math.round(iw * 0.10);
         const w = iw + pad * 2, h = ih + pad + bottomH;
-        g.fillStyle = '#faf8f5'; g.fillRect(0, 0, w, h);
+        if (S.signBgBlur) {
+            g.save();
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.filter = 'blur(60px) brightness(0.6)';
+            const bs = Math.max(w / iw, h / ih);
+            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            g.filter = 'none';
+            g.restore();
+        } else {
+            g.fillStyle = '#faf8f5'; g.fillRect(0, 0, w, h);
+        }
+        g.save();
+        if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
-        // 手写签名
-        g.fillStyle = S.signColor || '#555';
+        g.restore();
+        g.fillStyle = S.signBgBlur ? '#fff' : (S.signColor || '#555');
         g.font = 'italic ' + Math.round(iw * 0.05 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'center';
         g.save();
@@ -2652,7 +2664,7 @@ AV_BLUR:62 };
         if (S.signBgBlur) {
             g.save();
             g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-            g.filter = 'blur(40px) brightness(0.6)';
+            g.filter = 'blur(60px) brightness(0.6)';
             const bs = Math.max(w / iw, h / ih);
             g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
@@ -2724,7 +2736,7 @@ AV_BLUR:62 };
         if (S.signBgBlur) {
             g.save();
             g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-            g.filter = 'blur(40px) brightness(0.6)';
+            g.filter = 'blur(60px) brightness(0.6)';
             const bs = Math.max(w / iw, h / ih);
             g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
@@ -2773,7 +2785,7 @@ AV_BLUR:62 };
         // 模糊背景:把照片放大铺满画布
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-        g.filter = 'blur(40px) brightness(0.6)';
+        g.filter = 'blur(60px) brightness(0.6)';
         const bs = Math.max(w / iw, h / ih);
         g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
         g.filter = 'none';
@@ -2832,7 +2844,7 @@ AV_BLUR:62 };
         const w = iw + pad * 2, h = ih + pad + bottomH;
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-        g.filter = 'blur(40px) brightness(0.6)';
+        g.filter = 'blur(60px) brightness(0.6)';
         const bs = Math.max(w / iw, h / ih);
         g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
         g.filter = 'none';
@@ -2861,7 +2873,7 @@ AV_BLUR:62 };
         const w = iw + pad * 2, h = ih + pad * 2 + bottomH;
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-        g.filter = 'blur(40px) brightness(0.6)';
+        g.filter = 'blur(60px) brightness(0.6)';
         const bs = Math.max(w / iw, h / ih);
         g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
         g.filter = 'none';
