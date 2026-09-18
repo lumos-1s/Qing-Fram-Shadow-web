@@ -146,6 +146,13 @@ window.App = {
         if (cbF) cbF.addEventListener('change', () => { this.template.signFont = cbF.value; this.onSettingChanged(); });
         const cbC = document.getElementById('cbSignColor');
         if (cbC) cbC.addEventListener('change', () => { this.template.signColor = cbC.value; this.onSettingChanged(); });
+        const rgAS = document.getElementById('rgAvatarScale');
+        if (rgAS) rgAS.addEventListener('input', () => {
+            this.template.avatarScale = Number(rgAS.value) / 100;
+            const v = document.getElementById('valAvatarScale');
+            if (v) v.textContent = rgAS.value + '%';
+            this.onSettingChanged();
+        });
         // 头像上传(存全局)
         const btnAv = document.getElementById('btnUploadAvatar'), fileAv = document.getElementById('fileAvatar');
         if (btnAv && fileAv) {
@@ -912,6 +919,7 @@ window.App = {
             if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
             if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
             if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
+            if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 1) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if (this.template.userAvatar) {
                 const img = new Image();
                 img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };

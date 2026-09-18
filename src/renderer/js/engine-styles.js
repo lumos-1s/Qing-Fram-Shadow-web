@@ -1826,6 +1826,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             userSignature: String(t.userSignature || '').trim(),
             signFont: String(t.signFont || 'cursive'),
             signColor: String(t.signColor || '#555'),
+            avatarScale: Number(t.avatarScale || 1),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,
@@ -2634,7 +2635,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const midY = barY + bottomH / 2;
 
         // ══ 左侧:头像+签名 ══
-        const avatarR = Math.round(bottomH * 0.3);
+        const avatarR = Math.round(bottomH * 0.3 * (S.avatarScale || 1));
         const ax = pad + avatarR + 6, ay = midY;
         const globalAv = window.__qfsAvatarImg;
         if (globalAv && globalAv.complete && globalAv.naturalWidth) {
@@ -2686,7 +2687,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad, iw, ih);
         const barY = pad + ih;
-        const avatarR = Math.round(bottomH * 0.32);
+        const avatarR = Math.round(bottomH * 0.32 * (S.avatarScale || 1));
         const offX = S.avatarOffX || 0, offY = S.avatarOffY || 0;
         const ax = pad + avatarR + 8 + offX, ay = barY + bottomH / 2 + offY;
         const globalAv = window.__qfsAvatarImg;
