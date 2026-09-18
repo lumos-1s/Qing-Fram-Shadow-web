@@ -2713,12 +2713,11 @@ AV_BLUR:62 };
         g.font = fs + 'px sans-serif';
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2; // 参数行中心x
-        // 品牌居中在参数行上方
-        g.fillStyle = '#333';
-        g.font = 'bold ' + Math.round(iw * 0.028) + 'px sans-serif';
+        // 品牌居中在参数行上方(用drawLogo同款字体)
         g.textAlign = 'center';
         g.textBaseline = 'top';
-        g.fillText((S.exif.make || 'Camera').toUpperCase(), cxRight, barY + Math.round(bottomH * 0.15));
+        const logoFs = Math.round(iw * 0.028);
+        drawLogo(g, (S.exif.make || 'Camera'), cxRight - logoWidth((S.exif.make || 'Camera'), logoFs) / 2, barY + Math.round(bottomH * 0.15), logoFs);
         // 参数行
         g.fillStyle = '#999';
         g.font = fs + 'px sans-serif';
@@ -2824,11 +2823,10 @@ AV_BLUR:62 };
         g.font = fs + 'px sans-serif';
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2;
-        g.fillStyle = '#fff';
-        g.font = 'bold ' + Math.round(iw * 0.028) + 'px sans-serif';
         g.textAlign = 'center';
         g.textBaseline = 'top';
-        g.fillText((S.exif.make || 'Camera').toUpperCase(), cxRight, barY + Math.round(bottomH * 0.15));
+        const logoFs2 = Math.round(iw * 0.028);
+        drawLogo(g, (S.exif.make || 'Camera'), cxRight - logoWidth((S.exif.make || 'Camera'), logoFs2) / 2, barY + Math.round(bottomH * 0.15), logoFs2);
         g.fillStyle = 'rgba(255,255,255,0.7)';
         g.font = fs + 'px sans-serif';
         g.textBaseline = 'middle';
