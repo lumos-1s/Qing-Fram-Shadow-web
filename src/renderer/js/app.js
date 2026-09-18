@@ -50,7 +50,16 @@ window.App = {
         this.populateFonts();
         this.setupShortcuts();
         this.setupPanelInteractions();
-        this.bindTooltips();
+        // 工具栏按钮tooltip
+        const tips = {
+            btnUndo: '撤销 (Ctrl+Z)', btnRedo: '重做 (Ctrl+Y)',
+            btnReset: '重置', btnRandom: '随机预设',
+            btnFit: '适应窗口', btnOpen: '导入照片',
+        };
+        Object.entries(tips).forEach(([id, tip]) => {
+            const el = document.getElementById(id);
+            if (el) el.title = tip;
+        });
         document.querySelectorAll('.pg-title.collapsible').forEach(t => {
             if (t._bound) return;
             t._bound = true;
