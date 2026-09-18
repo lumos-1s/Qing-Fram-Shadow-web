@@ -1234,7 +1234,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.textBaseline = 'alphabetic';
         g.fillText(brand, ml, Math.round(h * 0.28));
         // 4. 三行圆角方框参数
-        if (showParams && S.useExif && S.cam) {
+        if (true && S.useExif && S.cam) {
             const boxW = Math.round(leftW * 0.28);
             const boxH = Math.round(boxW * 0.55);
             const fBox = Math.max(11, Math.round(boxH * 0.45));
