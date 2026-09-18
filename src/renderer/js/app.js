@@ -360,9 +360,9 @@ window.App = {
         window.addEventListener('mousemove', e => {
             if (this._dragAv) {
                 const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
-                this.template.avatarOffX = Math.round(this._dragAv.offX + dx);
-                this.template.avatarOffY = Math.round(this._dragAv.offY + dy);
-                this.scheduleRender();
+                this.template.avatarOffX = this._dragAv.offX + dx;
+                this.template.avatarOffY = this._dragAv.offY + dy;
+                this.renderPreview();
                 return;
             }
             if (this._dragPz) {

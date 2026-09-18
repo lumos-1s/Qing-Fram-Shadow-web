@@ -1824,8 +1824,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             aiCapSizePct: clampP(t.aiCapSizePct != null ? t.aiCapSizePct : 100, 50, 200),
             aiCapTheme: clampP(t.aiCapTheme != null ? t.aiCapTheme : 0, 0, 2),
             userSignature: String(t.userSignature || '').trim(),
-            avatarOffX: clampP(t.avatarOffX != null ? t.avatarOffX : 0, -300, 300),
-            avatarOffY: clampP(t.avatarOffY != null ? t.avatarOffY : 0, -200, 200),
+            avatarOffX: Number(t.avatarOffX || 0),
+            avatarOffY: Number(t.avatarOffY || 0),
             logoSize: clampP(t.logoSize != null ? t.logoSize : 14, 0, 200),
         };
     }
