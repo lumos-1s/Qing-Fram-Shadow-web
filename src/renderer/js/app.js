@@ -612,6 +612,7 @@ window.App = {
 
         this.template.paramPosition = $('cbParamPosition') ? $('cbParamPosition').value : 'CENTER';
         this.template.paramFontSize = $('slParamFontSize') ? parseInt($('slParamFontSize').value, 10) : 33;
+        this.template.userSignature = $('inpSignature') ? $('inpSignature').value : '';
         this.template.paramType = $('cbParamType') ? parseInt($('cbParamType').value, 10) : 0;
         this.syncManualExif();
 
@@ -765,6 +766,7 @@ window.App = {
 
             if ($('cbParamPosition')) $('cbParamPosition').value = this.template.paramPosition || 'CENTER';
             if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
+            if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
             this.updateParamFontLabel();
             if ($('cbParamType')) $('cbParamType').value = String(this.template.paramType != null ? this.template.paramType : 0);
 
