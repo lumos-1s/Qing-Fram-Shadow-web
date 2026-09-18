@@ -2325,13 +2325,17 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#0d1b2a';
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.fill(); }
         else g.fillRect(cx, cy, cw, ch);
-        // 照片完整显示
+        // 照片完整显示(支持缩放/偏移)
+        const sc = S.imgScale || 1;
+        const dw = iw * sc, dh = ih * sc;
+        const dx = cx + (iw - dw) / 2 + (S.imgOffsetX || 0);
+        const dy = cy + (ih - dh) / 2 + (S.imgOffsetY || 0);
         g.save();
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
-        g.drawImage(img, cx, cy, iw, ih);
+        g.drawImage(img, dx, dy, dw, dh);
         g.restore();
         // 文字大小(从面板参数)
-        const fParam = Math.max(12, Math.round(S.paramFontSize || iw * 0.035));
+        const fParam = Math.max(12, Math.round(S.paramFs || iw * 0.035));
         const fBrand = Math.max(16, Math.round(fParam * 1.3));
         g.textAlign = 'center';
         g.textBaseline = 'alphabetic';
