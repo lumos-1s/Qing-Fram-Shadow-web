@@ -683,7 +683,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 SIGN_BLUR:60,
 SIG_BLUR:61,
 AV_BLUR:62,
-AV_OVERLAY:63 };
+AV_OVERLAY:63,
+AV_OVERLAY_TR:64,
+AV_OVERLAY_BR:65 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -2249,7 +2251,9 @@ AV_OVERLAY:63 };
                 const bh = Math.round(iw * 0.11);
                 return { w: iw + p * 2, h: ih + p * 2 + bh };
             }
-            case 'AV_OVERLAY': {
+            case 'AV_OVERLAY':
+            case 'AV_OVERLAY_TR':
+            case 'AV_OVERLAY_BR': {
                 const p = Math.max(20, Math.round(iw * 0.03));
                 return { w: iw + p * 2, h: ih + p * 2 };
             }
@@ -2959,6 +2963,66 @@ AV_OVERLAY:63 };
         g.shadowBlur = 0;
     }
 
+    // ══ 头像·右上:头像在右上角,签名在下方 ══
+    function styleAvOverlayTR(img, size, g, iw, ih, S) {
+        const pad = Math.max(20, Math.round(iw * 0.03));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad, iw, ih);
+        const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
+        const ax = pad + iw - avatarR - Math.round(iw * 0.03);
+        const ay = pad + avatarR + Math.round(iw * 0.03);
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
+            g.restore();
+            g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+            g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 6; g.stroke(); g.shadowBlur = 0;
+        }
+        // 签名在头像下方居中
+        g.fillStyle = S.signColor || '#fff';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.textAlign = 'center';
+        g.textBaseline = 'top';
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
+        g.fillText(S.userSignature || '— my memory —', ax, ay + avatarR + Math.round(iw * 0.015));
+        g.shadowBlur = 0;
+    }
+
+    // ══ 头像·右下:头像在右下角,签名在左边 ══
+    function styleAvOverlayBR(img, size, g, iw, ih, S) {
+        const pad = Math.max(20, Math.round(iw * 0.03));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad, iw, ih);
+        const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
+        const ax = pad + iw - avatarR - Math.round(iw * 0.03);
+        const ay = pad + ih - avatarR - Math.round(iw * 0.03);
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
+            g.restore();
+            g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+            g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 6; g.stroke(); g.shadowBlur = 0;
+        }
+        // 签名在头像左边
+        g.fillStyle = S.signColor || '#fff';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.textAlign = 'right';
+        g.textBaseline = 'middle';
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
+        g.fillText(S.userSignature || '— my memory —', ax - avatarR - 12, ay);
+        g.shadowBlur = 0;
+    }
+
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2992,6 +3056,8 @@ AV_OVERLAY:63 };
             SIG_BLUR: styleSigBlur,
             AV_BLUR: styleAvBlur,
             AV_OVERLAY: styleAvOverlay,
+            AV_OVERLAY_TR: styleAvOverlayTR,
+            AV_OVERLAY_BR: styleAvOverlayBR,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
