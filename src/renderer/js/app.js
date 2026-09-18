@@ -372,10 +372,8 @@ window.App = {
             }
             if (this._dragAv) {
                 const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
-                const rect = canvas.getBoundingClientRect();
-                const kx = canvas.width / rect.width, ky = canvas.height / rect.height;
-                this.template.avatarOffX = Math.round(this._dragAv.offX + dx * kx);
-                this.template.avatarOffY = Math.round(this._dragAv.offY + dy * ky);
+                this.template.avatarOffX = Math.round(this._dragAv.offX + dx);
+                this.template.avatarOffY = Math.round(this._dragAv.offY + dy);
                 this.scheduleRender();
                 return;
             }
