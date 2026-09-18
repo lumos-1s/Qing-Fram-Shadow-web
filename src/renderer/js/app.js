@@ -2532,7 +2532,9 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     renderProfile() {
         const d = this.dom;
         const name = (this.user.nickname || this.user.username).trim();
-        d.loginAvatar.textContent = name.charAt(0).toUpperCase();
+        const av = localStorage.getItem('qfs_user_avatar');
+        if (av) { d.loginAvatar.style.background = 'url(' + av + ') center/cover'; d.loginAvatar.textContent = ''; }
+        else { d.loginAvatar.style.background = '#444'; d.loginAvatar.textContent = ''; }
         d.loginDisplayName.textContent = name;
         d.loginUsernameDisplay.textContent = '@' + this.user.username;
     },
