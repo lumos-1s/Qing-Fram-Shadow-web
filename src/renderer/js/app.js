@@ -187,7 +187,8 @@ window.App = {
             img.style.left = (w - iw * s) / 2 + 'px';
             img.style.top = (w - ih * s) / 2 + 'px';
         };
-        if (img.complete) apply(); else img.onload = apply;
+        img.onload = apply;
+        if (img.complete && img.naturalWidth) apply();
         // 拖动
         let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
         img.onmousedown = (e) => { dragging = true; sx = e.clientX; sy = e.clientY; ox = this._cropX; oy = this._cropY; e.preventDefault(); };
