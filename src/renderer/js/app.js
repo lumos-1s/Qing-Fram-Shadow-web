@@ -2067,7 +2067,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
     applyToSelectedEls(fn) {
-        this.selectedEls.forEach(s => fn(s.obj));
+        this.selectedEls.forEach(s => fn(s.obj, s.kind));
     },
 
     batchElOps() {
