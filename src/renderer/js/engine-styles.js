@@ -2180,9 +2180,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 return { w: iw + border * 2, h: ih + border + bottomPad };
             }
             case 'CARD_3D': {
-                const padX = Math.round(iw * 0.12);
-                const padTop = Math.round(iw * 0.1);
-                const padBottom = Math.round(iw * 0.15);
+                const padX = Math.round(iw * 0.15);
+                const padTop = Math.round(iw * 0.08);
+                const padBottom = Math.round(iw * 0.18);
                 return { w: iw + padX * 2, h: ih + padTop + padBottom };
             }
             case 'COMIC_PANEL': {
@@ -2486,26 +2486,34 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ══ 3D卡片翻转 ══
     function styleCard3D(img, size, g, iw, ih, S) {
-        const padX = Math.round(iw * 0.12);
-        const padTop = Math.round(iw * 0.1);
-        const padBottom = Math.round(iw * 0.15);
+        const padX = Math.round(iw * 0.15);
+        const padTop = Math.round(iw * 0.08);
+        const padBottom = Math.round(iw * 0.18);
         const w = iw + padX * 2, h = ih + padTop + padBottom;
         const grad = g.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, '#3a3a45'); grad.addColorStop(1, '#1a1a22');
+        grad.addColorStop(0, '#4a3728');
+        grad.addColorStop(0.5, '#3d2c1f');
+        grad.addColorStop(1, '#2a1d12');
         g.fillStyle = grad; g.fillRect(0, 0, w, h);
+        g.strokeStyle = 'rgba(0,0,0,0.1)'; g.lineWidth = 1;
+        for (let y = 0; y < h; y += 8) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + Math.random()*2); g.stroke(); }
+        const cardX = padX, cardY = padTop, cardW = iw, cardH = ih;
+        g.fillStyle = '#e8e8e8';
+        g.fillRect(cardX + 6, cardY + 8, cardW, cardH);
+        g.fillStyle = '#d0d0d0';
+        g.fillRect(cardX + 3, cardY + 4, cardW, cardH);
         g.save();
-        g.shadowColor = 'rgba(0,0,0,0.8)';
-        g.shadowBlur = 60;
-        g.shadowOffsetX = 10;
-        g.shadowOffsetY = 30;
-        g.fillStyle = '#fafafa';
-        g.fillRect(padX * 0.8, padTop * 0.8, iw + padX * 0.4, ih + padBottom * 0.9);
+        g.shadowColor = 'rgba(0,0,0,0.6)';
+        g.shadowBlur = 30;
+        g.shadowOffsetY = 15;
+        g.fillStyle = '#ffffff';
+        g.fillRect(cardX, cardY, cardW, cardH);
         g.restore();
-        g.drawImage(img, padX, padTop, iw, ih);
+        g.drawImage(img, cardX, cardY, iw, Math.round(ih * 0.88));
         g.fillStyle = '#999';
-        g.font = Math.round(iw * 0.022) + 'px cursive';
+        g.font = Math.round(iw * 0.025) + 'px cursive';
         g.textAlign = 'center';
-        g.fillText('✎ my memory', w / 2, padTop + ih + padBottom * 0.55);
+        g.fillText('✎ my memory', cardX + cardW / 2, cardY + Math.round(ih * 0.94));
     }
 
     // ══ 漫画分镜 ══
