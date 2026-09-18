@@ -2321,10 +2321,21 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#0d1b2a';
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.fill(); }
         else g.fillRect(cx, cy, cw, ch);
-        // 照片cover填充卡片上半部分(裁切到圆角)
+        // 照片cover填充整个卡片(裁切到圆角)
         g.save();
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
-        g.drawImage(img, cx, cy);
+        const sc = Math.max(cw / iw, ch / ih);
+        const dw = iw * sc, dh = ih * sc;
+        g.drawImage(img, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+        g.restore();
+        // 底部深色条压暗(让文字清晰)
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
+        const grad2 = g.createLinearGradient(0, cy + ih, 0, cy + ch);
+        grad2.addColorStop(0, 'rgba(13,27,42,0)');
+        grad2.addColorStop(1, 'rgba(13,27,42,0.9)');
+        g.fillStyle = grad2;
+        g.fillRect(cx, cy + ih, cw, bottomH);
         g.restore();
         // 底部文字
         const fParam = Math.max(16, Math.round(iw * 0.035));
