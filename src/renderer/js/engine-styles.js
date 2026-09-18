@@ -1823,6 +1823,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             aiCapFontIdx: clampP(t.aiCapFontIdx != null ? t.aiCapFontIdx : 0, 0, 3),
             aiCapSizePct: clampP(t.aiCapSizePct != null ? t.aiCapSizePct : 100, 50, 200),
             aiCapTheme: clampP(t.aiCapTheme != null ? t.aiCapTheme : 0, 0, 2),
+            userSignature: String(t.userSignature || '').trim(),
             logoSize: clampP(t.logoSize != null ? t.logoSize : 14, 0, 200),
         };
     }
