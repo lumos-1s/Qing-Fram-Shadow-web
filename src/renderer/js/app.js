@@ -415,26 +415,11 @@ window.App = {
             else { e.fontSize = clampNum((e.fontSize || 18) + dir * 2, 6, 300); if (e.autoSize) e.autoSize = 0; }
         }
         this.syncSliderFromEl(el);
-        // 直接保存+渲染,不走 onSettingChanged(避免 syncModelFromUI 重置视图/zoom)
         this.saveCurrentTemplate();
         this.scheduleRender();
-        this.rebindSelectedEls();
     },
 
-    rebindSelectedEls() {
-        if (!this.selectedEls || !this.selectedEls.length) return;
-        // 手势中(滑块拖动)this.template未被替换成customSettings,selectedEls仍指向this.template内的对象,不要重绑
-        if (this._gesture) return;
-        const t = (this.image && this.image.customSettings) || this.template;
-        if (!t || !t.logoElements) return;
-        this.selectedEls = this.selectedEls.map(sel => {
-            if (sel.kind !== 'logo') return sel;
-            const old = sel.obj;
-            const fresh = t.logoElements.find(e => e &&
-                e.name === old.name && e.x === old.x && e.y === old.y);
-            return fresh ? { kind: 'logo', obj: fresh } : sel;
-        });
-    },
+    rebindSelectedEls() { /* template引用稳定,无需重绑 */ },
 
     moveElement(drag, x, y) {
         const e = drag.ref;
@@ -945,7 +930,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if (token !== this.renderToken) return;
             // 交互进行中(格内拖动/平移/拖元素/手势)不得用旧快照替换当前模板,否则会将正在编辑的
             // 拼图平移/缩放瞬时回退到保存前的状态
-            if (this.image && this.image.customSettings && !this._dragPz && !this._dragEl && !this._pan && !this._gesture) this.template = this.image.customSettings;
+            // 不再用 customSettings 替换 this.template,保持编辑对象引用稳定
             this.normalizeTemplate();
             this.dom.stage.classList.toggle('has-img', !!this.image);
             const puzzle = this.template && this.template.puzzle && this.template.puzzle.enabled;
@@ -1010,7 +995,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (!this.image) return;
         const snap = this.cloneTemplate();
         this.imageTemplates.set(this.image, snap);
-        this.image.customSettings = snap;
+        // customSettings 保持指向当前 this.template,避免克隆后 selectedEls 引用失效
+        // undo/redo 时才会把 customSettings 换成新快照
         this.queueThumb(this.image);
         if (typeof this.scheduleDraft === 'function') this.scheduleDraft();
     },
@@ -2086,12 +2072,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
 
     batchElOps() {
         this.saveCurrentTemplate();
-        // 手势外同步替换 template 为最新快照,确保渲染用最新对象
-        if (!this._gesture && this.image && this.image.customSettings) {
-            this.template = this.image.customSettings;
-        }
         this.scheduleRender();
-        this.rebindSelectedEls();
     },
 
     copyElement() {
