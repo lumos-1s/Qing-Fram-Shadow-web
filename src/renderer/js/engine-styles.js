@@ -2347,7 +2347,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 6;
             g.fillStyle = '#ffffff';
             const brand = (S.cam.brand || 'FUJIFILM').toUpperCase();
-            g.fillText(brand, w / 2, ty - fParam * 1.5);
+            // 无参数时品牌直接画在底部
+            g.fillText(brand, w / 2, showParams ? ty - fParam * 1.5 : ty);
             g.shadowBlur = 0;
         }
         if (S.useExif && S.cam) {
