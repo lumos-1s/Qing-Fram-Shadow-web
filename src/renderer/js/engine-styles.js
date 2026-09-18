@@ -2321,18 +2321,17 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const h = ih + bottomH + outerPad * 2;
         // 白外底
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-        // 深色圆角卡片
-        const cx = outerPad, cy = outerPad, cw = iw, ch = ih + bottomH;
+        // 深色圆角卡片(只覆盖照片区域)
+        const cx = outerPad, cy = outerPad, cw = iw, ch = ih;
         const r = Math.round(Math.min(cw, ch) * 0.03);
         g.fillStyle = '#0d1b2a';
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.fill(); }
         else g.fillRect(cx, cy, cw, ch);
-        // 照片contain完整显示在卡片上部
+        // 照片完整显示
         g.save();
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
         g.drawImage(img, cx, cy, iw, ih);
         g.restore();
-        // 底部透明(不画背景条)
         // 底部文字
         const fParam = Math.max(16, Math.round(iw * 0.035));
         g.textAlign = 'center';
