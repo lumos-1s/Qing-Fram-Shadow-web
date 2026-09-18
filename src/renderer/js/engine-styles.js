@@ -1705,19 +1705,24 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleFujiWhite(img, size, g, iw, ih, S) {
         const pad = Math.max(12, Math.round(iw * 0.02));
         const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
-        const lineGap = Math.max(16, Math.round(fs * 0.8));
-        const barH = fs + lineGap + fs + Math.round(fs * 0.5);
+        const f2 = Math.round(fs * 0.85);
+        const lineGap = Math.round(fs * 0.6);
+        // 两行总高度 + 上下留白
+        const totalTextH = fs + lineGap + f2;
+        const padBottom = Math.round(fs * 0.6);
+        const barH = totalTextH + padBottom * 2;
         const w = iw + pad * 2, h = ih + pad + barH;
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
+        // 文字在barH内垂直居中
         const barY = ih + pad;
+        const startY = barY + padBottom;
         const line1 = 'FUJIFILM ' + S.cam.model;
         const m1 = textMetrics(g, line1, fs, false, true, 0);
-        drawTextL(g, line1, cx2(w, m1.w), barY + fs, 'rgb(40,40,40)', fs, false, true, 0);
-        const f2 = Math.round(fs * 0.85);
+        drawTextL(g, line1, cx2(w, m1.w), startY + fs, 'rgb(40,40,40)', fs, false, true, 0);
         const line2 = S.cam.focal + '  ' + S.cam.aperture + '  ' + S.cam.iso + '  ' + S.cam.shutter;
         const m2 = textMetrics(g, line2, f2, true, false, 0);
-        drawTextL(g, line2, cx2(w, m2.w), barY + fs + lineGap, 'rgb(120,120,120)', f2, true, false, 0);
+        drawTextL(g, line2, cx2(w, m2.w), startY + fs + lineGap + f2, 'rgb(120,120,120)', f2, true, false, 0);
     }
     function styleSimpleFilm(img, size, g, iw, ih, S) {
         const w = iw + size * 2, h = ih + size * 2;
@@ -2135,9 +2140,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'ART_CARD':
             case 'FUJI_WHITE': {
                 const af = Math.max(11, Math.round(autoExifSize((S ? S.paramFs : 12), iw)));
+                const af2 = Math.round(af * 0.85);
                 const pad = Math.max(12, Math.round(iw * 0.02));
-                const lineGap = Math.max(16, Math.round(af * 0.8));
-                const barH = af + lineGap + af + Math.round(af * 0.5);
+                const lineGap = Math.round(af * 0.6);
+                const padBottom = Math.round(af * 0.6);
+                const barH = af + lineGap + af2 + padBottom * 2;
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
             case 'STAMP_POSTAGE': {
