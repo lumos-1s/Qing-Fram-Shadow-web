@@ -423,13 +423,13 @@ window.App = {
 
     rebindSelectedEls() {
         if (!this.selectedEls || !this.selectedEls.length) return;
-        // saveCurrentTemplate 后 customSettings 已是新快照,以它为准
+        // 手势中(滑块拖动)this.template未被替换成customSettings,selectedEls仍指向this.template内的对象,不要重绑
+        if (this._gesture) return;
         const t = (this.image && this.image.customSettings) || this.template;
         if (!t || !t.logoElements) return;
         this.selectedEls = this.selectedEls.map(sel => {
             if (sel.kind !== 'logo') return sel;
             const old = sel.obj;
-            // 按名字+x+y匹配(改size/rotation不改x/y/name)
             const fresh = t.logoElements.find(e => e &&
                 e.name === old.name && e.x === old.x && e.y === old.y);
             return fresh ? { kind: 'logo', obj: fresh } : sel;
