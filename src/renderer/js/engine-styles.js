@@ -2486,32 +2486,26 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ══ 3D卡片翻转 ══
     function styleCard3D(img, size, g, iw, ih, S) {
-        const w = iw + 100, h = ih + 120;
-        // 桌面背景渐变
+        const padX = Math.round(iw * 0.12);
+        const padTop = Math.round(iw * 0.1);
+        const padBottom = Math.round(iw * 0.15);
+        const w = iw + padX * 2, h = ih + padTop + padBottom;
         const grad = g.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, '#2a2a35'); grad.addColorStop(1, '#1a1a22');
+        grad.addColorStop(0, '#3a3a45'); grad.addColorStop(1, '#1a1a22');
         g.fillStyle = grad; g.fillRect(0, 0, w, h);
-        // 卡片投影
         g.save();
-        g.shadowColor = 'rgba(0,0,0,0.5)';
-        g.shadowBlur = 30;
-        g.shadowOffsetY = 15;
-        g.fillStyle = '#fff';
-        g.beginPath();
-        g.moveTo(50, 30); g.lineTo(w - 50, 20); g.lineTo(w - 30, h - 40); g.lineTo(70, h - 30);
-        g.closePath(); g.fill();
+        g.shadowColor = 'rgba(0,0,0,0.8)';
+        g.shadowBlur = 60;
+        g.shadowOffsetX = 10;
+        g.shadowOffsetY = 30;
+        g.fillStyle = '#fafafa';
+        g.fillRect(padX * 0.8, padTop * 0.8, iw + padX * 0.4, ih + padBottom * 0.9);
         g.restore();
-        // 照片贴在卡片上(轻微透视)
-        g.save();
-        g.translate(60, 35);
-        g.transform(1, -0.05, 0.08, 1, 0, 0);
-        g.drawImage(img, 0, 0, iw, ih);
-        g.restore();
-        // 卡片底部手写
-        g.fillStyle = '#666';
-        g.font = '14px cursive';
+        g.drawImage(img, padX, padTop, iw, ih);
+        g.fillStyle = '#999';
+        g.font = Math.round(iw * 0.022) + 'px cursive';
         g.textAlign = 'center';
-        g.fillText('my memory', w / 2, h - 25);
+        g.fillText('✎ my memory', w / 2, padTop + ih + padBottom * 0.55);
     }
 
     // ══ 漫画分镜 ══
