@@ -165,15 +165,29 @@ window.App = {
         }
     },
     saveUserAvatar(dataUrl) {
-        localStorage.setItem('qfs_user_avatar', dataUrl);
+        // 先压缩到200x200再存,避免localStorage配额超限
         const img = new Image();
-        img.onload = () => { window.__qfsAvatarImg = img; this.onSettingChanged(); };
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            const size = 200;
+            c.width = size; c.height = size;
+            const ctx = c.getContext('2d');
+            // cover裁剪
+            const s = Math.max(size / img.width, size / img.height);
+            const dw = img.width * s, dh = img.height * s;
+            ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+            const compressed = c.toDataURL('image/jpeg', 0.85);
+            try {
+                localStorage.setItem('qfs_user_avatar', compressed);
+            } catch(e) { console.warn('头像存储失败:', e); }
+            window.__qfsAvatarImg = img;
+            this.onSettingChanged();
+            const pv = document.getElementById('loginAvatarPreview');
+            if (pv) { pv.style.background = 'url(' + compressed + ') center/cover'; pv.textContent = ''; }
+            const la = document.getElementById('loginAvatar');
+            if (la) { la.style.background = 'url(' + compressed + ') center/cover'; }
+        };
         img.src = dataUrl;
-        // 更新登录弹窗预览
-        const pv = document.getElementById('loginAvatarPreview');
-        if (pv) { pv.style.background = 'url(' + dataUrl + ') center/cover'; pv.textContent = ''; }
-        const la = document.getElementById('loginAvatar');
-        if (la) { la.style.background = 'url(' + dataUrl + ') center/cover'; }
     },
     bindAvatarUpload() {
         const pick = document.getElementById('btnPickAvatar'), file1 = document.getElementById('fileLoginAvatar');
