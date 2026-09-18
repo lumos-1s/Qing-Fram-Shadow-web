@@ -365,9 +365,7 @@ window.App = {
                 const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
                 this.template.avatarOffX = this._dragAv.offX + dx;
                 this.template.avatarOffY = this._dragAv.offY + dy;
-                if (!this._avRaf) {
-                    this._avRaf = requestAnimationFrame(() => { this._avRaf = null; this.renderPreview(); });
-                }
+                this.renderPreview();
                 return;
             }
             if (this._dragPz) {
