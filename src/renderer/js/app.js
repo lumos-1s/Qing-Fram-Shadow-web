@@ -335,6 +335,23 @@ window.App = {
                 // 背景板/分割间隙:保持当前图片选择不取消,继续走右侧命中/画布平移
             }
             const pt = this.screenToCanvas(e);
+            // 头像纪念:点头像可拖动
+            if (this.template.photoFrameStyle === 'AVATAR_MEMO') {
+                const img = this.image; if (!img) return;
+                const iw = img.width, ih = img.height;
+                const pad = Math.max(30, Math.round(iw * 0.05));
+                const bottomH = Math.round(iw * 0.16);
+                const avatarR = Math.round(bottomH * 0.32);
+                const offX = this.template.avatarOffX || 0, offY = this.template.avatarOffY || 0;
+                const ax = pad + avatarR + 8 + offX, ay = pad + ih + bottomH / 2 + offY;
+                const dx = pt.x - ax, dy = pt.y - ay;
+                if (dx*dx + dy*dy <= (avatarR + 10) * (avatarR + 10)) {
+                    e.preventDefault();
+                    this._dragAv = { sx: e.screenX, sy: e.screenY, offX, offY };
+                    canvas.style.cursor = 'move';
+                    return;
+                }
+            }
             const el = this.pickElement(pt);
             if (el) {
                 e.preventDefault();
@@ -351,6 +368,7 @@ window.App = {
             canvas.style.cursor = 'grabbing';
         });
         window.addEventListener('mousemove', e => {
+            if (this._dragAv) { this._dragAv = null; canvas.style.cursor = 'default'; return; }
             if (this._dragPz) {
                 const pk = this.tplPuzzle();
                 if (pk) {
@@ -360,6 +378,15 @@ window.App = {
                     this.puzzleDragMove(pk, this._dragPz, e);
                     this.scheduleRender();
                 }
+                return;
+            }
+            if (this._dragAv) {
+                const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
+                const rect = canvas.getBoundingClientRect();
+                const kx = canvas.width / rect.width, ky = canvas.height / rect.height;
+                this.template.avatarOffX = Math.round(this._dragAv.offX + dx * kx);
+                this.template.avatarOffY = Math.round(this._dragAv.offY + dy * ky);
+                this.scheduleRender();
                 return;
             }
             if (this._dragEl) {
