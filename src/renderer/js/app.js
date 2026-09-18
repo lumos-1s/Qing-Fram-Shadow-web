@@ -1913,11 +1913,12 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         // 简单分类:前四类按名称关键字,自定义留空待用户添加
         const cats = { brandIconBox: [], photoDecorBox: [], simpleIconBox: [], weatherIconBox: [], customIconBox: [] };
         this.logos.forEach(l => {
-            const n = l.name || '';
-            // 所有相机/品牌logo都归到品牌Logo池,按市场热度排序
+            // 自定义图标归到自定义图标池
+            if (l.custom) { cats.customIconBox.push(l); return; }
+            // 其余品牌logo归到品牌Logo池,按市场热度排序
             cats.brandIconBox.push(l);
-            cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
         });
+        cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
         pools.forEach((boxId, pi) => {
             const box = $(boxId);
             if (!box) return;
