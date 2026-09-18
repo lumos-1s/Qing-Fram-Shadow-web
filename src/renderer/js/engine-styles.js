@@ -2645,6 +2645,10 @@ AV_BLUR:62 };
         if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
         g.restore();
+        if (S.signBgBlur) {
+            g.fillStyle = 'rgba(0,0,0,0.45)';
+            g.fillRect(pad, pad + ih, iw, bottomH);
+        }
         g.fillStyle = S.signBgBlur ? '#fff' : (S.signColor || '#555');
         g.font = 'italic ' + Math.round(iw * 0.05 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'center';
@@ -2678,6 +2682,11 @@ AV_BLUR:62 };
         g.restore();
         const barY = pad + ih;
         const midY = barY + bottomH / 2;
+        // 模糊模式下底部条加半透明遮罩
+        if (S.signBgBlur) {
+            g.fillStyle = 'rgba(0,0,0,0.45)';
+            g.fillRect(pad, barY, iw, bottomH);
+        }
 
         // ══ 左侧:头像+签名 ══
         const avatarR = Math.round(bottomH * 0.3 * (S.avatarScale || 1));
