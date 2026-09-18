@@ -335,35 +335,14 @@ window.App = {
                 // 背景板/分割间隙:保持当前图片选择不取消,继续走右侧命中/画布平移
             }
             const pt = this.screenToCanvas(e);
-            // 头像纪念/签名+参数:点中头像才拖动
+            // 头像纪念/签名+参数:点底部条左侧区域选中头像
             const style = this.template.photoFrameStyle;
             if ((style === 'AVATAR_MEMO' || style === 'SIGN_PARAM') && this.image) {
-                const img = this.image;
-                const iw = img.width, ih = img.height;
-                const pad = Math.max(30, Math.round(iw * 0.05));
-                // 估算头像位置(和style函数里一致)
-                let ax, ay, avatarR;
-                if (style === 'SIGN_PARAM') {
-                    const bottomH = Math.round(iw * 0.18);
-                    avatarR = Math.round(bottomH * 0.3);
-                    ax = pad + avatarR + 6;
-                    ay = pad + ih + bottomH / 2;
-                } else {
-                    const bottomH = Math.round(iw * 0.16);
-                    avatarR = Math.round(bottomH * 0.32);
-                    ax = pad + avatarR + 8;
-                    ay = pad + ih + bottomH / 2;
-                }
-                ax += (this.template.avatarOffX || 0);
-                ay += (this.template.avatarOffY || 0);
-                // canvas有scale,pt是canvas像素坐标,ax/ay是绘制坐标,需要换算
-                // 简单估算:用屏幕坐标判断
                 const rect = canvas.getBoundingClientRect();
-                const sx = (ax / (canvas.width)) * rect.width + rect.left;
-                const sy = (ay / (canvas.height)) * rect.height + rect.top;
-                const sr = (avatarR / canvas.width) * rect.width;
-                const ddx = e.clientX - sx, ddy = e.clientY - sy;
-                if (ddx*ddx + ddy*ddy <= (sr + 8) * (sr + 8)) {
+                // 头像在屏幕左侧约15%宽度、垂直居中偏下
+                const inLeft = (e.clientX - rect.left) < rect.width * 0.25;
+                const inBottom = (e.clientY - rect.top) > rect.height * 0.7;
+                if (inLeft && inBottom) {
                     e.preventDefault();
                     this.template.avatarSelected = true;
                     this._dragAv = { sx: e.screenX, sy: e.screenY, offX: this.template.avatarOffX || 0, offY: this.template.avatarOffY || 0 };
