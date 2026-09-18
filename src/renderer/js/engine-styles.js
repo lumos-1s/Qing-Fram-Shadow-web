@@ -2166,6 +2166,28 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const bleed = Math.max(50, Math.floor(size * 1.5));
                 return { w: iw + bleed * 2, h: ih + bleed * 2 };
             }
+            case 'CYBER_GLITCH':
+            case 'TORN_JOURNAL': {
+                const p = Math.max(40, Math.round(iw * 0.04));
+                return { w: iw + p * 2, h: ih + p * 2 };
+            }
+            case 'POLAROID_HAND': {
+                const border = Math.max(30, Math.round(iw * 0.05));
+                const bottomPad = Math.max(100, Math.round(iw * 0.15));
+                return { w: iw + border * 2, h: ih + border + bottomPad };
+            }
+            case 'CARD_3D': {
+                return { w: iw + 120, h: ih + 150 };
+            }
+            case 'COMIC_PANEL': {
+                const gap = Math.round(iw * 0.015);
+                return { w: iw + gap * 3, h: ih + gap * 3 + Math.round(iw * 0.08) };
+            }
+            case 'NEWSPAPER': {
+                const pad = Math.max(40, Math.round(iw * 0.04));
+                const headH = Math.round(iw * 0.12);
+                return { w: iw + pad * 2, h: ih + pad * 2 + headH + 50 };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
