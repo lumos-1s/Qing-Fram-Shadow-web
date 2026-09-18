@@ -198,7 +198,7 @@ window.App = {
             e.preventDefault();
             const old = this._cropScale;
             this._cropScale *= (e.deltaY < 0 ? 1.1 : 0.9);
-            this._cropScale = Math.max(old, Math.min(this._cropScale, old * 4));
+            this._cropScale = Math.max(old * 0.3, Math.min(this._cropScale, old * 5));
             const iw = img.naturalWidth, ih = img.naturalHeight;
             img.style.width = iw * this._cropScale + 'px';
             img.style.height = ih * this._cropScale + 'px';
