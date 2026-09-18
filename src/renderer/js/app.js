@@ -174,9 +174,8 @@ window.App = {
     },
     loadUserAvatar() {
         this.updateTopBar();
-        // 默认签名=用户名
-        if (!this.template.userSignature) {
-            const un = localStorage.getItem('qfs_nickname') || localStorage.getItem('qfs_username') || '';
+        if (this.template && !this.template.userSignature) {
+            const un = (this.user && this.user.nickname) || localStorage.getItem('qfs_nickname') || localStorage.getItem('qfs_username') || '';
             if (un) this.template.userSignature = '— ' + un + ' —';
         }
         const saved = localStorage.getItem('qfs_user_avatar');
