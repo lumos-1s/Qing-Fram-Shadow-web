@@ -2654,13 +2654,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const avatarR = Math.round(iw * 0.06);
         const ax = pad + avatarR + 10, ay = pad + avatarR + 10;
         if (S.userAvatar) {
-            // 画用户头像(圆形裁剪)
             g.save();
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
-            const imgAv = new Image();
-            imgAv.src = S.userAvatar;
-            // 同步绘制(图片已加载)
-            if (imgAv.complete) {
+            // 用全局缓存的头像Image
+            const imgAv = window.__qfsAvatarImg;
+            if (imgAv && imgAv.complete && imgAv.naturalWidth) {
                 const s = Math.max(avatarR * 2 / imgAv.width, avatarR * 2 / imgAv.height);
                 g.drawImage(imgAv, ax - avatarR, ay - avatarR, imgAv.width * s, imgAv.height * s);
             } else {

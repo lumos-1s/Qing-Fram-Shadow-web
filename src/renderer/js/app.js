@@ -767,6 +767,11 @@ window.App = {
             if ($('cbParamPosition')) $('cbParamPosition').value = this.template.paramPosition || 'CENTER';
             if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
             if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
+            if (this.template.userAvatar) {
+                const img = new Image();
+                img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };
+                img.src = this.template.userAvatar;
+            }
             this.updateParamFontLabel();
             if ($('cbParamType')) $('cbParamType').value = String(this.template.paramType != null ? this.template.paramType : 0);
 
