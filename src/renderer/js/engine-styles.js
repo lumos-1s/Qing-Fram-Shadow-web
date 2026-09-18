@@ -2486,34 +2486,44 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ══ 3D卡片翻转 ══
     function styleCard3D(img, size, g, iw, ih, S) {
-        const padX = Math.round(iw * 0.15);
-        const padTop = Math.round(iw * 0.08);
-        const padBottom = Math.round(iw * 0.18);
+        const padX = Math.round(iw * 0.18);
+        const padTop = Math.round(iw * 0.1);
+        const padBottom = Math.round(iw * 0.2);
         const w = iw + padX * 2, h = ih + padTop + padBottom;
+        // 深棕桌面
         const grad = g.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, '#4a3728');
-        grad.addColorStop(0.5, '#3d2c1f');
-        grad.addColorStop(1, '#2a1d12');
+        grad.addColorStop(0, '#3d2c1f');
+        grad.addColorStop(1, '#1f1409');
         g.fillStyle = grad; g.fillRect(0, 0, w, h);
-        g.strokeStyle = 'rgba(0,0,0,0.1)'; g.lineWidth = 1;
-        for (let y = 0; y < h; y += 8) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + Math.random()*2); g.stroke(); }
-        const cardX = padX, cardY = padTop, cardW = iw, cardH = ih;
-        g.fillStyle = '#e8e8e8';
-        g.fillRect(cardX + 6, cardY + 8, cardW, cardH);
-        g.fillStyle = '#d0d0d0';
-        g.fillRect(cardX + 3, cardY + 4, cardW, cardH);
+        // 卡片投影(大而软)
         g.save();
-        g.shadowColor = 'rgba(0,0,0,0.6)';
-        g.shadowBlur = 30;
-        g.shadowOffsetY = 15;
-        g.fillStyle = '#ffffff';
-        g.fillRect(cardX, cardY, cardW, cardH);
+        g.shadowColor = 'rgba(0,0,0,0.8)';
+        g.shadowBlur = 50;
+        g.shadowOffsetX = 15;
+        g.shadowOffsetY = 25;
+        g.fillStyle = '#fff';
+        g.fillRect(padX, padTop, iw, ih);
         g.restore();
-        g.drawImage(img, cardX, cardY, iw, Math.round(ih * 0.88));
-        g.fillStyle = '#999';
+        // 卡片底部厚度(深色边)
+        g.fillStyle = '#ccc';
+        g.fillRect(padX + 8, padTop + 10, iw, ih);
+        g.fillStyle = '#bbb';
+        g.fillRect(padX + 4, padTop + 5, iw, ih);
+        // 白色正面(重新画,压在厚度上)
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.4)';
+        g.shadowBlur = 20;
+        g.shadowOffsetY = 8;
+        g.fillStyle = '#ffffff';
+        g.fillRect(padX, padTop, iw, ih);
+        g.restore();
+        // 照片占卡片85%高度
+        g.drawImage(img, padX, padTop, iw, Math.round(ih * 0.85));
+        // 底部手写
+        g.fillStyle = '#aaa';
         g.font = Math.round(iw * 0.025) + 'px cursive';
         g.textAlign = 'center';
-        g.fillText('✎ my memory', cardX + cardW / 2, cardY + Math.round(ih * 0.94));
+        g.fillText('✎ my memory', padX + iw / 2, padTop + Math.round(ih * 0.93));
     }
 
     // ══ 漫画分镜 ══
