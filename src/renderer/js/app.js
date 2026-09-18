@@ -50,6 +50,7 @@ window.App = {
         this.populateFonts();
         this.setupShortcuts();
         this.setupPanelInteractions();
+        this.bindTooltips();
         document.querySelectorAll('.pg-title.collapsible').forEach(t => {
             if (t._bound) return;
             t._bound = true;
@@ -304,20 +305,34 @@ window.App = {
             this.setActivePuzzleSlot(si);
             this.openSlotImage(si);
         });
-        // 桌面右键菜单:拼图格子
+        // 桌面右键菜单:拼图格子 / 画布空白处
         canvas.addEventListener('contextmenu', e => {
             const pk = this.tplPuzzle();
-            if (!pk) return;
-            const hp = this.puzzleHitTest(e);
-            if (!hp) return;
+            if (pk) {
+                const hp = this.puzzleHitTest(e);
+                if (hp) {
+                    e.preventDefault();
+                    this.setActivePuzzleSlot(hp.slot);
+                    this.openCtx(e.clientX, e.clientY, [
+                        ['替换照片(打开图片)', () => this.openSlotImage(hp.slot)],
+                        ['在此位置插入照片', () => this.insertImageFromPick(hp.slot)],
+                        ['旋转 90°', () => this.rotatePuzzleSlot(hp.slot)],
+                        ['重置本格', () => this.resetPuzzleSlot(hp.slot)],
+                        ['清空该格', () => this.clearSlotImage(hp.slot)],
+                    ]);
+                    return;
+                }
+            }
             e.preventDefault();
-            this.setActivePuzzleSlot(hp.slot);
             this.openCtx(e.clientX, e.clientY, [
-                ['替换照片(打开图片)', () => this.openSlotImage(hp.slot)],
-                ['在此位置插入照片', () => this.insertImageFromPick(hp.slot)],
-                ['旋转 90°', () => this.rotatePuzzleSlot(hp.slot)],
-                ['重置本格', () => this.resetPuzzleSlot(hp.slot)],
-                ['清空该格', () => this.clearSlotImage(hp.slot)],
+                ['适应窗口', () => this.fitZoom && this.fitZoom()],
+                ['1:1 实际大小', () => this.zoomActual && this.zoomActual()],
+                ['对比原图', () => this.toggleCompare && this.toggleCompare()],
+                ['—', null],
+                ['撤销 (Ctrl+Z)', () => this.undo()],
+                ['重做 (Ctrl+Y)', () => this.redo()],
+                ['—', null],
+                ['导出图片', () => this.doExport && this.doExport()],
             ]);
         });
         document.addEventListener('mousedown', e => {
