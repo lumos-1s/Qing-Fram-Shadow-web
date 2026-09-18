@@ -168,7 +168,7 @@ window.App = {
         const modal = document.getElementById('avatarCropModal');
         const img = document.getElementById('cropImg');
         if (!modal || !img) { this.saveUserAvatar(dataUrl); return; }
-        modal.style.display = 'flex';
+        modal.style.display = 'flex'; modal.style.alignItems = 'center'; modal.style.justifyContent = 'center';
         img.src = dataUrl;
         this._cropScale = 1;
         this._cropX = 0;
