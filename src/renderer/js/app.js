@@ -137,6 +137,25 @@ window.App = {
         d.loginUsername.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
         d.loginNickname.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
         this.setupDragDrop();
+        // 签名输入
+        const inpSig = document.getElementById('inpSignature');
+        if (inpSig) inpSig.addEventListener('input', () => { this.template.userSignature = inpSig.value; this.onSettingChanged(); });
+        // 头像上传
+        const btnAv = document.getElementById('btnUploadAvatar'), fileAv = document.getElementById('fileAvatar');
+        if (btnAv && fileAv) {
+            btnAv.addEventListener('click', () => fileAv.click());
+            fileAv.addEventListener('change', (e) => {
+                const f = e.target.files[0]; if (!f) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    this.template.userAvatar = ev.target.result;
+                    const img = new Image();
+                    img.onload = () => { window.__qfsAvatarImg = img; this.onSettingChanged(); };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(f);
+            });
+        }
         this.bindInteractive();
     },
 
