@@ -933,6 +933,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             const puzzle = this.template && this.template.puzzle && this.template.puzzle.enabled;
             if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
             else window.__render(this, false);
+            this.drawSelectionBox();
             if (this.autoFit) {
                 this.autoFit = false;
                 requestAnimationFrame(() => this.fitZoom());
