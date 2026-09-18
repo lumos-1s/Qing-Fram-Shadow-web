@@ -2332,12 +2332,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
         g.drawImage(img, cx, cy, iw, ih);
         g.restore();
-        // 底部深色条
-        g.save();
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
-        g.fillStyle = '#0d1b2a';
-        g.fillRect(cx, cy + ih, cw, bottomH);
-        g.restore();
+        // 底部透明(不画背景条)
         // 底部文字
         const fParam = Math.max(16, Math.round(iw * 0.035));
         g.textAlign = 'center';
@@ -2358,8 +2353,10 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             const iso = String(S.cam.iso || '100').replace(/^iso/i, '');
             const line = fLen + 'mm   ' + apt + '   ' + shut + 's   ISO' + iso;
             g.font = 'italic bold ' + fParam + 'px sans-serif';
+            g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 6;
             g.fillStyle = '#ffffff';
             g.fillText(line, w / 2, ty);
+            g.shadowBlur = 0;
         }
     }
     const draw = {
