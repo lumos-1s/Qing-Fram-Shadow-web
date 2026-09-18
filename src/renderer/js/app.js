@@ -1938,11 +1938,28 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             list.forEach(l => {
                 const c = document.createElement('div');
                 c.className = 'icon-cell';
-                c.title = l.name;
+                c.title = l.custom ? (l.name + '(点×删除)') : l.name;
                 const img = document.createElement('img');
                 img.src = l.dataUrl;
                 c.appendChild(img);
                 c.addEventListener('click', () => this.armLogoPlacement(l));
+                // 自定义图标右上角加×删除按钮
+                if (l.custom) {
+                    const del = document.createElement('span');
+                    del.textContent = '×';
+                    del.style.cssText = 'position:absolute;top:2px;right:4px;font-size:14px;line-height:1;color:#ea6668;cursor:pointer;font-weight:bold;';
+                    del.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm('删除自定义图标「' + l.name + '」?')) {
+                            this.deleteCustomIcon(l);
+                            this.logos = this.logos.filter(x => x !== l);
+                            this.renderLogoPools();
+                            this.setStatus('已删除');
+                        }
+                    });
+                    c.style.position = 'relative';
+                    c.appendChild(del);
+                }
                 box.appendChild(c);
             });
             const cnt = this.$({ brandIconBox: 'brandCnt', photoDecorBox: 'photoDecorCnt', simpleIconBox: 'simpleIconCnt', weatherIconBox: 'weatherIconCnt', customIconBox: 'customIconCnt' }[boxId]);
