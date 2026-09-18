@@ -2619,32 +2619,54 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.restore();
     }
 
-    // ══ 签名+参数 ══
+    // ══ 签名+参数:底部左头像+签名,右品牌+参数 ══
     function styleSignParam(img, size, g, iw, ih, S) {
         const pad = Math.max(30, Math.round(iw * 0.04));
         const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
-        const bottomH = Math.round(iw * 0.16);
+        const bottomH = Math.round(iw * 0.18);
         const w = iw + pad * 2, h = ih + pad + bottomH;
         g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad, iw, ih);
         const barY = pad + ih;
-        // 签名(手写)
-        g.fillStyle = '#444';
-        g.font = 'italic ' + Math.round(iw * 0.045) + 'px "Comic Sans MS", cursive';
-        g.textAlign = 'center';
-        g.save();
-        g.translate(w / 2, barY + Math.round(bottomH * 0.4));
-        g.rotate(-0.015);
-        g.fillText(S.userSignature || '— my memory —', 0, 0);
-        g.restore();
-        // 参数行
-        if (S.useExif && S.cam) {
-            g.fillStyle = '#999';
-            g.font = fs + 'px sans-serif';
-            g.textAlign = 'center';
-            const paramStr = (S.cam.focal||'') + '  ' + (S.cam.aperture||'') + '  ' + (S.cam.iso||'') + '  ' + (S.cam.shutter||'');
-            g.fillText(paramStr, w / 2, barY + Math.round(bottomH * 0.8));
+        const midY = barY + bottomH / 2;
+
+        // ══ 左侧:头像+签名 ══
+        const avatarR = Math.round(bottomH * 0.3);
+        const ax = pad + avatarR + 6, ay = midY;
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
+            g.restore();
+            g.strokeStyle = '#eee'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
         }
+        // 签名(头像右边)
+        g.fillStyle = '#444';
+        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "Comic Sans MS", cursive';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
+        g.textBaseline = 'alphabetic';
+
+        // ══ 右侧:品牌+参数 ══
+        const rx = w - pad;
+        g.textAlign = 'right';
+        // 品牌
+        g.fillStyle = '#333';
+        g.font = 'bold ' + Math.round(iw * 0.028) + 'px sans-serif';
+        g.textBaseline = 'top';
+        g.fillText((S.exif.make || 'Camera').toUpperCase(), rx, barY + Math.round(bottomH * 0.15));
+        // 参数
+        g.fillStyle = '#999';
+        g.font = fs + 'px sans-serif';
+        g.textBaseline = 'middle';
+        const paramStr = (S.exif.focal||'') + '  ' + (S.exif.aperture||'') + '  ' + (S.exif.iso||'') + '  ' + (S.exif.shutter||'');
+        g.fillText(paramStr, rx, barY + Math.round(bottomH * 0.65));
+        g.textBaseline = 'alphabetic';
+        g.textAlign = 'center';
     }
 
     // ══ 头像纪念 ══
