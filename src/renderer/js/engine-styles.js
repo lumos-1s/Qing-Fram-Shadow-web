@@ -1826,7 +1826,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             userSignature: String(t.userSignature || '').trim(),
             signFont: String(t.signFont || 'cursive'),
             signColor: String(t.signColor || '#555'),
-            avatarScale: Number(t.avatarScale || 1),
+            avatarScale: Number(t.avatarScale || 0.85),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,

@@ -919,7 +919,7 @@ window.App = {
             if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
             if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
             if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
-            if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 1) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
+            if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if (this.template.userAvatar) {
                 const img = new Image();
                 img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };
