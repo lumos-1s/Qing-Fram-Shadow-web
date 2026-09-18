@@ -2166,9 +2166,12 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const bleed = Math.max(50, Math.floor(size * 1.5));
                 return { w: iw + bleed * 2, h: ih + bleed * 2 };
             }
-            case 'CYBER_GLITCH':
-            case 'TORN_JOURNAL': {
+            case 'CYBER_GLITCH': {
                 const p = Math.max(40, Math.round(iw * 0.04));
+                return { w: iw + p * 2, h: ih + p * 2 };
+            }
+            case 'TORN_JOURNAL': {
+                const p = Math.max(50, Math.round(iw * 0.06));
                 return { w: iw + p * 2, h: ih + p * 2 };
             }
             case 'POLAROID_HAND': {
