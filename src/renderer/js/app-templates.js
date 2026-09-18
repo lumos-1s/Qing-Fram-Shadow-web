@@ -158,8 +158,26 @@ window.App = Object.assign(window.App || {}, {
     async loadLogos() {
         try { this.logos = (await window.qingframe.listLogos()) || []; }
         catch (e) { this.logos = []; }
+        try {
+            const saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+            saved.forEach(c => { if (c && c.dataUrl) this.logos.push(c); });
+        } catch(e) {}
         this.splashTick();
         if (this.dom.stRes) this.renderLogoPools();
+    },
+    saveCustomIcon(logo) {
+        try {
+            const saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+            saved.push(logo);
+            localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
+        } catch(e) {}
+    },
+    deleteCustomIcon(logo) {
+        try {
+            let saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+            saved = saved.filter(c => c.dataUrl !== logo.dataUrl);
+            localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
+        } catch(e) {}
     },
 
     async loadTextures() {
