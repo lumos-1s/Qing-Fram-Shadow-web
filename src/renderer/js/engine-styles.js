@@ -2065,8 +2065,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             }
             case 'FUJI_WM':
             case 'FUJI_WM_BRAND': {
-                const op = Math.max(50, Math.round(size * 2));
-                const bh = Math.max(60, Math.round(ih * 0.12));
+                const op = Math.max(15, Math.round(size * 0.5));
+                const bh = Math.max(50, Math.round(ih * 0.1));
                 return { w: iw + op * 2, h: ih + bh + op * 2 };
             }
             case 'IMP_CLASSIC':
@@ -2315,8 +2315,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // 富士水印: 深色圆角卡片+照片cover+底部品牌名+参数
     function styleFujifilm(img, size, g, iw, ih, S, withBrand) {
-        const outerPad = Math.max(50, Math.round(size * 2));
-        const bottomH = Math.max(60, Math.round(ih * 0.12));
+        const outerPad = Math.max(15, Math.round(size * 0.5));
+        const bottomH = Math.max(50, Math.round(ih * 0.1));
         const w = iw + outerPad * 2;
         const h = ih + bottomH + outerPad * 2;
         // 白外底
@@ -2327,20 +2327,15 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#0d1b2a';
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.fill(); }
         else g.fillRect(cx, cy, cw, ch);
-        // 照片cover填充整个卡片(裁切到圆角)
+        // 照片contain完整显示在卡片上部
         g.save();
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
-        const sc = Math.max(cw / iw, ch / ih);
-        const dw = iw * sc, dh = ih * sc;
-        g.drawImage(img, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+        g.drawImage(img, cx, cy, iw, ih);
         g.restore();
-        // 底部深色条压暗(让文字清晰)
+        // 底部深色条
         g.save();
         if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
-        const grad2 = g.createLinearGradient(0, cy + ih, 0, cy + ch);
-        grad2.addColorStop(0, 'rgba(13,27,42,0)');
-        grad2.addColorStop(1, 'rgba(13,27,42,0.9)');
-        g.fillStyle = grad2;
+        g.fillStyle = '#0d1b2a';
         g.fillRect(cx, cy + ih, cw, bottomH);
         g.restore();
         // 底部文字
