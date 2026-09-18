@@ -674,6 +674,14 @@
                         <input type="text" id="loginUsername" class="ctl-tx" placeholder="请输入用户名" maxlength="20" />
                     </div>
                     <div class="login-field">
+                        <label>头像（选填）</label>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div id="loginAvatarPreview" style="width:48px;height:48px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;color:#888;font-size:12px;overflow:hidden;">头像</div>
+                            <button id="btnPickAvatar" class="mini-btn" style="padding:6px 12px;">选择图片</button>
+                            <input type="file" id="fileLoginAvatar" accept="image/*" style="display:none;" />
+                        </div>
+                    </div>
+                    <div class="login-field">
                         <label for="loginNickname">昵称（选填）</label>
                         <input type="text" id="loginNickname" class="ctl-tx" placeholder="显示名称" maxlength="30" />
                     </div>
@@ -691,8 +699,10 @@
                         </div>
                     </div>
                     <div class="btn-row">
+                        <button id="btnChangeAvatar" class="mini-btn">更换头像</button>
                         <button id="loginLogout" class="mini-btn danger">退出登录</button>
                     </div>
+                    <input type="file" id="fileChangeAvatar" accept="image/*" style="display:none;" />
                 </div>
             </div>
         </div>

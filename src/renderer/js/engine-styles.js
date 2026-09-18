@@ -2653,7 +2653,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 左上角圆形头像
         const avatarR = Math.round(iw * 0.06);
         const ax = pad + avatarR + 10, ay = pad + avatarR + 10;
-        if (S.userAvatar) {
+        if (S.userAvatar || window.__qfsAvatarImg) {
             g.save();
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
             // 用全局缓存的头像Image

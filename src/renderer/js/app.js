@@ -136,27 +136,56 @@ window.App = {
         d.loginLogout.addEventListener('click', () => this.doLogout());
         d.loginUsername.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
         d.loginNickname.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
+        this.loadUserAvatar();
         this.setupDragDrop();
         // 签名输入
         const inpSig = document.getElementById('inpSignature');
         if (inpSig) inpSig.addEventListener('input', () => { this.template.userSignature = inpSig.value; this.onSettingChanged(); });
-        // 头像上传
+        // 头像上传(存全局)
         const btnAv = document.getElementById('btnUploadAvatar'), fileAv = document.getElementById('fileAvatar');
         if (btnAv && fileAv) {
             btnAv.addEventListener('click', () => fileAv.click());
             fileAv.addEventListener('change', (e) => {
                 const f = e.target.files[0]; if (!f) return;
                 const reader = new FileReader();
-                reader.onload = (ev) => {
-                    this.template.userAvatar = ev.target.result;
-                    const img = new Image();
-                    img.onload = () => { window.__qfsAvatarImg = img; this.onSettingChanged(); };
-                    img.src = ev.target.result;
-                };
+                reader.onload = (ev) => this.saveUserAvatar(ev.target.result);
                 reader.readAsDataURL(f);
             });
         }
+        this.bindAvatarUpload();
         this.bindInteractive();
+    },
+
+    loadUserAvatar() {
+        const saved = localStorage.getItem('qfs_user_avatar');
+        if (saved) {
+            const img = new Image();
+            img.onload = () => { window.__qfsAvatarImg = img; this.onSettingChanged(); };
+            img.src = saved;
+        }
+    },
+    saveUserAvatar(dataUrl) {
+        localStorage.setItem('qfs_user_avatar', dataUrl);
+        const img = new Image();
+        img.onload = () => { window.__qfsAvatarImg = img; this.onSettingChanged(); };
+        img.src = dataUrl;
+        // 更新登录弹窗预览
+        const pv = document.getElementById('loginAvatarPreview');
+        if (pv) { pv.style.background = 'url(' + dataUrl + ') center/cover'; pv.textContent = ''; }
+        const la = document.getElementById('loginAvatar');
+        if (la) { la.style.background = 'url(' + dataUrl + ') center/cover'; }
+    },
+    bindAvatarUpload() {
+        const pick = document.getElementById('btnPickAvatar'), file1 = document.getElementById('fileLoginAvatar');
+        const change = document.getElementById('btnChangeAvatar'), file2 = document.getElementById('fileChangeAvatar');
+        const readFile = (f) => {
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => this.saveUserAvatar(ev.target.result);
+            reader.readAsDataURL(f);
+        };
+        if (pick && file1) { pick.addEventListener('click', () => file1.click()); file1.addEventListener('change', (e) => readFile(e.target.files[0])); }
+        if (change && file2) { change.addEventListener('click', () => file2.click()); file2.addEventListener('change', (e) => readFile(e.target.files[0])); }
     },
 
     /* ══ 画布元素 / 缩放平移交互 ══ */
