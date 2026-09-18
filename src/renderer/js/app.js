@@ -335,24 +335,15 @@ window.App = {
                 // 背景板/分割间隙:保持当前图片选择不取消,继续走右侧命中/画布平移
             }
             const pt = this.screenToCanvas(e);
-            // 头像纪念/签名+参数:点底部条左侧区域选中头像
+            // 头像类预设:点画布任意位置选中头像并拖动
             const style = this.template.photoFrameStyle;
             if ((style === 'AVATAR_MEMO' || style === 'SIGN_PARAM') && this.image) {
-                const rect = canvas.getBoundingClientRect();
-                // 头像在屏幕左侧约15%宽度、垂直居中偏下
-                const inLeft = (e.clientX - rect.left) < rect.width * 0.25;
-                const inBottom = (e.clientY - rect.top) > rect.height * 0.7;
-                if (inLeft && inBottom) {
-                    e.preventDefault();
-                    this.template.avatarSelected = true;
-                    this._dragAv = { sx: e.screenX, sy: e.screenY, offX: this.template.avatarOffX || 0, offY: this.template.avatarOffY || 0 };
-                    canvas.style.cursor = 'move';
-                    this.onSettingChanged();
-                    return;
-                } else {
-                    this.template.avatarSelected = false;
-                    this.onSettingChanged();
-                }
+                e.preventDefault();
+                this.template.avatarSelected = true;
+                this._dragAv = { sx: e.screenX, sy: e.screenY, offX: this.template.avatarOffX || 0, offY: this.template.avatarOffY || 0 };
+                canvas.style.cursor = 'move';
+                this.onSettingChanged();
+                return;
             }
             const el = this.pickElement(pt);
             if (el) {
