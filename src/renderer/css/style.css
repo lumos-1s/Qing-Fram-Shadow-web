@@ -556,18 +556,19 @@ html.dark .mini-btn.primary { color: #0c1914; }
 .pool-title { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; display: flex; align-items: center; gap: 6px; }
 .pool-title .cnt { font-size: 10px; color: var(--text-3); }
 .icon-pool {
-    display: flex; gap: 6px; padding: 6px; overflow-x: auto;
+    display: flex; gap: 8px; padding: 8px; overflow-x: auto;
     background: var(--surface-alt); border: 1px solid var(--border); border-radius: 11px;
-    min-height: 46px;
+    min-height: 64px;
 }
 .icon-pool .icon-cell {
-    width: 36px; height: 36px; flex: 0 0 auto; border-radius: 9px; cursor: pointer;
+    width: 52px; height: 56px; flex: 0 0 auto; border-radius: 9px; cursor: pointer;
     background: var(--surface); border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center; padding: 4px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;
     transition: border-color .15s, transform .1s;
 }
 .icon-pool .icon-cell:hover { border-color: var(--primary); transform: scale(1.08); }
-.icon-pool .icon-cell img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.icon-pool .icon-cell img { max-width: 100%; max-height: 60%; object-fit: contain; }
+.icon-pool .icon-cell .ic-name { font-size: 8px; color: var(--text-3); margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .icon-pool .icon-cell.empty { background: transparent; border-style: dashed; color: var(--text-3); font-size: 10px; cursor: default; }
 .icon-pool .icon-cell.empty:hover { border-color: var(--border); transform: none; }
 
