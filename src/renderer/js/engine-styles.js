@@ -2229,6 +2229,11 @@ SIGN_BLUR:60 };
                 const bh = Math.round(iw * 0.14);
                 return { w: iw + p * 2, h: ih + p * 2 + bh };
             }
+            case 'SIGN_BLUR': {
+                const p = Math.max(30, Math.round(iw * 0.04));
+                const bh = Math.round(iw * 0.18);
+                return { w: iw + p * 2, h: ih + p + bh };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
