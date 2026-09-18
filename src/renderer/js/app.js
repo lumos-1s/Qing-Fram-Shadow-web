@@ -1923,7 +1923,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             const box = $(boxId);
             if (!box) return;
             box.innerHTML = '';
-            const list = pi === 4 ? [] : cats[boxId];
+            const list = cats[boxId];
             if (!list.length) {
                 // 空池隐藏整个组
                 const title = box.previousElementSibling;
