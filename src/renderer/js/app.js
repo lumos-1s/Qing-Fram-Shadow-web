@@ -2086,6 +2086,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
 
     batchElOps() {
         this.saveCurrentTemplate();
+        // 手势外同步替换 template 为最新快照,确保渲染用最新对象
+        if (!this._gesture && this.image && this.image.customSettings) {
+            this.template = this.image.customSettings;
+        }
         this.scheduleRender();
         this.rebindSelectedEls();
     },
