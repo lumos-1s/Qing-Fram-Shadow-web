@@ -1910,11 +1910,23 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         if (!stage) return;
         stage.style.cursor = 'crosshair';
         this.setStatus('点画布任意位置放置 ' + logo.name + '(右键取消)');
-        const onClick = (e) => {
+        const onDown = (e) => {
+            if (e.button === 2) {
+                stage.removeEventListener('mousedown', onDown);
+                stage.removeEventListener('contextmenu', onRight);
+                stage.style.cursor = '';
+                this._pendingLogo = null;
+                this.setStatus('已取消放置');
+                e.preventDefault();
+                return;
+            }
+            if (e.button !== 0) return;
             const rect = stage.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / (this.zoom || 1);
-            const y = (e.clientY - rect.top) / (this.zoom || 1);
-            stage.removeEventListener('click', onClick);
+            const z = this.zoom || 1;
+            const x = (e.clientX - rect.left) / z;
+            const y = (e.clientY - rect.top) / z;
+            stage.removeEventListener('mousedown', onDown);
+            stage.removeEventListener('contextmenu', onRight);
             stage.style.cursor = '';
             const pending = this._pendingLogo;
             this._pendingLogo = null;
@@ -1922,13 +1934,13 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         };
         const onRight = (e) => {
             e.preventDefault();
-            stage.removeEventListener('click', onClick);
+            stage.removeEventListener('mousedown', onDown);
             stage.removeEventListener('contextmenu', onRight);
             stage.style.cursor = '';
             this._pendingLogo = null;
             this.setStatus('已取消放置');
         };
-        stage.addEventListener('click', onClick);
+        stage.addEventListener('mousedown', onDown);
         stage.addEventListener('contextmenu', onRight);
     },
 
