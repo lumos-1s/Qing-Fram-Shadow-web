@@ -1567,9 +1567,9 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         if ($('slElementSize')) $('slElementSize').addEventListener('input', () => {
             const v = parseInt($('slElementSize').value, 10);
             this.updateLabel('lblElementSize', v);
-            this.applyToSelectedEls(el => {
-                if (el.kind === 'logo') el.size = v;
-                else if (el.kind === 'sticker') el.scale = clampNum(v / 60, 0.02, 3);
+            this.applyToSelectedEls((el, kind) => {
+                if (kind === 'logo') el.size = v;
+                else if (kind === 'sticker') el.scale = clampNum(v / 60, 0.02, 3);
             });
             this.batchElOps();
         });
