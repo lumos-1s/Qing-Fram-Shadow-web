@@ -50,6 +50,7 @@ window.App = {
         this.populateFonts();
         this.setupShortcuts();
         this.setupPanelInteractions();
+        this.bindCollapsibleGroups();
         this.updateHistoryButtons();
         this.initLogin();
         this.initDraft();
