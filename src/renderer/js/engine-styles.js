@@ -2653,11 +2653,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 左上角圆形头像
         const avatarR = Math.round(iw * 0.06);
         const ax = pad + avatarR + 10, ay = pad + avatarR + 10;
-        if (S.userAvatar || window.__qfsAvatarImg) {
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv) {
             g.save();
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
-            // 用全局缓存的头像Image
-            const imgAv = window.__qfsAvatarImg;
+            const imgAv = globalAv;
             if (imgAv && imgAv.complete && imgAv.naturalWidth) {
                 const s = Math.max(avatarR * 2 / imgAv.width, avatarR * 2 / imgAv.height);
                 g.drawImage(imgAv, ax - avatarR, ay - avatarR, imgAv.width * s, imgAv.height * s);
