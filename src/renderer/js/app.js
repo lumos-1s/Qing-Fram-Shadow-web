@@ -2012,8 +2012,9 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         const im = new Image();
         await new Promise(r => { im.onload = r; im.onerror = r; im.src = dataUrl; });
         if (!im.naturalWidth) { this.setStatus('图片加载失败'); return; }
-        const logo = { name: res.name || '自定义', dataUrl };
+        const logo = { name: res.name || '自定义', dataUrl, custom: true };
         this.logos.push(logo);
+        this.saveCustomIcon(logo);
         this.addLogoElement(logo);
         this.renderLogoPools();
     },
