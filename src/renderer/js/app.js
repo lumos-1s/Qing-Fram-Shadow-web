@@ -2082,6 +2082,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     batchElOps() {
         this.saveCurrentTemplate();
         this.scheduleRender();
+        this.rebindSelectedEls();
     },
 
     copyElement() {
