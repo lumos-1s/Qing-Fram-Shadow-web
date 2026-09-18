@@ -1959,7 +1959,6 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         this.saveCurrentTemplate();
         this.scheduleRender(true);
         this.setStatus(`已添加 Logo「${logo.name}」`);
-        requestAnimationFrame(() => this.focusElement(el, 2.5));
     },
 
     focusElement(el, factor) {
