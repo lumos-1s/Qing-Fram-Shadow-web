@@ -1827,6 +1827,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             signFont: String(t.signFont || 'cursive'),
             signColor: String(t.signColor || '#555'),
             avatarScale: Number(t.avatarScale || 0.85),
+            signSize: Number(t.signSize || 1),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,
@@ -2614,7 +2615,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.drawImage(img, pad, pad, iw, ih);
         // 手写签名
         g.fillStyle = S.signColor || '#555';
-        g.font = 'italic ' + Math.round(iw * 0.05) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.05 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'center';
         g.save();
         g.translate(w / 2, pad + ih + Math.round(bottomH * 0.6));
@@ -2655,7 +2656,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
         // 签名(头像右边)
         g.fillStyle = S.signColor || '#444';
-        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
@@ -2701,7 +2702,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
         }
         g.fillStyle = S.signColor || '#555';
-        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 16, ay);
