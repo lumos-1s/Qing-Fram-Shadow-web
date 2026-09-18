@@ -78,7 +78,9 @@ function renderToCanvas(app, compare) {
     // 画布后备尺寸变化后自动重新适配显示(缩略图条上方留白),避免旧缩放下画布溢出盖住缩略图条
     const curW = canvas.width, curH = canvas.height;
     if (prevW > 0 && prevH > 0 && (curW !== prevW || curH !== prevH)) {
-        if (typeof app.fitZoom === 'function') requestAnimationFrame(() => app.fitZoom());
+        // 正在操作元素(logo/sticker)时不自动 fitZoom,保持用户当前缩放级别
+        const hasSel = app.selectedEls && app.selectedEls.length;
+        if (!hasSel && typeof app.fitZoom === 'function') requestAnimationFrame(() => app.fitZoom());
     }
 }
 function _renderToCanvasInner(app, compare) {
