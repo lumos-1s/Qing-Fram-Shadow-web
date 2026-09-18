@@ -415,8 +415,9 @@ window.App = {
             else { e.fontSize = clampNum((e.fontSize || 18) + dir * 2, 6, 300); if (e.autoSize) e.autoSize = 0; }
         }
         this.syncSliderFromEl(el);
-        this.onSettingChanged();
-        // saveCurrentTemplate 会克隆 template,selectedEls 里的旧引用会失效,重新绑定
+        // 直接保存+渲染,不走 onSettingChanged(避免 syncModelFromUI 重置视图/zoom)
+        this.saveCurrentTemplate();
+        this.scheduleRender();
         this.rebindSelectedEls();
     },
 
