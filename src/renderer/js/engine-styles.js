@@ -2221,7 +2221,7 @@ SIGN_BLUR:60 };
             }
             case 'SIGN_PARAM': {
                 const p = Math.max(30, Math.round(iw * 0.04));
-                const bh = Math.round(iw * 0.16);
+                const bh = Math.round(iw * 0.14);
                 return { w: iw + p * 2, h: ih + p + bh };
             }
             case 'AVATAR_MEMO': {
@@ -2231,7 +2231,7 @@ SIGN_BLUR:60 };
             }
             case 'SIGN_BLUR': {
                 const p = Math.max(30, Math.round(iw * 0.04));
-                const bh = Math.round(iw * 0.18);
+                const bh = Math.round(iw * 0.14);
                 return { w: iw + p * 2, h: ih + p + bh };
             }
             default:
@@ -2634,7 +2634,7 @@ SIGN_BLUR:60 };
     function styleSignParam(img, size, g, iw, ih, S) {
         const pad = Math.max(30, Math.round(iw * 0.04));
         const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
-        const bottomH = Math.round(iw * 0.18);
+        const bottomH = Math.round(iw * 0.14);
         const w = iw + pad * 2, h = ih + pad + bottomH;
         g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad, iw, ih);
@@ -2729,7 +2729,7 @@ SIGN_BLUR:60 };
     function styleSignBlur(img, size, g, iw, ih, S) {
         const pad = Math.max(30, Math.round(iw * 0.04));
         const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
-        const bottomH = Math.round(iw * 0.18);
+        const bottomH = Math.round(iw * 0.14);
         const w = iw + pad * 2, h = ih + pad + bottomH;
         // 模糊背景:把照片放大铺满画布
         g.save();
