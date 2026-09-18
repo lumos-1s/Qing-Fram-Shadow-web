@@ -1703,19 +1703,21 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         drawTextL(g, model, w - pad - mfw.w, barY + swatchH + Math.floor((barH - swatchH + fs) / 2), 'rgb(60,60,60)', fs, false, true, 0);
     }
     function styleFujiWhite(img, size, g, iw, ih, S) {
-        const barH = Math.max(36, size), pad = Math.max(8, Math.floor(size / 2));
+        const pad = Math.max(12, Math.round(iw * 0.02));
+        const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
+        const lineGap = Math.max(16, Math.round(fs * 0.8));
+        const barH = fs + lineGap + fs + Math.round(fs * 0.5);
         const w = iw + pad * 2, h = ih + pad + barH;
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
         const barY = ih + pad;
-        const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
         const line1 = 'FUJIFILM ' + S.cam.model;
         const m1 = textMetrics(g, line1, fs, false, true, 0);
         drawTextL(g, line1, cx2(w, m1.w), barY + fs, 'rgb(40,40,40)', fs, false, true, 0);
-        const f2 = autoExifSize(S.paramFs, iw);
+        const f2 = Math.round(fs * 0.85);
         const line2 = S.cam.focal + '  ' + S.cam.aperture + '  ' + S.cam.iso + '  ' + S.cam.shutter;
         const m2 = textMetrics(g, line2, f2, true, false, 0);
-        drawTextL(g, line2, cx2(w, m2.w), barY + fs + Math.max(12, Math.floor(fs * 2 / 3)), 'rgb(120,120,120)', f2, true, false, 0);
+        drawTextL(g, line2, cx2(w, m2.w), barY + fs + lineGap, 'rgb(120,120,120)', f2, true, false, 0);
     }
     function styleSimpleFilm(img, size, g, iw, ih, S) {
         const w = iw + size * 2, h = ih + size * 2;
