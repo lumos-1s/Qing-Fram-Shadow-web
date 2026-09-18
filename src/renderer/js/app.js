@@ -50,7 +50,14 @@ window.App = {
         this.populateFonts();
         this.setupShortcuts();
         this.setupPanelInteractions();
-        this.bindCollapsibleGroups();
+        document.querySelectorAll('.pg-title.collapsible').forEach(t => {
+            if (t._bound) return;
+            t._bound = true;
+            t.addEventListener('click', () => {
+                const g = t.parentElement;
+                if (g) g.classList.toggle('collapsed');
+            });
+        });
         this.updateHistoryButtons();
         this.initLogin();
         this.initDraft();
