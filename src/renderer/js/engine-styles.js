@@ -674,7 +674,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ── 阶段二基设:风格序号 / Java Random(原件 cameraFor 的 seed RNG)──
     const ORD = { NONE:0,SIMPLE:1,POLAROID:2,FILM_STRIP:3,ROUNDED:4,DOUBLE_LINE:5,VINTAGE:6,GRADIENT:7,DROP_SHADOW:8,
-        BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,IDCARD:44,APPLECARD:45,CYBERNEON:46,NEONGLOW:47,
+        BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,FUJI_WM:48,FUJI_WM_BRAND:49,
         XIAOMI_IMP:17,CARD_LEICA:18,CARD_LOGO_PARAM:19,CARD_PURE_LOGO:20,CARD_SIMPLE:21,CARD_IMMERSION:22,
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
@@ -2306,6 +2306,50 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillText('✦ neon glow ✦', w / 2, ty);
         g.restore();
     }
+
+    // 富士水印: 深色圆角卡片+照片cover+底部品牌名+参数
+    function styleFujifilm(img, size, g, iw, ih, S, withBrand) {
+        const outerPad = Math.max(50, Math.round(size * 2));
+        const bottomH = Math.max(60, Math.round(ih * 0.12));
+        const w = iw + outerPad * 2;
+        const h = ih + bottomH + outerPad * 2;
+        // 白外底
+        g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+        // 深色圆角卡片
+        const cx = outerPad, cy = outerPad, cw = iw, ch = ih + bottomH;
+        const r = Math.round(Math.min(cw, ch) * 0.03);
+        g.fillStyle = '#0d1b2a';
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.fill(); }
+        else g.fillRect(cx, cy, cw, ch);
+        // 照片cover填充卡片上半部分(裁切到圆角)
+        g.save();
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
+        g.drawImage(img, cx, cy);
+        g.restore();
+        // 底部文字
+        const fParam = Math.max(16, Math.round(iw * 0.035));
+        g.textAlign = 'center';
+        g.textBaseline = 'alphabetic';
+        let ty = cy + ih + Math.round(bottomH * 0.6);
+        if (withBrand && S.cam) {
+            const fBrand = Math.max(20, Math.round(iw * 0.045));
+            g.font = 'bold ' + fBrand + 'px sans-serif';
+            g.fillStyle = '#ffffff';
+            const brand = (S.cam.brand || 'FUJIFILM').toUpperCase();
+            g.fillText(brand, w / 2, ty - Math.round(bottomH * 0.15));
+            ty += Math.round(fParam * 1.2);
+        }
+        if (S.useExif && S.cam) {
+            const fLen = S.cam.focal || '450';
+            const apt = S.cam.aperture || 'F6.3';
+            const shut = S.cam.shutter || '1/125';
+            const iso = S.cam.iso || '100';
+            const line = fLen + 'mm   ' + apt + '   ' + shut + 's   ISO' + iso;
+            g.font = 'italic bold ' + fParam + 'px sans-serif';
+            g.fillStyle = '#ffffff';
+            g.fillText(line, w / 2, ty);
+        }
+    }
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2319,7 +2363,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             OVERLAY_PARAM_LEFT: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 0),
             OVERLAY_PARAM_RIGHT: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 1),
             OVERLAY_PARAM_BOTTOM: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 2),
-        IDCARD: styleIdCard, APPLECARD: styleAppleCard, CYBERNEON: styleCyberNeon, NEONGLOW: styleNeonGlow,
+        FUJI_WM: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,false),
+        FUJI_WM_BRAND: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,true),
             OVERLAY_LOGO_BOTTOM: styleOverlayLogo,
             COLOR_CLASSIC: styleColorClassic, COLOR_REFINED: styleColorRefined, ART_CARD: styleArtCard,
             FUJI_WHITE: styleFujiWhite, SIMPLE_FILM: styleSimpleFilm,
