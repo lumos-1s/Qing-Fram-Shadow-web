@@ -682,7 +682,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56,SIGNATURE:57,SIGN_PARAM:58,AVATAR_MEMO:59,
 SIGN_BLUR:60,
 SIG_BLUR:61,
-AV_BLUR:62 };
+AV_BLUR:62,
+AV_OVERLAY:63 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -2248,6 +2249,10 @@ AV_BLUR:62 };
                 const bh = Math.round(iw * 0.11);
                 return { w: iw + p * 2, h: ih + p * 2 + bh };
             }
+            case 'AV_OVERLAY': {
+                const p = Math.max(20, Math.round(iw * 0.03));
+                return { w: iw + p * 2, h: ih + p * 2 };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
@@ -2921,6 +2926,39 @@ AV_BLUR:62 };
         g.textAlign = 'center';
     }
 
+    // ══ 头像·叠加:头像+签名直接放在照片上 ══
+    function styleAvOverlay(img, size, g, iw, ih, S) {
+        const pad = Math.max(20, Math.round(iw * 0.03));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad, iw, ih);
+        // 头像在左下角
+        const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
+        const ax = pad + avatarR + Math.round(iw * 0.03);
+        const ay = pad + ih - avatarR - Math.round(iw * 0.03);
+        const globalAv = window.__qfsAvatarImg;
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
+            g.restore();
+            g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+            g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 6; g.shadowOffsetY = 2;
+            g.stroke();
+            g.shadowBlur = 0;
+        }
+        // 签名在头像右边
+        g.fillStyle = S.signColor || '#fff';
+        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
+        g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
+        g.shadowBlur = 0;
+    }
+
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2953,6 +2991,7 @@ AV_BLUR:62 };
             SIGN_BLUR: styleSignBlur,
             SIG_BLUR: styleSigBlur,
             AV_BLUR: styleAvBlur,
+            AV_OVERLAY: styleAvOverlay,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
