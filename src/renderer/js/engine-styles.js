@@ -1826,6 +1826,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             userSignature: String(t.userSignature || '').trim(),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
+            avatarSelected: !!t.avatarSelected,
             logoSize: clampP(t.logoSize != null ? t.logoSize : 14, 0, 200),
         };
     }
@@ -2640,8 +2641,14 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
             g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
             g.restore();
-            g.strokeStyle = '#eee'; g.lineWidth = 2;
+            if (S.avatarSelected) {
+                g.shadowColor = '#10b981'; g.shadowBlur = 12;
+                g.strokeStyle = '#10b981'; g.lineWidth = 3;
+            } else {
+                g.strokeStyle = '#eee'; g.lineWidth = 2;
+            }
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+            g.shadowBlur = 0;
         }
         // 签名(头像右边)
         g.fillStyle = '#444';
