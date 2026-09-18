@@ -335,16 +335,6 @@ window.App = {
                 // 背景板/分割间隙:保持当前图片选择不取消,继续走右侧命中/画布平移
             }
             const pt = this.screenToCanvas(e);
-            // 头像类预设:点画布任意位置选中头像并拖动
-            const style = this.template.photoFrameStyle;
-            if ((style === 'AVATAR_MEMO' || style === 'SIGN_PARAM') && this.image) {
-                e.preventDefault();
-                this.template.avatarSelected = true;
-                this._dragAv = { sx: e.screenX, sy: e.screenY, offX: this.template.avatarOffX || 0, offY: this.template.avatarOffY || 0 };
-                canvas.style.cursor = 'move';
-                this.onSettingChanged();
-                return;
-            }
             const el = this.pickElement(pt);
             if (el) {
                 e.preventDefault();
@@ -361,13 +351,6 @@ window.App = {
             canvas.style.cursor = 'grabbing';
         });
         window.addEventListener('mousemove', e => {
-            if (this._dragAv) {
-                const dx = e.screenX - this._dragAv.sx, dy = e.screenY - this._dragAv.sy;
-                this.template.avatarOffX = this._dragAv.offX + dx;
-                this.template.avatarOffY = this._dragAv.offY + dy;
-                this.renderPreview();
-                return;
-            }
             if (this._dragPz) {
                 const pk = this.tplPuzzle();
                 if (pk) {
@@ -395,7 +378,6 @@ window.App = {
             this.applyZoomStyle();
         });
         window.addEventListener('mouseup', () => {
-            if (this._dragAv) { this._dragAv = null; canvas.style.cursor = 'default'; return; }
             if (this._dragPz) {
                 const d = this._dragPz;
                 const pk = this.tplPuzzle();
