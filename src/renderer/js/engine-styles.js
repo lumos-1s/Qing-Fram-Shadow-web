@@ -674,7 +674,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ── 阶段二基设:风格序号 / Java Random(原件 cameraFor 的 seed RNG)──
     const ORD = { NONE:0,SIMPLE:1,POLAROID:2,FILM_STRIP:3,ROUNDED:4,DOUBLE_LINE:5,VINTAGE:6,GRADIENT:7,DROP_SHADOW:8,
-        BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,FUJI_WM:48,FUJI_WM_BRAND:49,
+        BLUR_CLASSIC:9,BLUR_DATE:10,WM_CLASSIC:11,WM_SINGLE:12,WM_BRAND_LOGO:13,WM_AI:14,IMP_FROSTED:15,IMP_CLASSIC:16,FUJI_WM:48,FUJI_WM_BRAND:49,DARK_BRAND_ONLY:50,
         XIAOMI_IMP:17,CARD_LEICA:18,CARD_LOGO_PARAM:19,CARD_PURE_LOGO:20,CARD_SIMPLE:21,CARD_IMMERSION:22,
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
@@ -1234,7 +1234,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.textBaseline = 'alphabetic';
         g.fillText(brand, ml, Math.round(h * 0.28));
         // 4. 三行圆角方框参数
-        if (S.useExif && S.cam) {
+        if (showParams && S.useExif && S.cam) {
             const boxW = Math.round(leftW * 0.28);
             const boxH = Math.round(boxW * 0.55);
             const fBox = Math.max(11, Math.round(boxH * 0.45));
@@ -2064,7 +2064,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 return { w: lw + iw + rp, h: ih + tbp * 2 };
             }
             case 'FUJI_WM':
-            case 'FUJI_WM_BRAND': {
+            case 'FUJI_WM_BRAND':
+            case 'DARK_BRAND_ONLY': {
                 const op = Math.max(15, Math.round(size * 0.5));
                 return { w: iw + op * 2, h: ih + op * 2 };
             }
@@ -2313,7 +2314,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
 
     // 富士水印: 深色圆角卡片+照片cover+底部品牌名+参数
-    function styleFujifilm(img, size, g, iw, ih, S, withBrand) {
+    function styleFujifilm(img, size, g, iw, ih, S, withBrand, showParams) { showParams = showParams !== false;
         const outerPad = Math.max(15, Math.round(size * 0.5));
         const w = iw + outerPad * 2;
         const h = ih + outerPad * 2;
@@ -2377,6 +2378,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             OVERLAY_PARAM_BOTTOM: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 2),
         FUJI_WM: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,false),
         FUJI_WM_BRAND: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,true),
+        DARK_BRAND_ONLY: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,true,false),
             OVERLAY_LOGO_BOTTOM: styleOverlayLogo,
             COLOR_CLASSIC: styleColorClassic, COLOR_REFINED: styleColorRefined, ART_CARD: styleArtCard,
             FUJI_WHITE: styleFujiWhite, SIMPLE_FILM: styleSimpleFilm,
