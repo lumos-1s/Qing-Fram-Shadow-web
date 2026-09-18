@@ -142,6 +142,10 @@ window.App = {
         // 签名输入
         const inpSig = document.getElementById('inpSignature');
         if (inpSig) inpSig.addEventListener('input', () => { this.template.userSignature = inpSig.value; this.onSettingChanged(); });
+        const cbF = document.getElementById('cbSignFont');
+        if (cbF) cbF.addEventListener('change', () => { this.template.signFont = cbF.value; this.onSettingChanged(); });
+        const cbC = document.getElementById('cbSignColor');
+        if (cbC) cbC.addEventListener('change', () => { this.template.signColor = cbC.value; this.onSettingChanged(); });
         // 头像上传(存全局)
         const btnAv = document.getElementById('btnUploadAvatar'), fileAv = document.getElementById('fileAvatar');
         if (btnAv && fileAv) {
@@ -170,6 +174,11 @@ window.App = {
     },
     loadUserAvatar() {
         this.updateTopBar();
+        // 默认签名=用户名
+        if (!this.template.userSignature) {
+            const un = localStorage.getItem('qfs_nickname') || localStorage.getItem('qfs_username') || '';
+            if (un) this.template.userSignature = '— ' + un + ' —';
+        }
         const saved = localStorage.getItem('qfs_user_avatar');
         if (saved) {
             const img = new Image();
@@ -902,6 +911,8 @@ window.App = {
             if ($('cbParamPosition')) $('cbParamPosition').value = this.template.paramPosition || 'CENTER';
             if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
             if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
+            if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
+            if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
             if (this.template.userAvatar) {
                 const img = new Image();
                 img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };

@@ -1824,6 +1824,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             aiCapSizePct: clampP(t.aiCapSizePct != null ? t.aiCapSizePct : 100, 50, 200),
             aiCapTheme: clampP(t.aiCapTheme != null ? t.aiCapTheme : 0, 0, 2),
             userSignature: String(t.userSignature || '').trim(),
+            signFont: String(t.signFont || 'cursive'),
+            signColor: String(t.signColor || '#555'),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,
@@ -2610,8 +2612,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#faf8f5'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad, iw, ih);
         // 手写签名
-        g.fillStyle = '#555';
-        g.font = 'italic ' + Math.round(iw * 0.05) + 'px "Comic Sans MS", cursive';
+        g.fillStyle = S.signColor || '#555';
+        g.font = 'italic ' + Math.round(iw * 0.05) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'center';
         g.save();
         g.translate(w / 2, pad + ih + Math.round(bottomH * 0.6));
@@ -2651,8 +2653,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.shadowBlur = 0;
         }
         // 签名(头像右边)
-        g.fillStyle = '#444';
-        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "Comic Sans MS", cursive';
+        g.fillStyle = S.signColor || '#444';
+        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
@@ -2697,8 +2699,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
         }
-        g.fillStyle = '#555';
-        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "Comic Sans MS", cursive';
+        g.fillStyle = S.signColor || '#555';
+        g.font = 'italic ' + Math.round(iw * 0.035) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 16, ay);
