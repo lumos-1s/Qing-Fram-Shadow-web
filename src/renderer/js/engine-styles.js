@@ -2713,11 +2713,16 @@ AV_BLUR:62 };
         g.font = fs + 'px sans-serif';
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2; // 参数行中心x
-        // 品牌居中在参数行上方(用drawLogo同款字体)
+        // 品牌居中在参数行上方(印象毛玻璃同款衬线字体)
+        const brandTxt = (S.exif.make || 'Camera').toUpperCase();
+        const fBrand = Math.round(iw * 0.028);
+        g.fillStyle = S.signBgBlur ? '#fff' : '#333';
+        g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+        g.letterSpacing = Math.round(fBrand * 0.15);
         g.textAlign = 'center';
         g.textBaseline = 'top';
-        const logoFs = Math.round(iw * 0.028);
-        drawLogo(g, (S.exif.make || 'Camera'), cxRight - logoWidth((S.exif.make || 'Camera'), logoFs) / 2, barY + Math.round(bottomH * 0.15), logoFs);
+        g.fillText(brandTxt, cxRight, barY + Math.round(bottomH * 0.15));
+        g.letterSpacing = 0;
         // 参数行
         g.fillStyle = '#999';
         g.font = fs + 'px sans-serif';
@@ -2823,10 +2828,15 @@ AV_BLUR:62 };
         g.font = fs + 'px sans-serif';
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2;
+        const brandTxt2 = (S.exif.make || 'Camera').toUpperCase();
+        const fBrand2 = Math.round(iw * 0.028);
+        g.fillStyle = S.signBgBlur ? '#fff' : '#333';
+        g.font = 'bold ' + fBrand2 + "px Georgia, 'Times New Roman', serif";
+        g.letterSpacing = Math.round(fBrand2 * 0.15);
         g.textAlign = 'center';
         g.textBaseline = 'top';
-        const logoFs2 = Math.round(iw * 0.028);
-        drawLogo(g, (S.exif.make || 'Camera'), cxRight - logoWidth((S.exif.make || 'Camera'), logoFs2) / 2, barY + Math.round(bottomH * 0.15), logoFs2);
+        g.fillText(brandTxt2, cxRight, barY + Math.round(bottomH * 0.15));
+        g.letterSpacing = 0;
         g.fillStyle = 'rgba(255,255,255,0.7)';
         g.font = fs + 'px sans-serif';
         g.textBaseline = 'middle';
