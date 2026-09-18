@@ -1912,6 +1912,11 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         this.setStatus('已添加贴纸(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
     },
 
+
+    _brandRank(n) {
+        const ranking = {"APPLE":100,"SAMSUNG":95,"XIAOMI":90,"VIVO":80,"OPPO":78,"HONOR":72,"HUAWEI":70,"GOOGLE":65,"ONEPLUS":62,"REALME":58,"MOTOROLA":55,"LENOVO":50,"ASUS":48,"NOTHING":45,"NUBIA":42,"REDMI":88,"REDMAGIC":38,"IQOO":52,"TECNO":38,"INFINIX":35,"ITEL":33,"DOOGEE":25,"ULEFONE":22,"BLACKSHARK":30,"VERTU":20,"NOKIA":48,"LG":45,"HTC":40,"MEIZU":35,"CANON":98,"SONY":92,"FUJIFILM":85,"NIKON":80,"PANASONIC":60,"RICOH":45,"OLYMPUS":42,"PENTAX":38,"SIGMA":40,"LEICA":55,"HASSELBLAD":48,"POLAROID":50,"GOPRO":52,"DJI":58,"INSTA360":50,"RED":35,"CONTAX":25,"ALPA":15,"LINHOF":12,"MAMIYA":18,"ROLLEI":20,"PHASEONE":25,"HORSEMAN":10,"TOYO":8,"VOIGTLÄNDER":15,"SEAGULL":20,"TAMRON":30,"AGFA":18,"KODAK":45,"LOMO":30,"BLACKMAGIC":42,"ZEISS":50,"CASIO":25,"CAT":5};
+        return ranking[(n||'').replace(/\.png$/i,'').toUpperCase()] ?? 5;
+    },
     /* ══ Logo 页签 ══ */
     renderLogoPools() {
         const $ = this.$;
@@ -1920,8 +1925,9 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         const cats = { brandIconBox: [], photoDecorBox: [], simpleIconBox: [], weatherIconBox: [], customIconBox: [] };
         this.logos.forEach(l => {
             const n = l.name || '';
-            // 所有相机/品牌logo都归到品牌Logo池
+            // 所有相机/品牌logo都归到品牌Logo池,按市场热度排序
             cats.brandIconBox.push(l);
+            cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
         });
         pools.forEach((boxId, pi) => {
             const box = $(boxId);
