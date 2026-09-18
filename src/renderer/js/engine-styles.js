@@ -2063,6 +2063,12 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const tbp = Math.max(50, Math.round(size * 1.2));
                 return { w: lw + iw + rp, h: ih + tbp * 2 };
             }
+            case 'FUJI_WM':
+            case 'FUJI_WM_BRAND': {
+                const op = Math.max(50, Math.round(size * 2));
+                const bh = Math.max(60, Math.round(ih * 0.12));
+                return { w: iw + op * 2, h: ih + bh + op * 2 };
+            }
             case 'IMP_CLASSIC':
                 return { w: iw + pad2(8) * 2, h: ih + pad2(8) * 2 };
             case 'XIAOMI_IMP': {
