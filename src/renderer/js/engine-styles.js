@@ -1831,6 +1831,7 @@ AV_BLUR:62 };
             signColor: String(t.signColor || '#555'),
             avatarScale: Number(t.avatarScale || 0.85),
             signSize: Number(t.signSize || 1),
+            signBgBlur: Number(t.signBgBlur || 0),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,
@@ -2648,8 +2649,21 @@ AV_BLUR:62 };
         const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
         const bottomH = Math.round(iw * 0.14);
         const w = iw + pad * 2, h = ih + pad + bottomH;
-        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        if (S.signBgBlur) {
+            g.save();
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.filter = 'blur(40px) brightness(0.6)';
+            const bs = Math.max(w / iw, h / ih);
+            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            g.filter = 'none';
+            g.restore();
+        } else {
+            g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        }
+        g.save();
+        if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
+        g.restore();
         const barY = pad + ih;
         const midY = barY + bottomH / 2;
 
@@ -2707,8 +2721,21 @@ AV_BLUR:62 };
         const pad = Math.max(30, Math.round(iw * 0.05));
         const bottomH = Math.round(iw * 0.16);
         const w = iw + pad * 2, h = ih + pad + bottomH;
-        g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, w, h);
+        if (S.signBgBlur) {
+            g.save();
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.filter = 'blur(40px) brightness(0.6)';
+            const bs = Math.max(w / iw, h / ih);
+            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            g.filter = 'none';
+            g.restore();
+        } else {
+            g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, w, h);
+        }
+        g.save();
+        if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
+        g.restore();
         const barY = pad + ih;
         const avatarR = Math.round(bottomH * 0.32 * (S.avatarScale || 1));
         const offX = S.avatarOffX || 0, offY = S.avatarOffY || 0;
