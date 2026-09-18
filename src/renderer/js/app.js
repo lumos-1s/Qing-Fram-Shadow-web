@@ -452,6 +452,35 @@ window.App = {
         this.updateLabel('lblElementSize', sizeVal);
     },
 
+    drawSelectionBox() {
+        const canvas = this.dom.canvas;
+        if (!canvas || !this.selectedEls || !this.selectedEls.length) return;
+        const ctx = canvas.getContext('2d');
+        for (const sel of this.selectedEls) {
+            const e = sel.obj;
+            if (!e) continue;
+            let cx = e.x, cy = e.y, size = e.size || 60;
+            if (typeof cx !== 'number' || typeof cy !== 'number') {
+                const p = this.logoPos(e, canvas.width, canvas.height, size);
+                cx = p.cx; cy = p.cy;
+            }
+            ctx.save();
+            ctx.strokeStyle = '#00e5a0';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(cx - size / 2 - 6, cy - size / 2 - 6, size + 12, size + 12);
+            // 四个角小方块
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#00e5a0';
+            const h = 5;
+            [[cx-size/2-6, cy-size/2-6],[cx+size/2+6-h, cy-size/2-6],
+             [cx-size/2-6, cy+size/2+6-h],[cx+size/2+6-h, cy+size/2+6-h]].forEach(([x,y])=>{
+                ctx.fillRect(x, y, h, h);
+            });
+            ctx.restore();
+        }
+    },
+
     /* ══ 默认模板 ══ */
     defaultTemplate() {
         return {
