@@ -2135,7 +2135,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             case 'ART_CARD':
             case 'FUJI_WHITE': {
                 const af = Math.max(11, Math.round(autoExifSize((S ? S.paramFs : 12), iw)));
-                const barH = Math.max(36, size, Math.round(af * 5 / 3)), pad = pad2(8);
+                const pad = Math.max(12, Math.round(iw * 0.02));
+                const lineGap = Math.max(16, Math.round(af * 0.8));
+                const barH = af + lineGap + af + Math.round(af * 0.5);
                 return { w: iw + pad * 2, h: ih + pad + barH };
             }
             case 'STAMP_POSTAGE': {
