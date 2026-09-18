@@ -679,7 +679,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
         PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35,
-        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56 };
+        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56,SIGNATURE:57,SIGN_PARAM:58,AVATAR_MEMO:59 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -2205,6 +2205,21 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const headH = Math.round(iw * 0.12);
                 return { w: iw + pad * 2, h: ih + pad * 2 + headH + 50 };
             }
+            case 'SIGNATURE': {
+                const p = Math.max(30, Math.round(iw * 0.04));
+                const bh = Math.round(iw * 0.12);
+                return { w: iw + p * 2, h: ih + p + bh };
+            }
+            case 'SIGN_PARAM': {
+                const p = Math.max(30, Math.round(iw * 0.04));
+                const bh = Math.round(iw * 0.16);
+                return { w: iw + p * 2, h: ih + p + bh };
+            }
+            case 'AVATAR_MEMO': {
+                const p = Math.max(30, Math.round(iw * 0.05));
+                const bh = Math.round(iw * 0.14);
+                return { w: iw + p * 2, h: ih + p * 2 + bh };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
@@ -2582,6 +2597,83 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillText('— A captured moment in time', w / 2, pad + 50 + ih + 25);
     }
 
+
+    // ══ 签名纪念 ══
+    function styleSignature(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(iw * 0.04));
+        const bottomH = Math.round(iw * 0.12);
+        const w = iw + pad * 2, h = ih + pad + bottomH;
+        g.fillStyle = '#faf8f5'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad, iw, ih);
+        // 手写签名
+        g.fillStyle = '#555';
+        g.font = 'italic ' + Math.round(iw * 0.05) + 'px "Comic Sans MS", cursive';
+        g.textAlign = 'center';
+        g.save();
+        g.translate(w / 2, pad + ih + Math.round(bottomH * 0.6));
+        g.rotate(-0.02);
+        g.fillText(S.userSignature || '— my memory —', 0, 0);
+        g.restore();
+    }
+
+    // ══ 签名+参数 ══
+    function styleSignParam(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(iw * 0.04));
+        const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
+        const bottomH = Math.round(iw * 0.16);
+        const w = iw + pad * 2, h = ih + pad + bottomH;
+        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad, iw, ih);
+        const barY = pad + ih;
+        // 签名(手写)
+        g.fillStyle = '#444';
+        g.font = 'italic ' + Math.round(iw * 0.045) + 'px "Comic Sans MS", cursive';
+        g.textAlign = 'center';
+        g.save();
+        g.translate(w / 2, barY + Math.round(bottomH * 0.4));
+        g.rotate(-0.015);
+        g.fillText(S.userSignature || '— my memory —', 0, 0);
+        g.restore();
+        // 参数行
+        if (S.useExif && S.cam) {
+            g.fillStyle = '#999';
+            g.font = fs + 'px sans-serif';
+            g.textAlign = 'center';
+            const paramStr = (S.cam.focal||'') + '  ' + (S.cam.aperture||'') + '  ' + (S.cam.iso||'') + '  ' + (S.cam.shutter||'');
+            g.fillText(paramStr, w / 2, barY + Math.round(bottomH * 0.8));
+        }
+    }
+
+    // ══ 头像纪念 ══
+    function styleAvatarMemo(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(iw * 0.05));
+        const bottomH = Math.round(iw * 0.14);
+        const w = iw + pad * 2, h = ih + pad * 2 + bottomH;
+        g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, w, h);
+        // 左上角圆形头像占位
+        const avatarR = Math.round(iw * 0.06);
+        const ax = pad + avatarR + 10, ay = pad + avatarR + 10;
+        g.fillStyle = '#ddd';
+        g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#999';
+        g.font = Math.round(avatarR * 0.8) + 'px sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText('头像', ax, ay);
+        g.textBaseline = 'alphabetic';
+        // 照片
+        g.drawImage(img, pad, pad, iw, ih);
+        // 签名
+        g.fillStyle = '#555';
+        g.font = 'italic ' + Math.round(iw * 0.04) + 'px "Comic Sans MS", cursive';
+        g.textAlign = 'center';
+        g.fillText(S.userSignature || '— my memory —', w / 2, pad + ih + Math.round(bottomH * 0.55));
+        // 日期
+        g.fillStyle = '#aaa';
+        g.font = Math.round(iw * 0.02) + 'px sans-serif';
+        g.fillText(new Date().toLocaleDateString('zh-CN'), w / 2, pad + ih + Math.round(bottomH * 0.85));
+    }
+
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2609,6 +2701,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             CYBER_GLITCH: styleCyberGlitch, POLAROID_HAND: stylePolaroidHand,
             TORN_JOURNAL: styleTornJournal, CARD_3D: styleCard3D,
             COMIC_PANEL: styleComicPanel, NEWSPAPER: styleNewspaper,
+            SIGNATURE: styleSignature, SIGN_PARAM: styleSignParam,
+            AVATAR_MEMO: styleAvatarMemo,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
