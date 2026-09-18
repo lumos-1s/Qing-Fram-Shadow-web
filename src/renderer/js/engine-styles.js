@@ -2650,17 +2650,35 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const bottomH = Math.round(iw * 0.14);
         const w = iw + pad * 2, h = ih + pad * 2 + bottomH;
         g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, w, h);
-        // 左上角圆形头像占位
+        // 左上角圆形头像
         const avatarR = Math.round(iw * 0.06);
         const ax = pad + avatarR + 10, ay = pad + avatarR + 10;
-        g.fillStyle = '#ddd';
-        g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#999';
-        g.font = Math.round(avatarR * 0.8) + 'px sans-serif';
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        g.fillText('头像', ax, ay);
-        g.textBaseline = 'alphabetic';
+        if (S.userAvatar) {
+            // 画用户头像(圆形裁剪)
+            g.save();
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
+            const imgAv = new Image();
+            imgAv.src = S.userAvatar;
+            // 同步绘制(图片已加载)
+            if (imgAv.complete) {
+                const s = Math.max(avatarR * 2 / imgAv.width, avatarR * 2 / imgAv.height);
+                g.drawImage(imgAv, ax - avatarR, ay - avatarR, imgAv.width * s, imgAv.height * s);
+            } else {
+                g.fillStyle = '#ddd'; g.fillRect(ax - avatarR, ay - avatarR, avatarR*2, avatarR*2);
+            }
+            g.restore();
+            g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 2;
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
+        } else {
+            g.fillStyle = '#ddd';
+            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.fill();
+            g.fillStyle = '#999';
+            g.font = Math.round(avatarR * 0.8) + 'px sans-serif';
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.fillText('头像', ax, ay);
+            g.textBaseline = 'alphabetic';
+        }
         // 照片
         g.drawImage(img, pad, pad, iw, ih);
         // 签名
