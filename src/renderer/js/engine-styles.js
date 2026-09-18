@@ -2654,32 +2654,19 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 左上角圆形头像
         const avatarR = Math.round(iw * 0.06);
         const ax = pad + avatarR + 10, ay = pad + avatarR + 10;
+        // 先画照片
+        g.drawImage(img, pad, pad, iw, ih);
+        // 再画头像(叠在左上角)
         const globalAv = window.__qfsAvatarImg;
-        if (globalAv) {
+        if (globalAv && globalAv.complete && globalAv.naturalWidth) {
             g.save();
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.clip();
-            const imgAv = globalAv;
-            if (imgAv && imgAv.complete && imgAv.naturalWidth) {
-                const s = Math.max(avatarR * 2 / imgAv.width, avatarR * 2 / imgAv.height);
-                g.drawImage(imgAv, ax - avatarR, ay - avatarR, imgAv.width * s, imgAv.height * s);
-            } else {
-                g.fillStyle = '#ddd'; g.fillRect(ax - avatarR, ay - avatarR, avatarR*2, avatarR*2);
-            }
+            const s = Math.max(avatarR * 2 / globalAv.width, avatarR * 2 / globalAv.height);
+            g.drawImage(globalAv, ax - avatarR, ay - avatarR, globalAv.width * s, globalAv.height * s);
             g.restore();
             g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 2;
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
-        } else {
-            g.fillStyle = '#ddd';
-            g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.fill();
-            g.fillStyle = '#999';
-            g.font = Math.round(avatarR * 0.8) + 'px sans-serif';
-            g.textAlign = 'center';
-            g.textBaseline = 'middle';
-            g.fillText('头像', ax, ay);
-            g.textBaseline = 'alphabetic';
         }
-        // 照片
-        g.drawImage(img, pad, pad, iw, ih);
         // 签名
         g.fillStyle = '#555';
         g.font = 'italic ' + Math.round(iw * 0.04) + 'px "Comic Sans MS", cursive';
