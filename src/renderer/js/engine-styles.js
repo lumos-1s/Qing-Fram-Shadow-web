@@ -679,7 +679,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         OVERLAY_PARAM_LEFT:23,OVERLAY_PARAM_RIGHT:24,OVERLAY_PARAM_BOTTOM:25,OVERLAY_LOGO_BOTTOM:26,
         COLOR_CLASSIC:27,COLOR_REFINED:28,ART_CARD:29,WHITE_PLAIN:30,FUJI_WHITE:31,
         PARAM_TOP_LEFT:32,PARAM_BOTTOM_LEFT:33,PARAM_BOTTOM_SINGLE:34,SIMPLE_FILM:35,
-        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43 };
+        STAMP_POSTAGE:36,TEARED_PAPER:37,FOLD_CORNER:38,PINBOARD_TAPE:39, VHS_TAPE:40,ALBUM_CORNER:41,MOVIE_TICKET:42,WATERCOLOR_BLEED:43,CYBER_GLITCH:51,POLAROID_HAND:52,TORN_JOURNAL:53,CARD_3D:54,COMIC_PANEL:55,NEWSPAPER:56 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -2364,6 +2364,178 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.shadowBlur = 0;
         }
     }
+
+    // ══ 赛博故障风 ══
+    function styleCyberGlitch(img, size, g, iw, ih, S) {
+        const pad = Math.max(20, Math.round(size * 0.5));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        // 深色底
+        g.fillStyle = '#0a0a0f'; g.fillRect(0, 0, w, h);
+        // RGB色偏错位
+        g.save();
+        g.globalAlpha = 0.85;
+        g.drawImage(img, pad - 3, pad);
+        g.globalCompositeOperation = 'screen';
+        g.globalAlpha = 0.6;
+        g.fillStyle = '#ff0040';
+        g.drawImage(img, pad - 5, pad);
+        g.globalAlpha = 0.6;
+        g.fillStyle = '#00ffff';
+        g.drawImage(img, pad + 5, pad);
+        g.restore();
+        // 扫描线
+        g.fillStyle = 'rgba(0,0,0,0.15)';
+        for (let y = pad; y < pad + ih; y += 3) g.fillRect(pad, y, iw, 1);
+        // 错位条
+        for (let i = 0; i < 8; i++) {
+            const by = pad + Math.floor(Math.random() * ih);
+            const bh = Math.floor(Math.random() * 8) + 2;
+            const off = Math.floor(Math.random() * 20) - 10;
+            g.drawImage(img, pad, by, iw, bh, pad + off, by, iw, bh);
+        }
+        // 噪点
+        for (let i = 0; i < 200; i++) {
+            g.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.3) + ')';
+            g.fillRect(pad + Math.random() * iw, pad + Math.random() * ih, 1, 1);
+        }
+        // REC红点+时间码
+        g.fillStyle = '#ff0040';
+        g.beginPath(); g.arc(pad + 20, pad + 20, 6, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#00ff88';
+        g.font = 'bold 14px monospace';
+        g.textAlign = 'left';
+        g.fillText('REC 12:34:56', pad + 35, pad + 25);
+    }
+
+    // ══ 拍立得手写风 ══
+    function stylePolaroidHand(img, size, g, iw, ih, S) {
+        const border = Math.max(24, Math.round(iw * 0.06));
+        const bottomPad = Math.max(60, Math.round(iw * 0.2));
+        const w = iw + border * 2, h = ih + border + bottomPad;
+        // 白色相纸
+        g.fillStyle = '#fefefe'; g.fillRect(0, 0, w, h);
+        // 照片
+        g.drawImage(img, border, border, iw, ih);
+        // 底部手写日期
+        g.fillStyle = '#333';
+        g.font = 'italic 18px "Comic Sans MS", cursive';
+        g.textAlign = 'center';
+        g.save();
+        g.translate(w / 2, border + ih + 40);
+        g.rotate(-0.03);
+        g.fillText(new Date().toLocaleDateString('zh-CN'), 0, 0);
+        g.restore();
+        // 小爱心装饰
+        g.fillStyle = '#ff6b9d';
+        g.beginPath(); g.arc(w / 2 + 80, border + ih + 35, 4, 0, Math.PI * 2); g.fill();
+    }
+
+    // ══ 撕纸手账风 ══
+    function styleTornJournal(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(size * 0.8));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        // 牛皮纸底
+        g.fillStyle = '#e8dcc4'; g.fillRect(0, 0, w, h);
+        // 纸纹
+        g.fillStyle = 'rgba(139,119,89,0.1)';
+        for (let i = 0; i < 100; i++) g.fillRect(Math.random() * w, Math.random() * h, 2, 1);
+        // 撕边效果(不规则)
+        const sx = pad, sy = pad, sw = iw, sh = ih;
+        g.fillStyle = '#fff';
+        g.beginPath();
+        g.moveTo(sx, sy);
+        for (let x = 0; x <= sw; x += 10) g.lineTo(sx + x, sy + (Math.random() - 0.5) * 8);
+        for (let y = 0; y <= sh; y += 10) g.lineTo(sx + sw + (Math.random() - 0.5) * 8, sy + y);
+        for (let x = sw; x >= 0; x -= 10) g.lineTo(sx + x, sy + sh + (Math.random() - 0.5) * 8);
+        for (let y = sh; y >= 0; y -= 10) g.lineTo(sx + (Math.random() - 0.5) * 8, sy + y);
+        g.closePath(); g.fill();
+        g.save(); g.clip();
+        g.drawImage(img, sx, sy, sw, sh);
+        g.restore();
+        // 胶带
+        g.fillStyle = 'rgba(255,200,50,0.6)';
+        g.fillRect(sx + sw / 2 - 30, sy - 8, 60, 16);
+        g.fillRect(sx - 8, sy + sh / 2 - 8, 16, 60);
+    }
+
+    // ══ 3D卡片翻转 ══
+    function styleCard3D(img, size, g, iw, ih, S) {
+        const w = iw + 100, h = ih + 120;
+        // 桌面背景渐变
+        const grad = g.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, '#2a2a35'); grad.addColorStop(1, '#1a1a22');
+        g.fillStyle = grad; g.fillRect(0, 0, w, h);
+        // 卡片投影
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)';
+        g.shadowBlur = 30;
+        g.shadowOffsetY = 15;
+        g.fillStyle = '#fff';
+        g.beginPath();
+        g.moveTo(50, 30); g.lineTo(w - 50, 20); g.lineTo(w - 30, h - 40); g.lineTo(70, h - 30);
+        g.closePath(); g.fill();
+        g.restore();
+        // 照片贴在卡片上(轻微透视)
+        g.save();
+        g.translate(60, 35);
+        g.transform(1, -0.05, 0.08, 1, 0, 0);
+        g.drawImage(img, 0, 0, iw, ih);
+        g.restore();
+        // 卡片底部手写
+        g.fillStyle = '#666';
+        g.font = '14px cursive';
+        g.textAlign = 'center';
+        g.fillText('my memory', w / 2, h - 25);
+    }
+
+    // ══ 漫画分镜 ══
+    function styleComicPanel(img, size, g, iw, ih, S) {
+        const gap = 8;
+        const cols = 2, rows = 2;
+        const cw = Math.floor(iw / cols), ch = Math.floor(ih / rows);
+        const w = iw + gap * (cols + 1), h = ih + gap * (rows + 1) + 60;
+        // 黑底
+        g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
+        // 切成4格
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const x = gap + c * (cw + gap), y = gap + r * (ch + gap);
+                g.drawImage(img, c * cw, r * ch, cw, ch, x, y, cw, ch);
+                g.strokeStyle = '#fff'; g.lineWidth = 3;
+                g.strokeRect(x, y, cw, ch);
+            }
+        }
+        // 气泡框
+        g.fillStyle = '#fff';
+        g.beginPath(); g.arc(w - 80, h - 30, 22, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#000';
+        g.font = 'bold 12px sans-serif';
+        g.textAlign = 'center';
+        g.fillText('!', w - 80, h - 26);
+    }
+
+    // ══ 复古报纸 ══
+    function styleNewspaper(img, size, g, iw, ih, S) {
+        const pad = Math.max(30, Math.round(size * 0.6));
+        const w = iw + pad * 2, h = ih + pad * 2 + 100;
+        // 报纸米黄底
+        g.fillStyle = '#f0e9d6'; g.fillRect(0, 0, w, h);
+        // 报头
+        g.fillStyle = '#1a1a1a';
+        g.font = 'bold 36px Georgia, serif';
+        g.textAlign = 'center';
+        g.fillText('THE DAILY PHOTO', w / 2, pad);
+        g.font = '12px serif';
+        g.fillText(new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), w / 2, pad + 20);
+        // 分隔线
+        g.fillRect(pad, pad + 30, w - pad * 2, 2);
+        // 照片
+        g.drawImage(img, pad, pad + 50, iw, ih);
+        // 照片说明
+        g.font = 'italic 14px serif';
+        g.fillText('— A captured moment in time', w / 2, pad + 50 + ih + 25);
+    }
+
     const draw = {
             SIMPLE: styleSimple, WHITE_PLAIN: styleWhitePlain, ROUNDED: styleRounded,
             FILM_STRIP: styleFilmStrip, POLAROID: stylePolaroid,
@@ -2388,6 +2560,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape,
             VHS_TAPE: styleVhsTape, ALBUM_CORNER: styleAlbumCorner,
             MOVIE_TICKET: styleMovieTicket, WATERCOLOR_BLEED: styleWatercolorBleed,
+            CYBER_GLITCH: styleCyberGlitch, POLAROID_HAND: stylePolaroidHand,
+            TORN_JOURNAL: styleTornJournal, CARD_3D: styleCard3D,
+            COMIC_PANEL: styleComicPanel, NEWSPAPER: styleNewspaper,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
