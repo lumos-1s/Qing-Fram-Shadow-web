@@ -489,9 +489,6 @@ window.App = {
 
     drawSelectionBox() {
         try {
-            const dbg = this.dom.canvas.getContext('2d');
-            dbg.strokeStyle = '#ff0000';
-            dbg.strokeRect(10, 10, 50, 50);
             const canvas = this.dom.canvas;
             if (!canvas || !this.selectedEls || !this.selectedEls.length) return;
             const ctx = canvas.getContext('2d');
