@@ -422,7 +422,7 @@ window.App = {
         const e = drag.ref;
         const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
         const clampV = (v, max, half) => half > 0 ? Math.max(half, Math.min(v, max - half)) : Math.max(0, Math.min(v, max));
-        if (drag.kind === 'logo') { e.x = clampV(x, cw, (e.size || 60) / 2); e.y = clampV(y, ch, (e.size || 60) / 2); e.offsetX = 0; e.offsetY = 0; }
+        if (drag.kind === 'logo') { e.x = x; e.y = y; e.offsetX = 0; e.offsetY = 0; }
         else if (drag.kind === 'sticker') { e.x = clampV(x, cw, 20); e.y = clampV(y, ch, 20); }
         else if (drag.kind === 'text') { e.x = clampV(x, cw, 30); e.y = clampV(y, ch, 20); }
         this.onSettingChanged();
@@ -453,32 +453,33 @@ window.App = {
     },
 
     drawSelectionBox() {
-        const canvas = this.dom.canvas;
-        if (!canvas || !this.selectedEls || !this.selectedEls.length) return;
-        const ctx = canvas.getContext('2d');
-        for (const sel of this.selectedEls) {
-            const e = sel.obj;
-            if (!e) continue;
-            let cx = e.x, cy = e.y, size = e.size || 60;
-            if (typeof cx !== 'number' || typeof cy !== 'number') {
-                const p = this.logoPos(e, canvas.width, canvas.height, size);
-                cx = p.cx; cy = p.cy;
+        try {
+            const canvas = this.dom.canvas;
+            if (!canvas || !this.selectedEls || !this.selectedEls.length) return;
+            const ctx = canvas.getContext('2d');
+            for (const sel of this.selectedEls) {
+                const e = sel.obj;
+                if (!e) continue;
+                let cx = e.x, cy = e.y, size = e.size || 60;
+                if (typeof cx !== 'number' || typeof cy !== 'number') {
+                    const p = this.logoPos(e, canvas.width, canvas.height, size);
+                    cx = p.cx; cy = p.cy;
+                }
+                ctx.save();
+                ctx.strokeStyle = '#00e5a0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.strokeRect(cx - size / 2 - 6, cy - size / 2 - 6, size + 12, size + 12);
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#00e5a0';
+                const h = 5;
+                [[cx-size/2-6, cy-size/2-6],[cx+size/2+6-h, cy-size/2-6],
+                 [cx-size/2-6, cy+size/2+6-h],[cx+size/2+6-h, cy+size/2+6-h]].forEach(([x,y])=>{
+                    ctx.fillRect(x, y, h, h);
+                });
+                ctx.restore();
             }
-            ctx.save();
-            ctx.strokeStyle = '#00e5a0';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([6, 4]);
-            ctx.strokeRect(cx - size / 2 - 6, cy - size / 2 - 6, size + 12, size + 12);
-            // 四个角小方块
-            ctx.setLineDash([]);
-            ctx.fillStyle = '#00e5a0';
-            const h = 5;
-            [[cx-size/2-6, cy-size/2-6],[cx+size/2+6-h, cy-size/2-6],
-             [cx-size/2-6, cy+size/2+6-h],[cx+size/2+6-h, cy+size/2+6-h]].forEach(([x,y])=>{
-                ctx.fillRect(x, y, h, h);
-            });
-            ctx.restore();
-        }
+        } catch(err) { console.warn('drawSelectionBox', err); }
     },
 
     /* ══ 默认模板 ══ */
