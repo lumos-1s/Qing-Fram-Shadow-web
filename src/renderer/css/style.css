@@ -731,3 +731,8 @@ button.tbtn:focus-visible, .mini-btn:focus-visible, .st-btn:focus-visible { outl
 .splash-status { font-size: 12px; color: var(--text-3); animation: splash-fade .5s .28s ease both; }
 @keyframes splash-fade { from { opacity: 0; } to { opacity: 1; } }
 #splash.splash-hide { opacity: 0; pointer-events: none; }
+/* 参数分组折叠 */
+.pg-title.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+.pg-title.collapsible::before { content: '▾'; font-size: 10px; color: var(--text-3); transition: transform .15s; }
+.param-group.collapsed .pg-title.collapsible::before { transform: rotate(-90deg); }
+.param-group.collapsed > .param-row, .param-group.collapsed > .hint-box { display: none; }
