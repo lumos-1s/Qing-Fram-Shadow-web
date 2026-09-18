@@ -2351,7 +2351,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.fillText(brand, w / 2, showParams ? ty - fParam * 1.5 : ty);
             g.shadowBlur = 0;
         }
-        if (S.useExif && S.cam) {
+        if (showParams && S.useExif && S.cam) {
             const fLen = String(S.cam.focal || '450').replace(/mm$/i, '');
             const apt = String(S.cam.aperture || 'F6.3').replace(/^f\//i, 'F');
             const shut = String(S.cam.shutter || '1/125').replace(/s$/i, '');
