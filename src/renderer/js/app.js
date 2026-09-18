@@ -406,7 +406,7 @@ window.App = {
         if (el.kind === 'logo') {
             if (typeof e.x !== 'number') { e.x = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cx; e.y = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cy; }
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
-            else e.size = clampNum((e.size || 60) + dir * 6, 8, 400);
+            else e.size = clampNum((e.size || 60) + dir * 25, 8, 1200);
         } else if (el.kind === 'sticker') {
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
             else e.scale = clampNum((e.scale || 1) * (dir > 0 ? 1.1 : 0.9), 0.02, 3);
