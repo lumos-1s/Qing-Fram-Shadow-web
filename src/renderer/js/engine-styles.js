@@ -2367,44 +2367,42 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ══ 赛博故障风 ══
     function styleCyberGlitch(img, size, g, iw, ih, S) {
-        const pad = Math.max(20, Math.round(size * 0.5));
+        const pad = Math.max(40, Math.round(iw * 0.04));
         const w = iw + pad * 2, h = ih + pad * 2;
-        // 深色底
         g.fillStyle = '#0a0a0f'; g.fillRect(0, 0, w, h);
-        // RGB色偏错位
+        // RGB色偏(加强)
         g.save();
-        g.globalAlpha = 0.85;
-        g.drawImage(img, pad - 3, pad);
+        g.drawImage(img, pad, pad);
         g.globalCompositeOperation = 'screen';
-        g.globalAlpha = 0.6;
-        g.fillStyle = '#ff0040';
-        g.drawImage(img, pad - 5, pad);
-        g.globalAlpha = 0.6;
-        g.fillStyle = '#00ffff';
-        g.drawImage(img, pad + 5, pad);
+        g.globalAlpha = 0.7;
+        g.fillStyle = 'rgba(255,0,64,0.6)';
+        g.drawImage(img, pad - 6, pad);
+        g.globalAlpha = 0.7;
+        g.fillStyle = 'rgba(0,255,255,0.6)';
+        g.drawImage(img, pad + 6, pad);
         g.restore();
         // 扫描线
-        g.fillStyle = 'rgba(0,0,0,0.15)';
-        for (let y = pad; y < pad + ih; y += 3) g.fillRect(pad, y, iw, 1);
-        // 错位条
-        for (let i = 0; i < 8; i++) {
+        g.fillStyle = 'rgba(0,0,0,0.2)';
+        for (let y = pad; y < pad + ih; y += 4) g.fillRect(pad, y, iw, 2);
+        // 错位条(更明显)
+        for (let i = 0; i < 12; i++) {
             const by = pad + Math.floor(Math.random() * ih);
-            const bh = Math.floor(Math.random() * 8) + 2;
-            const off = Math.floor(Math.random() * 20) - 10;
+            const bh = Math.floor(Math.random() * 15) + 3;
+            const off = Math.floor(Math.random() * 40) - 20;
             g.drawImage(img, pad, by, iw, bh, pad + off, by, iw, bh);
         }
         // 噪点
-        for (let i = 0; i < 200; i++) {
-            g.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.3) + ')';
-            g.fillRect(pad + Math.random() * iw, pad + Math.random() * ih, 1, 1);
+        for (let i = 0; i < 400; i++) {
+            g.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.4) + ')';
+            g.fillRect(pad + Math.random() * iw, pad + Math.random() * ih, 2, 2);
         }
-        // REC红点+时间码
+        // REC红点+时间码(大字)
         g.fillStyle = '#ff0040';
-        g.beginPath(); g.arc(pad + 20, pad + 20, 6, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(pad + 25, pad + 30, 10, 0, Math.PI * 2); g.fill();
         g.fillStyle = '#00ff88';
-        g.font = 'bold 14px monospace';
+        g.font = 'bold 20px monospace';
         g.textAlign = 'left';
-        g.fillText('REC 12:34:56', pad + 35, pad + 25);
+        g.fillText('● REC  12:34:56', pad + 45, pad + 37);
     }
 
     // ══ 拍立得手写风 ══
