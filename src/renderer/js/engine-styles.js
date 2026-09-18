@@ -1832,6 +1832,7 @@ AV_BLUR:62 };
             avatarScale: Number(t.avatarScale || 0.85),
             signSize: Number(t.signSize || 1),
             signBgBlur: Number(t.signBgBlur || 0),
+            paramColor: String(t.paramColor || 'auto'),
             avatarOffX: Number(t.avatarOffX || 0),
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,
@@ -2716,7 +2717,9 @@ AV_BLUR:62 };
         // 品牌居中在参数行上方(印象毛玻璃同款衬线字体)
         const brandTxt = (S.exif.make || 'Camera').toUpperCase();
         const fBrand = Math.round(iw * 0.028);
-        g.fillStyle = S.signBgBlur ? '#fff' : '#333';
+        const pColor = S.paramColor === 'auto' ? (S.signBgBlur ? '#fff' : '#333') : S.paramColor;
+        const pColorSoft = S.paramColor === 'auto' ? (S.signBgBlur ? 'rgba(255,255,255,0.7)' : '#999') : (S.paramColor === '#fff' ? 'rgba(255,255,255,0.7)' : '#999');
+        g.fillStyle = pColor;
         g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand * 0.15);
         g.textAlign = 'center';
@@ -2724,7 +2727,7 @@ AV_BLUR:62 };
         g.fillText(brandTxt, cxRight, barY + Math.round(bottomH * 0.15));
         g.letterSpacing = 0;
         // 参数行
-        g.fillStyle = '#999';
+        g.fillStyle = pColorSoft;
         g.font = fs + 'px sans-serif';
         g.textBaseline = 'middle';
         g.fillText(paramStr, cxRight, barY + Math.round(bottomH * 0.65));
@@ -2830,7 +2833,9 @@ AV_BLUR:62 };
         const cxRight = rx - pw / 2;
         const brandTxt2 = (S.exif.make || 'Camera').toUpperCase();
         const fBrand2 = Math.round(iw * 0.028);
-        g.fillStyle = S.signBgBlur ? '#fff' : '#333';
+        const pColor2 = S.paramColor === 'auto' ? (S.signBgBlur ? '#fff' : '#333') : S.paramColor;
+        const pColorSoft2 = S.paramColor === 'auto' ? (S.signBgBlur ? 'rgba(255,255,255,0.7)' : '#999') : (S.paramColor === '#fff' ? 'rgba(255,255,255,0.7)' : '#999');
+        g.fillStyle = pColor2;
         g.font = 'bold ' + fBrand2 + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand2 * 0.15);
         g.textAlign = 'center';

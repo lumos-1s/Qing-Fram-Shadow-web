@@ -165,6 +165,11 @@ window.App = {
             this.template.signBgBlur = chkBB.checked ? 1 : 0;
             this.onSettingChanged();
         });
+        const cbPC = document.getElementById('cbParamColor');
+        if (cbPC) cbPC.addEventListener('change', () => {
+            this.template.paramColor = cbPC.value;
+            this.onSettingChanged();
+        });
         // 头像上传(存全局)
         const btnAv = document.getElementById('btnUploadAvatar'), fileAv = document.getElementById('fileAvatar');
         if (btnAv && fileAv) {
@@ -934,6 +939,7 @@ window.App = {
             if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
             if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;
+            if ($('cbParamColor')) $('cbParamColor').value = this.template.paramColor || 'auto';
             if (this.template.userAvatar) {
                 const img = new Image();
                 img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };
