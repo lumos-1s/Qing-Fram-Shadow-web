@@ -158,8 +158,26 @@ window.App = Object.assign(window.App || {}, {
     async loadLogos() {
         try { this.logos = (await window.qingframe.listLogos()) || []; }
         catch (e) { this.logos = []; }
+        try {
+            const saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+            saved.forEach(c => { if (c && c.dataUrl) this.logos.push(c); });
+        } catch(e) {}
         this.splashTick();
         if (this.dom.stRes) this.renderLogoPools();
+    },
+    saveCustomIcon(logo) {
+        try {
+            const saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+            saved.push(logo);
+            localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
+        } catch(e) {}
+    },
+    deleteCustomIcon(logo) {
+        try {
+            let saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+            saved = saved.filter(c => c.dataUrl !== logo.dataUrl);
+            localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
+        } catch(e) {}
     },
 
     async loadTextures() {
@@ -168,10 +186,31 @@ window.App = Object.assign(window.App || {}, {
         this.splashTick();
     },
 
+    getFavorites() { try { return JSON.parse(localStorage.getItem("qfs_fav_presets") || "[]"); } catch(e) { return []; } },
+    setFavorites(arr) { localStorage.setItem("qfs_fav_presets", JSON.stringify(arr)); },
+    getRecent() { try { return JSON.parse(localStorage.getItem("qfs_recent_presets") || "[]"); } catch(e) { return []; } },
+    pushRecent(name) {
+        if (!name) return;
+        let r = this.getRecent().filter(n => n !== name);
+        r.unshift(name);
+        if (r.length > 6) r = r.slice(0, 6);
+        localStorage.setItem("qfs_recent_presets", JSON.stringify(r));
+    },
+    toggleFav(name) {
+        let f = this.getFavorites();
+        if (f.includes(name)) f = f.filter(n => n !== name);
+        else f.push(name);
+        this.setFavorites(f);
+        this.buildTree(this._searchVal || "");
+    },
+
     buildTree(filter) {
         const tree = this.dom.presetTree;
         tree.innerHTML = '';
         const f = (filter || '').toLowerCase();
+        this._searchVal = filter || '';
+        const favs = this.getFavorites();
+        const recent = this.getRecent();
         const order = ['潮流', '高级感', '极简', '胶片', '质感', '复古', '杂志', '水印', '氛围', '比例', '票根'];
         const merge = { 创意: '潮流', 奢华: '高级感', 现代: '极简', 排版: '极简', 影院: '胶片', 星空: '氛围' };
         const groupIcons = {
@@ -212,6 +251,56 @@ window.App = Object.assign(window.App || {}, {
         const curName = (this.template && this.template.templateName) || '';
         const curGrp = curName ? [...sorted].find(g => (groups.get(g) || []).some(p => p.templateName === curName)) : null;
         const defOpen = curGrp || sorted[0] || null;
+        const renderItem = (p, grp) => {
+            const item = document.createElement('div');
+            item.className = 'preset-item' + (p.templateName === curName ? ' active' : '');
+            const dot = document.createElement('span');
+            dot.className = 'dot';
+            dot.textContent = iconFor(p.templateName);
+            item.appendChild(dot);
+            const label = document.createElement('span');
+            label.textContent = p.templateName;
+            item.appendChild(label);
+            const star = document.createElement('span');
+            star.textContent = favs.includes(p.templateName) ? '★' : '☆';
+            star.style.cssText = 'margin-left:auto;cursor:pointer;font-size:14px;color:#f59e0b;padding:0 4px;';
+            star.title = '收藏/取消收藏';
+            star.addEventListener('click', (e) => { e.stopPropagation(); this.toggleFav(p.templateName); });
+            item.appendChild(star);
+            item.addEventListener('click', () => this.selectPreset(p, item));
+            item.dataset.grp = grp;
+            return item;
+        };
+        // 收藏分组
+        if (!f || favs.some(n => n.toLowerCase().includes(f))) {
+            const favPresets = favs.map(n => this.presets.find(p => p.templateName === n)).filter(Boolean);
+            if (favPresets.length) {
+                const gEl = document.createElement('div');
+                gEl.className = 'preset-group open';
+                const nm = document.createElement('div');
+                nm.className = 'group-name';
+                nm.innerHTML = '<span class="caret">▸</span><span class="g-icon">⭐</span><span>收藏 · ' + favPresets.length + '</span>';
+                nm.addEventListener('click', () => gEl.classList.toggle('open'));
+                gEl.appendChild(nm);
+                favPresets.forEach(p => gEl.appendChild(renderItem(p, '收藏')));
+                tree.appendChild(gEl);
+            }
+        }
+        // 最近使用分组
+        if (!f) {
+            const recPresets = recent.map(n => this.presets.find(p => p.templateName === n)).filter(Boolean);
+            if (recPresets.length) {
+                const gEl = document.createElement('div');
+                gEl.className = 'preset-group open';
+                const nm = document.createElement('div');
+                nm.className = 'group-name';
+                nm.innerHTML = '<span class="caret">▸</span><span class="g-icon">🕐</span><span>最近使用 · ' + recPresets.length + '</span>';
+                nm.addEventListener('click', () => gEl.classList.toggle('open'));
+                gEl.appendChild(nm);
+                recPresets.forEach(p => gEl.appendChild(renderItem(p, '最近使用')));
+                tree.appendChild(gEl);
+            }
+        }
         for (const grp of sorted) {
             const groupEl = document.createElement('div');
             groupEl.className = 'preset-group' + ((f && groups.get(grp).length) || grp === defOpen ? ' open' : '');
@@ -234,20 +323,7 @@ window.App = Object.assign(window.App || {}, {
             });
             groupEl.appendChild(name);
             tree.appendChild(groupEl);
-            for (const p of groups.get(grp)) {
-                const item = document.createElement('div');
-                item.className = 'preset-item';
-                const dot = document.createElement('span');
-                dot.className = 'dot';
-                dot.textContent = iconFor(p.templateName);
-                item.appendChild(dot);
-                const label = document.createElement('span');
-                label.textContent = p.templateName;
-                item.appendChild(label);
-                item.addEventListener('click', () => this.selectPreset(p, item));
-                item.dataset.grp = grp;
-                groupEl.appendChild(item);
-            }
+            for (const p of groups.get(grp)) groupEl.appendChild(renderItem(p, grp));
         }
     },
     filterTree(v) { this.buildTree(v); },
@@ -255,8 +331,10 @@ window.App = Object.assign(window.App || {}, {
     selectPreset(p, itemEl) {
         this.pushUndo();
         this.applyPreset(p);
+        this.pushRecent(p.templateName);
         document.querySelectorAll('.preset-item').forEach(el => el.classList.remove('active'));
         if (itemEl) itemEl.classList.add('active');
+        this.buildTree(this._searchVal || '');
     },
 
     applyPreset(p) {

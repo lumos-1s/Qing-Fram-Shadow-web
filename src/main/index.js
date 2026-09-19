@@ -11,10 +11,10 @@ protocol.registerSchemesAsPrivileged([
 
 // 主进程侧 EXIF 解析(渲染进程 exif.js 以 CommonJS 导出)
 const exifUtil = require(path.join(__dirname, '..', 'renderer', 'js', 'exif.js'));
-function readExif(filePath) {
+async function readExif(filePath) {
     try {
         if (!filePath || !fs.existsSync(filePath)) return {};
-        const buf = fs.readFileSync(filePath);
+        const buf = await fs.promises.readFile(filePath);
         if (!buf || !buf.length) return {};
         const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
         const raw = exifUtil.parseExif(ab);
@@ -267,7 +267,7 @@ ipcMain.handle('open-image', async () => {
     if (canceled || filePaths.length === 0) return null;
     saveState({ lastOpenDir: path.dirname(filePaths[0]) });
     const fp = filePaths[0];
-    return { name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: readExif(fp) };
+    return { name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: await readExif(fp) };
 });
 
 ipcMain.handle('open-images', async () => {
@@ -280,7 +280,9 @@ ipcMain.handle('open-images', async () => {
     });
     if (canceled || !filePaths.length) return null;
     saveState({ lastOpenDir: path.dirname(filePaths[0]) });
-    return filePaths.map(fp => ({ name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: readExif(fp) }));
+    const items = [];
+    for (const fp of filePaths) items.push({ name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: await readExif(fp) });
+    return items;
 });
 
 ipcMain.handle('read-exif', (_e, filePath) => readExif(String(filePath || '')));

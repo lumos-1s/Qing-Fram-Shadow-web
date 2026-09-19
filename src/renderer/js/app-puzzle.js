@@ -134,6 +134,7 @@ window.App = Object.assign(window.App || {}, {
         const pk = this.template.puzzle || (this.template.puzzle = this.defaultTemplate().puzzle);
         const $ = this.$;
         pk.gap = $('slPuzzleGap') ? parseInt($('slPuzzleGap').value, 10) : pk.gap;
+        pk.cornerRadius = $('slPuzzleCorner') ? parseInt($('slPuzzleCorner').value, 10) : (pk.cornerRadius == null ? 3 : pk.cornerRadius);
         pk.bgMode = $('cbPuzzleBg') ? parseInt($('cbPuzzleBg').value, 10) : 0;
         pk.canvasRatio = $('cbPuzzleCanvas') ? $('cbPuzzleCanvas').value : 'auto';
         pk.borderColor = $('cpPuzzleBorder') ? $('cpPuzzleBorder').value.replace('#', '') : 'ffffff';
@@ -190,6 +191,8 @@ window.App = Object.assign(window.App || {}, {
         const n = this.puzzleSlotCount(pk.layout);
         if ($('slPuzzleGap')) $('slPuzzleGap').value = pk.gap != null ? pk.gap : 6;
         this.updateLabel('lblPuzzleGap', pk.gap != null ? pk.gap : 6);
+        if ($('slPuzzleCorner')) $('slPuzzleCorner').value = pk.cornerRadius != null ? pk.cornerRadius : 3;
+        this.updateLabel('lblPuzzleCorner', (pk.cornerRadius != null ? pk.cornerRadius : 3) + '%');
         if ($('cbPuzzleBg')) $('cbPuzzleBg').value = String(pk.bgMode || 0);
         if ($('cbPuzzleCanvas')) $('cbPuzzleCanvas').value = pk.canvasRatio || 'auto';
         if ($('cpPuzzleBorder')) $('cpPuzzleBorder').value = '#' + (pk.borderColor || 'ffffff');
@@ -389,8 +392,43 @@ window.App = Object.assign(window.App || {}, {
         this.setStatus('已删除字幕 ' + key.toUpperCase());
     },
 
-    clearCaption() {
-        this.deleteCaption();
+    // 旋转当前格子图片 90°
+    rotatePuzzleSlot(i) {
+        const pk = this.tplPuzzle();
+        if (!pk) return;
+        this.onSettingCommit();
+        const sc = pk.slots[i] || (pk.slots[i] = {});
+        sc.rotate = ((sc.rotate || 0) + 1) % 4;
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+        this.setStatus('格子旋转 90°');
+    },
+
+    // 重置单个格子的缩放/位置
+    resetPuzzleSlot(i) {
+        const pk = this.tplPuzzle();
+        if (!pk) return;
+        this.onSettingCommit();
+        const sc = pk.slots[i];
+        if (sc) { delete sc.zoom; delete sc.offsetX; delete sc.offsetY; }
+        this.saveCurrentTemplate();
+        this.setSlotOffsetSliders(sc);
+        this.scheduleRender(true);
+        this.setStatus('已重置格子 ' + (i + 1));
+    },
+
+    // 全部重置:所有格子的缩放/位置/旋转
+    resetAllSlots() {
+        const pk = this.tplPuzzle();
+        if (!pk) return;
+        this.onSettingCommit();
+        for (const k in pk.slots) {
+            const sc = pk.slots[k];
+            delete sc.zoom; delete sc.offsetX; delete sc.offsetY; delete sc.rotate;
+        }
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+        this.setStatus('已重置所有格子');
     },
 
     // 清空全部格子图片(保留布局/间距/缩放,便于重新放入)
@@ -488,8 +526,47 @@ window.App = Object.assign(window.App || {}, {
         const pk = this.tplPuzzle();
         if (!pk || !window.__buildPuzzleSlots) return null;
         const p = this.puzzlePx(e);
+        // 先检测是否在分隔线附近(±10px)
+        const axisHit = this.puzzleAxisAtPx(p.x, p.y);
+        if (axisHit) return { type: 'axis', dim: axisHit.dim, idx: axisHit.idx, x: p.x, y: p.y };
         const hit = this.puzzleSlotAtPx(p.x, p.y);
         return hit != null ? { type: 'slot', slot: hit, x: p.x, y: p.y } : null;
+    },
+
+    // 检测鼠标是否在分隔线(轴线)附近,返回 {dim, idx} 或 null
+    puzzleAxisAtPx(x, y) {
+        const pk = this.tplPuzzle();
+        if (!pk || !pk.layout || pk.layout === 'single') return null;
+        const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        const axes = window.__clampPuzzleAxes ? window.__clampPuzzleAxes(pk.layout, pk.axisVals) : (pk.axisVals || {});
+        const tol = 10; // 像素容差
+        // 竖轴(v):垂直线,检测 x
+        const vList = (axes.v || []);
+        for (let i = 0; i < vList.length; i++) {
+            const ax = vList[i] * W;
+            if (Math.abs(x - ax) <= tol && y > 0 && y < H) return { dim: 'v', idx: i };
+        }
+        // 横轴(h):水平线,检测 y
+        const hList = (axes.h || []);
+        for (let i = 0; i < hList.length; i++) {
+            const ay = hList[i] * H;
+            if (Math.abs(y - ay) <= tol && x > 0 && x < W) return { dim: 'h', idx: i };
+        }
+        return null;
+    },
+
+    // 拖拽分隔线:更新轴位
+    puzzleDragAxis(pk, d, e) {
+        const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        const p = this.puzzlePx(e);
+        if (!pk.axisVals) pk.axisVals = {};
+        if (d.dim === 'v') {
+            if (!pk.axisVals.v) pk.axisVals.v = [];
+            pk.axisVals.v[d.idx] = Math.max(0.12, Math.min(0.88, p.x / W));
+        } else {
+            if (!pk.axisVals.h) pk.axisVals.h = [];
+            pk.axisVals.h[d.idx] = Math.max(0.12, Math.min(0.88, p.y / H));
+        }
     },
 
     // 画布像素→槽位索引(按引擎可见区域内缩 gap,间隙/边框处返回 null)
@@ -569,6 +646,8 @@ window.App = Object.assign(window.App || {}, {
     // 拖拽:格内→图片精确跟随(anchor+余量换算);进入其他格→"放下即互换"预备态
     puzzleDragMove(pk, d, e) {
         const W = this.dom.canvas.width, H = this.dom.canvas.height;
+        // 拖拽分隔线
+        if (d.type === 'axis') { this.puzzleDragAxis(pk, d, e); return; }
         this.ensurePuzzleSlotsCount(pk);
         const src = d.slot;
         const p = this.puzzlePx(e);
@@ -643,6 +722,18 @@ window.App = Object.assign(window.App || {}, {
             const ta = pk.captions[ka], tb = pk.captions[kb];
             if (tb !== undefined) { pk.captions[ka] = tb; tb.gapId = 'S' + a; } else delete pk.captions[ka];
             if (ta !== undefined) { pk.captions[kb] = ta; ta.gapId = 'S' + b; } else delete pk.captions[kb];
+        }
+        // 交换淡入动画
+        const cv = this.dom.canvas;
+        if (cv) {
+            cv.style.transition = 'opacity 0.35s ease-out, filter 0.35s ease-out';
+            cv.style.opacity = '0.15';
+            cv.style.filter = 'blur(3px)';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                cv.style.opacity = '1';
+                cv.style.filter = '';
+                setTimeout(() => { cv.style.transition = ''; cv.style.opacity = ''; cv.style.filter = ''; }, 400);
+            }));
         }
     },
 

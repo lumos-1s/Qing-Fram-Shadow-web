@@ -78,7 +78,9 @@ function renderToCanvas(app, compare) {
     // 画布后备尺寸变化后自动重新适配显示(缩略图条上方留白),避免旧缩放下画布溢出盖住缩略图条
     const curW = canvas.width, curH = canvas.height;
     if (prevW > 0 && prevH > 0 && (curW !== prevW || curH !== prevH)) {
-        if (typeof app.fitZoom === 'function') requestAnimationFrame(() => app.fitZoom());
+        // 正在操作元素(logo/sticker)时不自动 fitZoom,保持用户当前缩放级别
+        const hasSel = app.selectedEls && app.selectedEls.length;
+        if (!hasSel && typeof app.fitZoom === 'function') requestAnimationFrame(() => app.fitZoom());
     }
 }
 function _renderToCanvasInner(app, compare) {
@@ -665,23 +667,6 @@ function applyGlobalLight(ctx, light, cw, ch) {
     }
 }
 
-// EXIF 底条(原版 drawDecoration ??exifAutoText 逻辑)
-function drawExifBar(ctx, decor, cw, ch) {
-    if ((decor.exifAutoText || 0) !== 1) return;
-    let exifLine = null;
-    for (const l of (decor.textLines || [])) {
-        if (l.text && (l.align === 'bottom' || l.align === 'exif')) { exifLine = l; break; }
-    }
-    if (!exifLine) return;
-    const fs = autoExifTextSize(exifLine, cw);
-    const pad = Math.max(6, fs * 0.25);
-    const baseY = ch - fs - 10;
-    const top = baseY - fs * 0.9 - pad;
-    const bottom = Math.min(ch, baseY + fs * 0.25 + pad);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(0, top, cw, bottom - top);
-}
-
 // 文字字号:exif 自适行??2000px 基准缩放(0.5~2.5 ??,其余保持原??原版 autoExifTextSize)
 function autoExifTextSize(textLine, canvasW) {
     let fs = Math.max(1, textLine.fontSize || 1);
@@ -1002,21 +987,23 @@ function drawLogoElements(ctx, elements, cw, ch) {
         const img = getElementBitmap(el.dataUrl);
         if (!img || !img.complete || !img.naturalWidth) continue;
         const size = Math.max(2, el.size || 60);
+        // 按原图宽高比缩放(size为宽度,高度按比例)
+        const ratio = img.naturalHeight / img.naturalWidth || 1;
+        const dw = size, dh = size * ratio;
         let cx, cy;
         if (typeof el.x === 'number' && typeof el.y === 'number') {
             cx = el.x; cy = el.y;
         } else {
-            // 传统锚点对齐(相对画布)
             const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
             const ox = el.offsetX || 20, oy = el.offsetY || 20;
-            cx = hAlign === 'left' ? ox + size / 2 : hAlign === 'center' ? cw / 2 : cw - ox - size / 2;
-            cy = vAlign === 'top' ? oy + size / 2 : vAlign === 'center' ? ch / 2 : ch - oy - size / 2;
+            cx = hAlign === 'left' ? ox + dw / 2 : hAlign === 'center' ? cw / 2 : cw - ox - dw / 2;
+            cy = vAlign === 'top' ? oy + dh / 2 : vAlign === 'center' ? ch / 2 : ch - oy - dh / 2;
         }
         ctx.save();
         ctx.globalAlpha = clamp((el.opacity == null ? 100 : el.opacity) / 100, 0, 1);
         ctx.translate(cx, cy);
         if (el.rotation) ctx.rotate(el.rotation * Math.PI / 180);
-        ctx.drawImage(img, -size / 2, -size / 2, size, size);
+        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
         ctx.restore();
     }
 }
@@ -1150,60 +1137,6 @@ function clampPuzzleAxes(layoutType, axes) {
     return out;
 }
 
-function puzzleRects(layout, W, H, g) {
-    const g2 = g / 2, rows = (hx) => { const a = []; for (let i = 0; i < hx; i++) a.push(i); return a; };
-    switch (layout) {
-        case 'h2': return [[0, 0, (W - g) / 2, H], [(W - g) / 2 + g, 0, (W - g) / 2, H]];
-        case 'v2': return [[0, 0, W, (H - g) / 2], [0, (H - g) / 2 + g, W, (H - g) / 2]];
-        case 'as2': {
-            const w1 = Math.round(W * 2 / 3 - g2), w2 = W - w1 - g;
-            return [[0, 0, w1, H], [w1 + g, 0, w2, H]];
-        }
-        case 'h3': {
-            const cw = (W - 2 * g) / 3; const a = [];
-            for (const i of rows(3)) a.push([i * (cw + g), 0, cw, H]);
-            return a;
-        }
-        case 'v3': {
-            const chh = (H - 2 * g) / 3; const a = [];
-            for (const i of rows(3)) a.push([0, i * (chh + g), W, chh]);
-            return a;
-        }
-        case 'grid4': {
-            const cw = (W - g) / 2, chh = (H - g) / 2; const a = [];
-            for (const rr of rows(2)) for (const c of rows(2)) a.push([c * (cw + g), rr * (chh + g), cw, chh]);
-            return a;
-        }
-        case 'as4': {
-            const w1 = Math.round(W * 3 / 5 - g2), w2 = W - w1 - g, chh = (H - 2 * g) / 3;
-            const a = [[0, 0, w1, H]];
-            for (const i of rows(3)) a.push([w1 + g, i * (chh + g), w2, chh]);
-            return a;
-        }
-        case 'h4': {
-            const cw = (W - 3 * g) / 4; const a = [];
-            for (const i of rows(4)) a.push([i * (cw + g), 0, cw, H]);
-            return a;
-        }
-        case 'v4': {
-            const chh = (H - 3 * g) / 4; const a = [];
-            for (const i of rows(4)) a.push([0, i * (chh + g), W, chh]);
-            return a;
-        }
-        case 'grid6': {
-            const cw = (W - 2 * g) / 3, chh = (H - g) / 2; const a = [];
-            for (const rr of rows(2)) for (const c of rows(3)) a.push([c * (cw + g), rr * (chh + g), cw, chh]);
-            return a;
-        }
-        case 'grid9': {
-            const cw = (W - 2 * g) / 3, chh = (H - 2 * g) / 3; const a = [];
-            for (const rr of rows(3)) for (const c of rows(3)) a.push([c * (cw + g), rr * (chh + g), cw, chh]);
-            return a;
-        }
-        default: return [[0, 0, W, H]];
-    }
-}
-
 // 槽内图片适配:cover/contain + 槽位缩放/偏移
 function puzzleFit(r, iw, ih, mode, zoomPct, offX, offY) {
     const z = (zoomPct == null ? 100 : zoomPct) / 100;
@@ -1312,6 +1245,7 @@ function renderPuzzle(app, compare, noSelection) {
 
     const axes = clampPuzzleAxes(layout, pk.axisVals);
     let slots0 = buildPuzzleSlots(layout, axes);
+    const rawSlots = slots0.slice(); // 未加间隙的原始格子位置,给模糊背景用
     const Wn = W || 1, Hn = H || 1;
     const border = parseColor(pk.borderColor || 'ffffff', 100);
     const b = Math.max(1, Math.round(Wn * 0.003));
@@ -1325,30 +1259,25 @@ function renderPuzzle(app, compare, noSelection) {
     const shiftX = shift / Wn, shiftY = shift / Hn;
     const EPS = 1e-6;
     slots0 = slots0.map(r => {
-        let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3], ch = false;
-        if (x0 <= EPS) { x0 += shiftX; ch = true; }
-        if (x1 >= 1 - EPS) { x1 -= shiftX; ch = true; }
-        if (y0 <= EPS) { y0 += shiftY; ch = true; }
-        if (y1 >= 1 - EPS) { y1 -= shiftY; ch = true; }
-        return ch ? [x0, y0, x1 - x0, y1 - y0] : r;
+        let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3];
+        x0 += shiftX; x1 -= shiftX; y0 += shiftY; y1 -= shiftY;
+        return [x0, y0, x1 - x0, y1 - y0];
     });
-    // 字幕字号存储为相对 4000 长边的像素基准值,按实际画布等比缩放
-    const capFs = Math.max(Wn, Hn) / 4000;
+    // 字幕字号:画布长边基准 + 受字幕带高度(gth)约束,gap 小则字号自动缩小,避免行间重叠
+    const gthBase = Math.max(2, gapPx * 2);
+    const capFsRaw = Math.max(Wn, Hn) / 4000;
+    // 字号上限:字幕带高度的 0.45(单行)/0.75(双行),保证文字在带内不溢出
+    const capFs = Math.min(capFsRaw, gthBase / 28 * 0.9);
 
     if (pk.bgMode === 1 && used[0]) {
-        drawDetailBlurBackground(ctx, used, slots0, Wn, Hn);
+        drawDetailBlurBackground(ctx, used, rawSlots, Wn, Hn);
     } else {
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = rgba(border);
         ctx.fillRect(0, 0, Wn, Hn);
     }
 
     if (pk.bgMode === 1 && used[0]) {
-        // 模糊照片底:边框只框住每张图显示区域,背景从缝隙中透出
-        ctx.fillStyle = rgba(border);
-        slots0.forEach(r => {
-            const frw = Math.max(1, pw(r[2]) - gapPx * 2), frh = Math.max(1, ph(r[3]) - gapPx * 2);
-            ctx.fillRect(px(r[0]) + gapPx - b, py(r[1]) + gapPx - b, frw + b * 2, frh + b * 2);
-        });
+        // 模糊照片底:不画细边框,照片直接贴在虚化背景上
     } else {
         // 白色背景:保持原有边框铺满(整格外扩 b)
         ctx.fillStyle = rgba(border);
@@ -1382,14 +1311,47 @@ function renderPuzzle(app, compare, noSelection) {
         // 底部行图片让出等宽字幕带,字幕不叠到图上
         let chh = Math.max(1, rh - gapPx * 2);
         if (hasBottomCap && r[1] + 1e-6 >= (rowsN > 1 ? (hAxRow[rowsN - 2] || 1) : 0)) chh = Math.max(1, chh - gth);
-        ctx.rect(cx, cy, cw, chh);
+        // 格子圆角(用户可调,默认3%)
+        const cornerPct = (pk.cornerRadius == null ? 3 : pk.cornerRadius) / 100;
+        const cr = Math.max(0, Math.min(cw, chh) * cornerPct);
+        // 格子阴影(模糊模式下在clip之前画,只画投影不填色)
+        if (pk.bgMode === 1) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.65)';
+            ctx.shadowBlur = Math.max(20, Math.min(cw, chh) * 0.1);
+            ctx.shadowOffsetY = Math.max(8, Math.min(cw, chh) * 0.035);
+            ctx.fillStyle = 'rgba(255,255,255,1)';
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
+            else ctx.rect(cx, cy, cw, chh);
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(cx, cy, cw, chh, cr);
+        else ctx.rect(cx, cy, cw, chh);
         ctx.clip();
         const fillMode = sc.fillMode || pk.slotFill || 'cover';
         const zoom = sc.zoom != null ? sc.zoom : (pk.zoom != null ? pk.zoom : 100);
         const offX = clamp(sc.offsetX != null ? sc.offsetX : (pk.offsetX || 0), -100, 100);
         const offY = clamp(sc.offsetY != null ? sc.offsetY : (pk.offsetY || 0), -100, 100);
         const fit = puzzleFit({ x: cx, y: cy, w: cw, h: chh }, im.el.naturalWidth, im.el.naturalHeight, fillMode, zoom, offX, offY);
-        ctx.drawImage(im.el, fit.dx, fit.dy, fit.dw, fit.dh);
+        // 格子内图片旋转(0/90/180/270)
+        const rot = ((sc.rotate || 0) % 4 + 4) % 4;
+        if (rot === 0) {
+            ctx.drawImage(im.el, fit.dx, fit.dy, fit.dw, fit.dh);
+        } else {
+            ctx.save();
+            ctx.translate(cx + cw / 2, cy + chh / 2);
+            ctx.rotate(rot * Math.PI / 2);
+            const rw = (rot % 2 === 1) ? chh : cw;
+            const rh = (rot % 2 === 1) ? cw : chh;
+            const rscale = Math.max(rw / (im.el.naturalWidth || 1), rh / (im.el.naturalHeight || 1));
+            const rdw = (im.el.naturalWidth || 1) * rscale;
+            const rdh = (im.el.naturalHeight || 1) * rscale;
+            ctx.drawImage(im.el, -rdw / 2, -rdh / 2, rdw, rdh);
+            ctx.restore();
+        }
         ctx.restore();
         // 格子画面字幕:叠印在该格图片底部,宽度随格子自适应(门牌号 S<i>)
         const scap = (pk.captions && pk.captions[i]);
@@ -1467,8 +1429,8 @@ function renderPuzzle(app, compare, noSelection) {
     app.applyZoomStyle();
 }
 
-// 重虚化照片底:把多格照片缩到极小再放大,产生强烈虚化
-function drawDetailBlurBackground(ctx, used, slots0, Wn, Hn) {
+// 重虚化照片底:多格照片按格子位置无缝铺满再强模糊
+function drawDetailBlurBackground(ctx, used, rawSlots, Wn, Hn) {
     const avail = used.filter(x => x && x.el);
     if (!avail.length) { ctx.fillStyle = '#eeeeee'; ctx.fillRect(0, 0, Wn, Hn); return; }
     // 用 1/4 输出尺寸的中间画布绘制照片,再以强模糊上采样,得到柔和可辨的模糊照片底
@@ -1477,10 +1439,15 @@ function drawDetailBlurBackground(ctx, used, slots0, Wn, Hn) {
     const tmp = document.createElement('canvas');
     tmp.width = tw; tmp.height = th;
     const tctx = tmp.getContext('2d');
-    slots0.forEach((r, i) => {
+    // 按原始格子位置(无间隙)把每张照片 cover 填满对应格子
+    rawSlots.forEach((r, i) => {
         const im = avail[i % avail.length];
         if (!im) return;
-        tctx.drawImage(im.el, r[0] * tw, r[1] * th, r[2] * tw, r[3] * th);
+        const dx = r[0] * tw, dy = r[1] * th, dw = r[2] * tw, dh = r[3] * th;
+        const iw = im.el.naturalWidth, ih = im.el.naturalHeight;
+        const scale = Math.max(dw / iw, dh / ih);
+        const cw = iw * scale, ch = ih * scale;
+        tctx.drawImage(im.el, dx + (dw - cw) / 2, dy + (dh - ch) / 2, cw, ch);
     });
     ctx.save();
     ctx.imageSmoothingEnabled = true;

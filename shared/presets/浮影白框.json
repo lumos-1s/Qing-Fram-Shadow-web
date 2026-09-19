@@ -4,11 +4,11 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 1,
-    "marginTop": 30,
-    "marginBottom": 30,
-    "marginLeft": 30,
-    "marginRight": 30,
-    "imgScale": 1.0,
+    "marginTop": 60,
+    "marginBottom": 60,
+    "marginLeft": 60,
+    "marginRight": 60,
+    "imgScale": 0.95,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
     "bgBlurEnable": 0,
@@ -28,10 +28,19 @@
         "fillOpacity": 100,
         "gradientType": "linear",
         "gradientAngle": 0,
-        "gradientStops": [{"position": 0.0, "color": "#ffffff"}, {"position": 1.0, "color": "#cccccc"}],
+        "gradientStops": [
+          {
+            "position": 0,
+            "color": "#ffffff"
+          },
+          {
+            "position": 1,
+            "color": "#cccccc"
+          }
+        ],
         "gradientOpacity": 100,
         "textureSrc": "",
-        "textureScale": 1.0,
+        "textureScale": 1,
         "textureOffsetX": 0,
         "textureOffsetY": 0,
         "textureOpacity": 100,

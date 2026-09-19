@@ -74,7 +74,10 @@
                 </button>
                 <div class="sep"></div>
                 <div class="account" id="accountArea">
-                    <span id="loginStatus" class="status-pill clickable">未登录</span>
+                    <div id="loginStatus" class="status-pill clickable" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 12px 4px 4px;">
+                        <div id="topAvatar" style="width:28px;height:28px;border-radius:50%;background:#333;overflow:hidden;flex-shrink:0;border:1.5px solid #10b981;"></div>
+                        <span id="topUserName">未登录</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -129,7 +132,7 @@
                     <!-- ══ Tab1 参数 ══ -->
                     <div class="tab-panel active" id="panel-param">
                         <div class="param-group">
-                            <div class="pg-title">画布比例</div>
+                            <div class="pg-title collapsible">画布比例</div>
                             <div class="param-row">
                                 <label>画布比例</label>
                                 <select id="cbCanvasRatio" class="ctl-sel">
@@ -145,7 +148,7 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">画布边距</div>
+                            <div class="pg-title collapsible">画布边距</div>
                             <div class="param-row">
                                 <label>统一边距</label>
                                 <input type="range" id="slGlobalMargin" class="ctl-rng" min="10" max="300" step="10" value="100" />
@@ -155,52 +158,78 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">图片缩放 / 偏移</div>
+                            <div class="pg-title collapsible">图片缩放 / 偏移</div>
                             <div class="param-row">
                                 <label>图片缩放</label>
                                 <input type="range" id="slImgScale" class="ctl-rng" min="10" max="150" step="1" value="100" />
                                 <span class="pval" id="lblImgScale"></span>
                             </div>
-                            <div class="param-row"><label>偏移 X</label><input type="number" id="tfImgOffsetX" class="ctl-num" min="-1500" max="1500" /></div>
-                            <div class="param-row"><label>偏移 Y</label><input type="number" id="tfImgOffsetY" class="ctl-num" min="-1500" max="1500" /></div>
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">图片圆角</div>
-                            <div class="param-row chk-row">
-                                <label>圆角锁定</label>
-                                <input type="checkbox" id="cbCornerLock" class="ctl-chk" />
-                                <span class="chk-hint">四角联动</span>
-                            </div>
-                            <div class="param-row"><label>左上</label><input type="range" id="slCornerTL" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblCornerTL"></span></div>
-                            <div class="param-row"><label>右上</label><input type="range" id="slCornerTR" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblCornerTR"></span></div>
-                            <div class="param-row"><label>左下</label><input type="range" id="slCornerBL" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblCornerBL"></span></div>
-                            <div class="param-row"><label>右下</label><input type="range" id="slCornerBR" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblCornerBR"></span></div>
+                            <div class="pg-title collapsible">图片圆角</div>
                             <div class="param-row">
-                                <label>统一圆角</label>
+                                <label>图片圆角</label>
                                 <input type="range" id="slCornerRadius" class="ctl-rng" min="0" max="500" value="0" />
                                 <span class="pval" id="lblCornerRadius"></span>
                             </div>
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">参数位置 / 字号</div>
-                            <div class="param-row">
-                                <label>参数位置</label>
-                                <select id="cbParamPosition" class="ctl-sel">
-                                    <option value="LEFT">居左</option>
-                                    <option value="CENTER" selected>居中</option>
-                                    <option value="RIGHT">居右</option>
-                                    <option value="SPLIT">分列</option>
-                                </select>
-                            </div>
+                            <div class="pg-title collapsible">参数位置 / 字号</div>
                             <div class="param-row">
                                 <label>参数字号</label>
                                 <input type="range" id="slParamFontSize" class="ctl-rng" min="0" max="160" step="1" value="100" />
                                 <span class="pval" id="lblParamFontSize"></span>
                             </div>
-                            <div class="hint-box">字号 0 = 自适应（按照片短边）；拖动到 0 即恢复自适应。</div>
+                            <div id="grpPersonal" style="display:none;">
                             <div class="param-row">
+                                <label>个性签名</label>
+                                <input type="text" id="inpSignature" placeholder="输入你的签名文字" style="width:100%;padding:6px 8px;background:#2a2a35;border:1px solid #444;border-radius:6px;color:#eee;font-size:13px;box-sizing:border-box;" />
+                            </div>
+                            <div class="param-row">
+                                <label>签名字体</label>
+                                <select id="cbSignFont" class="ctl-sel">
+                                    <option value="cursive">手写斜体</option>
+                                    <option value="Bradley Hand">Bradley手写</option>
+                                    <option value="Segoe Script">Script花体</option>
+                                    <option value="Comic Sans MS">Comic趣味</option>
+                                    <option value="Brush Script MT">Brush书法</option>
+                                    <option value="Lucida Handwriting">Lucida手写</option>
+                                    <option value="Pristina">Pristina花体</option>
+                                    <option value="Mistral">Mistral飘逸</option>
+                                </select>
+                            </div>
+                            <div class="param-row">
+                                <label>签名颜色</label>
+                                <select id="cbSignColor" class="ctl-sel">
+                                    <option value="#555">深灰</option>
+                                    <option value="#333">黑色</option>
+                                    <option value="#c9a96e">金色</option>
+                                    <option value="#e74c3c">红色</option>
+                                    <option value="#3498db">蓝色</option>
+                                    <option value="#2ecc71">绿色</option>
+                                    <option value="#9b59b6">紫色</option>
+                                    <option value="#e67e22">橙色</option>
+                                </select>
+                            </div>
+                            <div class="param-row">
+                                <label>头像大小 <span id="valAvatarScale" style="float:right;color:#10b981;font-weight:600;">85%</span></label>
+                                <input type="range" id="rgAvatarScale" min="50" max="200" value="85" style="width:100%;" />
+                            </div>
+                            <div class="param-row">
+                                <label>签名大小 <span id="valSignSize" style="float:right;color:#10b981;font-weight:600;">100%</span></label>
+                                <input type="range" id="rgSignSize" min="50" max="200" value="100" style="width:100%;" />
+                            </div>
+                            <div class="param-row">
+                                <label>参数颜色</label>
+                                <select id="cbParamColor" class="ctl-sel">
+                                    <option value="auto">自动</option>
+                                    <option value="#000">黑色</option>
+                                    <option value="#fff">白色</option>
+                                </select>
+                            </div>
+                            <div class="param-row" id="rowParamType">
                                 <label>参数类型</label>
                                 <select id="cbParamType" class="ctl-sel">
                                     <option value="0">完整参数</option>
@@ -208,10 +237,24 @@
                                     <option value="2">日期参数</option>
                                 </select>
                             </div>
+                            <div class="param-row" id="rowParamPos">
+                                <label>参数位置</label>
+                                <select id="cbParamPosition" class="ctl-sel">
+                                    <option value="CENTER">居中</option>
+                                    <option value="RIGHT">居右</option>
+                                    <option value="SPLIT">分列</option>
+                                </select>
+                            </div>
+                            </div>
+                            <div class="param-row" id="rowBgBlur" style="display:none;">
+                                <label>背景模糊
+                                    <input type="checkbox" id="chkBgBlur" style="float:right;width:18px;height:18px;cursor:pointer;accent-color:#10b981;" />
+                                </label>
+                            </div>
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">相机参数(自动识别)</div>
+                            <div class="pg-title collapsible">相机参数(自动识别)</div>
                             <div class="hint-box">已自动识别照片 EXIF 并显示在下方，可直接修改，画布实时更新；全部清空则走原版随机相机参数。</div>
                             <div class="param-row"><label>品牌</label><input type="text" id="tfExifBrand" class="ctl-tx" placeholder="SONY" /></div>
                             <div class="param-row"><label>型号</label><input type="text" id="tfExifModel" class="ctl-tx" placeholder="A7 IV" /></div>
@@ -226,7 +269,7 @@
                     <!-- ══ Tab2 边框 ══ -->
                     <div class="tab-panel" id="panel-border">
                         <div class="param-group ctl-grp-layers">
-                            <div class="pg-title">图层管理</div>
+                            <div class="pg-title collapsible">图层管理</div>
                             <div class="btn-row">
                                 <button class="mini-btn" id="btnAddLayer">+ 添加图层</button>
                                 <button class="mini-btn danger" id="btnRemoveLayer">− 删除图层</button>
@@ -248,7 +291,8 @@
                         </div>
 
                         <div class="param-group ctl-grp-layers">
-                            <div class="pg-title">填充</div>
+                            <div class="pg-title collapsible">填充</div>
+                            <div class="pg-title collapsible" style="margin-top:8px;">填充(高级)</div>
                             <div class="param-row">
                                 <label>填充类型</label>
                                 <select id="cbFillType" class="ctl-sel">
@@ -300,7 +344,7 @@
                         </div>
 
                         <div class="param-group ctl-grp-layers">
-                            <div class="pg-title">描边</div>
+                            <div class="pg-title collapsible">描边</div>
                             <div class="param-row">
                                 <label>描边粗细</label>
                                 <input type="range" id="slStrokeWidth" class="ctl-rng" min="0" max="50" value="0" />
@@ -331,26 +375,16 @@
                         </div>
 
                         <div class="param-group ctl-grp-layers">
-                            <div class="pg-title">边框圆角</div>
-                            <div class="param-row chk-row">
-                                <label>四角联动</label>
-                                <input type="checkbox" id="cbLayerCornerLock" class="ctl-chk" />
-                                <span class="chk-hint">勾选后统一圆角</span>
-                            </div>
-                            <div class="param-row"><label>左上</label><input type="range" id="slLayerCornerTL" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblLayerCornerTL"></span></div>
-                            <div class="param-row"><label>右上</label><input type="range" id="slLayerCornerTR" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblLayerCornerTR"></span></div>
-                            <div class="param-row"><label>左下</label><input type="range" id="slLayerCornerBL" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblLayerCornerBL"></span></div>
-                            <div class="param-row"><label>右下</label><input type="range" id="slLayerCornerBR" class="ctl-rng" min="0" max="500" value="0" /><span class="pval" id="lblLayerCornerBR"></span></div>
+                            <div class="pg-title collapsible">边框圆角</div>
                             <div class="param-row">
-                                <label>统一圆角</label>
+                                <label>边框圆角</label>
                                 <input type="range" id="slLayerCornerRadius" class="ctl-rng" min="0" max="500" value="0" />
                                 <span class="pval" id="lblLayerCornerRadius"></span>
                             </div>
-                            <div class="hint-box">此处圆角只作用于边框图层(含描边/投影),照片圆角在"模板"页签单独调整。</div>
                         </div>
 
                         <div class="param-group ctl-grp-layers">
-                            <div class="pg-title">阴影 / 发光</div>
+                            <div class="pg-title collapsible">阴影 / 发光</div>
                             <div class="param-row chk-row">
                                 <label>投影</label>
                                 <input type="checkbox" id="cbShadow" class="ctl-chk" />
@@ -372,7 +406,7 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">撕边（胶片特效）</div>
+                            <div class="pg-title collapsible">撕边（胶片特效）</div>
                             <div class="param-row chk-row">
                                 <label>撕边</label>
                                 <input type="checkbox" id="cbTearEnable" class="ctl-chk" />
@@ -385,7 +419,7 @@
                     <!-- ══ Tab3 光影 ══ -->
                     <div class="tab-panel" id="panel-light">
                         <div class="param-group ctl-grp-light">
-                            <div class="pg-title">暗角</div>
+                            <div class="pg-title collapsible">暗角</div>
                             <div class="param-row chk-row">
                                 <label>暗角</label>
                                 <input type="checkbox" id="cbVignette" class="ctl-chk" />
@@ -395,7 +429,7 @@
                         </div>
 
                         <div class="param-group ctl-grp-light">
-                            <div class="pg-title">漏光</div>
+                            <div class="pg-title collapsible">漏光</div>
                             <div class="param-row chk-row">
                                 <label>漏光</label>
                                 <input type="checkbox" id="cbLightLeak" class="ctl-chk" />
@@ -416,7 +450,7 @@
                     <!-- ══ Tab4 装饰 ══ -->
                     <div class="tab-panel" id="panel-decor">
                         <div class="param-group">
-                            <div class="pg-title">EXIF 水印</div>
+                            <div class="pg-title collapsible">EXIF 水印</div>
                             <div class="param-row chk-row">
                                 <label>显示 EXIF</label>
                                 <input type="checkbox" id="cbExifText" class="ctl-chk" />
@@ -426,7 +460,7 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">自定义文字</div>
+                            <div class="pg-title collapsible">自定义文字</div>
                             <div class="param-row"><label>文字内容</label><input type="text" id="tfCustomText" class="ctl-tx" placeholder="输入文字,实时预览" /></div>
                             <div class="param-row"><label>字号</label><input type="range" id="slTextSize" class="ctl-rng" min="8" max="200" value="18" /><span class="pval" id="lblTextSize"></span></div>
                             <div class="param-row"><label>颜色</label><input type="color" id="cpTextColor" class="ctl-cl" value="#000000" /></div>
@@ -442,7 +476,7 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">贴纸</div>
+                            <div class="pg-title collapsible">贴纸</div>
                             <div class="btn-row">
                                 <button class="mini-btn primary" id="btnAddSticker">添加贴纸</button>
                             </div>
@@ -450,7 +484,7 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">四角装饰括号</div>
+                            <div class="pg-title collapsible">四角装饰括号</div>
                             <div class="param-row chk-row">
                                 <label>角饰</label>
                                 <input type="checkbox" id="cbCornerDecor" class="ctl-chk" />
@@ -470,7 +504,7 @@
                     <!-- ══ Tab5 Logo ══ -->
                     <div class="tab-panel" id="panel-logo">
                         <div class="param-group">
-                            <div class="pg-title">图标库</div>
+                            <div class="pg-title collapsible">图标库</div>
                             <div class="pool-title">品牌 Logo <span class="cnt" id="brandCnt"></span></div>
                             <div class="icon-pool" id="brandIconBox"></div>
                             <div class="pool-title">照片装饰 <span class="cnt" id="photoDecorCnt"></span></div>
@@ -487,7 +521,7 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">元素管理</div>
+                            <div class="pg-title collapsible">元素管理</div>
                             <div class="el-status" id="elStatus">未选中元素</div>
                             <div class="el-list" id="elList"></div>
                             <div class="param-row"><label>透明度</label><input type="range" id="slActiveIconOpacity" class="ctl-rng" min="0" max="100" value="100" /><span class="pval" id="lblActiveIconOpacity"></span></div>
@@ -511,12 +545,12 @@
                     <!-- ══ Tab6 模板 ══ -->
                     <div class="tab-panel" id="panel-template">
                         <div class="param-group">
-                            <div class="pg-title">模板信息</div>
+                            <div class="pg-title collapsible">模板信息</div>
                             <div class="param-row"><label>名称</label><input type="text" id="tfTemplateName" class="ctl-tx" placeholder="模板名称" /></div>
                             <div class="param-row"><label>标签</label><input type="text" id="tfTemplateTag" class="ctl-tx" placeholder="分类标签" /></div>
                         </div>
                         <div class="param-group">
-                            <div class="pg-title">保存 / 加载</div>
+                            <div class="pg-title collapsible">保存 / 加载</div>
                             <div class="btn-row btn-2">
                                 <button class="mini-btn primary" id="btnSaveTemplate">保存</button>
                                 <button class="mini-btn" id="btnLoadTemplate">加载</button>
@@ -528,7 +562,7 @@
                             <div class="hint-box">保存到统一模板目录，加载/导入支持 .qfs 与 .json。</div>
                         </div>
                         <div class="param-group">
-                            <div class="pg-title">代码预设 / 快速预设</div>
+                            <div class="pg-title collapsible">代码预设 / 快速预设</div>
                             <div class="btn-row btn-2">
                                 <button class="mini-btn" id="btnQuickFilm">复古胶片</button>
                                 <button class="mini-btn" id="btnQuickIdCard">证件照</button>
@@ -554,32 +588,27 @@
                     <!-- ══ Tab7 拼图 ══ -->
                     <div class="tab-panel" id="panel-puzzle">
                         <div class="param-group">
-                            <div class="pg-title">拼图布局</div>
+                            <div class="pg-title collapsible">拼图布局</div>
                             <div class="el-status" id="lblPuzzleSlot">当前槽位：无（未启用）</div>
                             <div class="btn-row btn-12" id="puzzleLayouts"></div>
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title">拼图照片池</div>
-                            <div class="btn-row">
-                                <button class="mini-btn" id="btnPuzzleAddImg">+ 加图（导入）</button>
-                                <button class="mini-btn primary" id="btnPuzzleRepuzzle">重拼（按序填满）</button>
-                            </div>
-                        </div>
-
-                        <div class="param-group">
-                            <div class="pg-title">间距与字幕</div>
+                            <div class="pg-title collapsible">间距与字幕</div>
                             <div class="param-row"><label>格子间距</label><input type="range" id="slPuzzleGap" class="ctl-rng" min="0" max="200" value="6" /><span class="pval" id="lblPuzzleGap"></span></div>
-                            <div class="param-row">
-                                <label>选择</label>
-                                <select id="cbPuzzleGapPick" class="ctl-sel"></select>
+                            <div class="param-row"><label>格子圆角</label><input type="range" id="slPuzzleCorner" class="ctl-rng" min="0" max="30" value="3" /><span class="pval" id="lblPuzzleCorner"></span></div>
+                            <div class="param-row"><label>选择</label><select id="cbPuzzleGapPick" class="ctl-sel"></select></div>
+                            <div class="btn-row">
                                 <button class="mini-btn" id="btnEditGapCaption">添加/编辑字幕</button>
                                 <button class="mini-btn danger" id="btnDeleteGapCaption">删除字幕</button>
+                            </div>
+                            <div class="btn-row">
+                                <button class="mini-btn" id="btnResetAllSlots">全部重置格子</button>
                             </div>
                         </div>
 
                         <div class="param-group" id="vbCaptionEditor" style="display:none">
-                            <div class="pg-title">字幕条编辑器<span id="lblEditingCap" class="pval"></span></div>
+                            <div class="pg-title collapsible">字幕条编辑器<span id="lblEditingCap" class="pval"></span></div>
                             <div class="param-row"><label>第一行</label><input type="text" id="tfCapLine1" class="ctl-tx" placeholder="主标题" /></div>
                             <div class="param-row"><label>字号</label><input type="range" id="slCapSize1" class="ctl-rng" min="8" max="200" value="28" /><span class="pval" id="lblCapSize1"></span></div>
                             <div class="param-row"><label>字体</label><select id="cbCapFont1" class="ctl-sel"></select></div>
@@ -598,11 +627,10 @@
                                 <span class="chk-hint">仅间隙字幕可用</span>
                             </div>
                             <div class="param-row"><label>间距</label><input type="range" id="slCapSpacing" class="ctl-rng" min="0" max="300" value="0" /><span class="pval" id="lblCapSpacing"></span></div>
-                            <button class="mini-btn danger" id="btnClearCapSlot">清空字幕</button>
-                        </div>
+                                                    </div>
 
                         <div class="param-group">
-                            <div class="pg-title">画面参数</div>
+                            <div class="pg-title collapsible">画面参数</div>
                             <div class="param-row">
                                 <label>背景</label>
                                 <select id="cbPuzzleBg" class="ctl-sel">
@@ -671,6 +699,14 @@
                         <input type="text" id="loginUsername" class="ctl-tx" placeholder="请输入用户名" maxlength="20" />
                     </div>
                     <div class="login-field">
+                        <label>头像（选填）</label>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div id="loginAvatarPreview" style="width:48px;height:48px;border-radius:50%;background:#333;overflow:hidden;"></div>
+                            <button id="btnPickAvatar" class="mini-btn" style="padding:6px 12px;">选择图片</button>
+                            <input type="file" id="fileLoginAvatar" accept="image/*" style="display:none;" />
+                        </div>
+                    </div>
+                    <div class="login-field">
                         <label for="loginNickname">昵称（选填）</label>
                         <input type="text" id="loginNickname" class="ctl-tx" placeholder="显示名称" maxlength="30" />
                     </div>
@@ -688,9 +724,26 @@
                         </div>
                     </div>
                     <div class="btn-row">
+                        <button id="btnChangeAvatar" class="mini-btn">更换头像</button>
                         <button id="loginLogout" class="mini-btn danger">退出登录</button>
                     </div>
+                    <input type="file" id="fileChangeAvatar" accept="image/*" style="display:none;" />
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 头像裁切弹窗 -->
+    <div id="avatarCropModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10000;align-items:center;justify-content:center;">
+        <div style="background:#1e1e26;border-radius:12px;padding:20px;width:420px;max-width:90vw;">
+            <div style="color:#eee;font-size:16px;margin-bottom:12px;">调整头像</div>
+            <div style="position:relative;width:300px;height:300px;margin:0 auto;border-radius:50%;overflow:hidden;border:2px solid #555;cursor:move;">
+                <img id="cropImg" style="position:absolute;top:0;left:0;transform-origin:center;user-select:none;" draggable="false" />
+            </div>
+            <div style="color:#999;font-size:12px;margin-top:8px;text-align:center;">拖动移动 · 滚轮缩放</div>
+            <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+                <button id="cropCancel" style="padding:8px 16px;background:#333;border:none;border-radius:6px;color:#eee;cursor:pointer;">取消</button>
+                <button id="cropOk" style="padding:8px 16px;background:#10b981;border:none;border-radius:6px;color:#fff;cursor:pointer;">确认</button>
             </div>
         </div>
     </div>

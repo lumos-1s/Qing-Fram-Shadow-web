@@ -40,16 +40,62 @@ window.App = {
     _puzzleDropTarget: null, // 拖拽互换预备目标格
     _skipPuzzleCapture: false,
 
+    restoreLastState() {
+        try {
+            const raw = localStorage.getItem('qfs_last_state');
+            if (!raw) return;
+            const s = JSON.parse(raw);
+            // 找到对应预设并选中
+            if (s.presetName && this.presets) {
+                const p = this.presets.find(x => x.name === s.presetName);
+                if (p) { this.selectPreset(p); return; }
+            }
+            // 没找到预设就只恢复关键字段
+            if (s.photoFrameStyle && this.template) {
+                this.template.photoFrameStyle = s.photoFrameStyle;
+                if (s.userSignature) this.template.userSignature = s.userSignature;
+                if (s.signFont) this.template.signFont = s.signFont;
+                if (s.signColor) this.template.signColor = s.signColor;
+                if (s.avatarScale) this.template.avatarScale = s.avatarScale;
+                if (s.signSize) this.template.signSize = s.signSize;
+                if (s.signBgBlur != null) this.template.signBgBlur = s.signBgBlur;
+                if (s.paramColor) this.template.paramColor = s.paramColor;
+                if (s.paramFontSize) this.template.paramFontSize = s.paramFontSize;
+                this.refreshUI();
+                this.scheduleRender();
+            }
+        } catch (_) {}
+    },
+
     init() {
         this.initSplash();
         this.cacheDom();
         this.bind();
         this.loadPresets();
+        this.restoreLastState();
         this.loadLogos();
         this.loadTextures();
         this.populateFonts();
         this.setupShortcuts();
         this.setupPanelInteractions();
+        // 工具栏按钮tooltip
+        const tips = {
+            btnUndo: '撤销 (Ctrl+Z)', btnRedo: '重做 (Ctrl+Y)',
+            btnReset: '重置', btnRandom: '随机预设',
+            btnFit: '适应窗口', btnOpen: '导入照片',
+        };
+        Object.entries(tips).forEach(([id, tip]) => {
+            const el = document.getElementById(id);
+            if (el) el.title = tip;
+        });
+        document.querySelectorAll('.pg-title.collapsible').forEach(t => {
+            if (t._bound) return;
+            t._bound = true;
+            t.addEventListener('click', () => {
+                const g = t.parentElement;
+                if (g) g.classList.toggle('collapsed');
+            });
+        });
         this.updateHistoryButtons();
         this.initLogin();
         this.initDraft();
@@ -111,15 +157,182 @@ window.App = {
         d.btnCompare.addEventListener('mousedown', () => this.setCompare(true));
         d.btnCompare.addEventListener('mouseup', () => this.setCompare(false));
         d.btnCompare.addEventListener('mouseleave', () => this.setCompare(false));
-        d.loginStatus.addEventListener('click', () => this.openLoginModal());
+        this.updateTopBar();
+            d.loginStatus.addEventListener('click', () => this.openLoginModal());
         d.loginModalClose.addEventListener('click', () => this.closeLoginModal());
         d.loginModal.addEventListener('mousedown', e => { if (e.target === d.loginModal) this.closeLoginModal(); });
         d.loginSubmit.addEventListener('click', () => this.doLogin());
         d.loginLogout.addEventListener('click', () => this.doLogout());
         d.loginUsername.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
         d.loginNickname.addEventListener('keydown', e => { if (e.key === 'Enter') this.doLogin(); });
+        this.loadUserAvatar();
         this.setupDragDrop();
+        // 签名输入
+        const inpSig = document.getElementById('inpSignature');
+        if (inpSig) inpSig.addEventListener('input', () => { this.template.userSignature = inpSig.value; this.onSettingChanged(); });
+        const cbF = document.getElementById('cbSignFont');
+        if (cbF) cbF.addEventListener('change', () => { this.template.signFont = cbF.value; this.onSettingChanged(); });
+        const cbC = document.getElementById('cbSignColor');
+        if (cbC) cbC.addEventListener('change', () => { this.template.signColor = cbC.value; this.onSettingChanged(); });
+        const rgAS = document.getElementById('rgAvatarScale');
+        if (rgAS) rgAS.addEventListener('input', () => {
+            this.template.avatarScale = Number(rgAS.value) / 100;
+            const v = document.getElementById('valAvatarScale');
+            if (v) v.textContent = rgAS.value + '%';
+            this.onSettingChanged();
+        });
+        const rgSS = document.getElementById('rgSignSize');
+        if (rgSS) rgSS.addEventListener('input', () => {
+            this.template.signSize = Number(rgSS.value) / 100;
+            const v = document.getElementById('valSignSize');
+            if (v) v.textContent = rgSS.value + '%';
+            this.onSettingChanged();
+        });
+        const chkBB = document.getElementById('chkBgBlur');
+        if (chkBB) chkBB.addEventListener('change', () => {
+            this.template.signBgBlur = chkBB.checked ? 1 : 0;
+            this.onSettingChanged();
+        });
+        const cbPC = document.getElementById('cbParamColor');
+        if (cbPC) cbPC.addEventListener('change', () => {
+            this.template.paramColor = cbPC.value;
+            this.onSettingChanged();
+        });
+        // 头像上传(存全局)
+        const btnAv = document.getElementById('btnUploadAvatar'), fileAv = document.getElementById('fileAvatar');
+        if (btnAv && fileAv) {
+            btnAv.addEventListener('click', () => fileAv.click());
+            fileAv.addEventListener('change', (e) => {
+                const f = e.target.files[0]; if (!f) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => this.saveUserAvatar(ev.target.result);
+                reader.readAsDataURL(f);
+            });
+        }
+        this.bindAvatarUpload();
         this.bindInteractive();
+    },
+
+    updateTopBar() {
+        const name = localStorage.getItem('qfs_username') || localStorage.getItem('qfs_nickname') || '';
+        const topName = document.getElementById('topUserName');
+        const topAv = document.getElementById('topAvatar');
+        if (topName) topName.textContent = name || '未登录';
+        if (topAv) {
+            const av = localStorage.getItem('qfs_user_avatar');
+            if (av) { topAv.style.background = 'url(' + av + ') center/cover'; topAv.textContent = ''; }
+            else { topAv.style.background = '#444'; topAv.textContent = '头'; }
+        }
+    },
+    loadUserAvatar() {
+        this.updateTopBar();
+        if (this.template && !this.template.userSignature) {
+            const un = (this.user && this.user.nickname) || localStorage.getItem('qfs_nickname') || localStorage.getItem('qfs_username') || '';
+            if (un) this.template.userSignature = '— ' + un + ' —';
+        }
+        const saved = localStorage.getItem('qfs_user_avatar');
+        if (saved) {
+            const img = new Image();
+            img.onload = () => { window.__qfsAvatarImg = img; this.onSettingChanged(); };
+            img.src = saved;
+        }
+    },
+    openAvatarCrop(dataUrl) {
+        const modal = document.getElementById('avatarCropModal');
+        const img = document.getElementById('cropImg');
+        if (!modal || !img) { this.saveUserAvatar(dataUrl); return; }
+        modal.style.display = 'flex'; modal.style.alignItems = 'center'; modal.style.justifyContent = 'center';
+        img.src = dataUrl;
+        this._cropScale = 1;
+        this._cropX = 0;
+        this._cropY = 0;
+        const apply = () => {
+            const wrap = img.parentElement;
+            const w = wrap.clientWidth;
+            // 图片按cover填,初始scale按宽度
+            const iw = img.naturalWidth || 300;
+            const ih = img.naturalHeight || 300;
+            const s = Math.max(w / iw, w / ih);
+            this._cropScale = s;
+            this._cropX = 0; this._cropY = 0;
+            img.style.width = iw * s + 'px';
+            img.style.height = ih * s + 'px';
+            img.style.left = (w - iw * s) / 2 + 'px';
+            img.style.top = (w - ih * s) / 2 + 'px';
+        };
+        img.onload = apply;
+        if (img.complete && img.naturalWidth) apply();
+        // 拖动
+        let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+        img.onmousedown = (e) => { dragging = true; sx = e.clientX; sy = e.clientY; ox = this._cropX; oy = this._cropY; e.preventDefault(); };
+        window.onmousemove = (e) => { if (!dragging) return; this._cropX = ox + e.clientX - sx; this._cropY = oy + e.clientY - sy; img.style.left = this._cropX + 'px'; img.style.top = this._cropY + 'px'; };
+        window.onmouseup = () => { dragging = false; };
+        // 滚轮缩放
+        img.onwheel = (e) => {
+            e.preventDefault();
+            const old = this._cropScale;
+            this._cropScale *= (e.deltaY < 0 ? 1.1 : 0.9);
+            this._cropScale = Math.max(old * 0.3, Math.min(this._cropScale, old * 5));
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            img.style.width = iw * this._cropScale + 'px';
+            img.style.height = ih * this._cropScale + 'px';
+        };
+        // 确认
+        document.getElementById('cropOk').onclick = () => {
+            const wrap = img.parentElement;
+            const size = wrap.clientWidth;
+            const c = document.createElement('canvas');
+            c.width = 200; c.height = 200;
+            const ctx = c.getContext('2d');
+            // 从img位置映射到canvas
+            const scale = this._cropScale;
+            const imgX = -parseFloat(img.style.left) / scale;
+            const imgY = -parseFloat(img.style.top) / scale;
+            const cropSize = wrap.clientWidth / scale;
+            ctx.drawImage(img, imgX, imgY, cropSize, cropSize, 0, 0, 200, 200);
+            const out = c.toDataURL('image/jpeg', 0.85);
+            modal.style.display = 'none';
+            this.saveUserAvatar(out);
+        };
+        document.getElementById('cropCancel').onclick = () => { modal.style.display = 'none'; };
+    },
+    saveUserAvatar(dataUrl) {
+        // 先压缩到200x200再存,避免localStorage配额超限
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            const size = 200;
+            c.width = size; c.height = size;
+            const ctx = c.getContext('2d');
+            // cover裁剪
+            const s = Math.max(size / img.width, size / img.height);
+            const dw = img.width * s, dh = img.height * s;
+            ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+            const compressed = c.toDataURL('image/jpeg', 0.85);
+            try {
+                localStorage.setItem('qfs_user_avatar', compressed);
+            } catch(e) { console.warn('头像存储失败:', e); }
+            window.__qfsAvatarImg = img;
+            this.onSettingChanged();
+            const pv = document.getElementById('loginAvatarPreview');
+            if (pv) { pv.style.background = 'url(' + compressed + ') center/cover'; pv.textContent = ''; }
+            const la = document.getElementById('loginAvatar');
+            if (la) { la.style.background = 'url(' + compressed + ') center/cover'; }
+            this.updateTopBar();
+        };
+        img.src = dataUrl;
+    },
+    bindAvatarUpload() {
+        const pick = document.getElementById('btnPickAvatar'), file1 = document.getElementById('fileLoginAvatar');
+        const change = document.getElementById('btnChangeAvatar'), file2 = document.getElementById('fileChangeAvatar');
+        const readFile = (f) => {
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => this.openAvatarCrop(ev.target.result);
+            reader.readAsDataURL(f);
+        };
+        if (pick && file1) { pick.addEventListener('click', () => file1.click()); file1.addEventListener('change', (e) => readFile(e.target.files[0])); }
+        if (change && file2) { change.addEventListener('click', () => file2.click()); file2.addEventListener('change', (e) => readFile(e.target.files[0])); }
     },
 
     /* ══ 画布元素 / 缩放平移交互 ══ */
@@ -155,6 +368,12 @@ window.App = {
                     e.preventDefault();
                     this.selectedEls = [];
                     this.refreshElList();
+                    // 拖拽分隔线调轴位
+                    if (hp.type === 'axis') {
+                        this._dragPz = { type: 'axis', dim: hp.dim, idx: hp.idx, sx: e.screenX, sy: e.screenY, moved: false };
+                        canvas.style.cursor = (hp.dim === 'v') ? 'col-resize' : 'row-resize';
+                        return;
+                    }
                     // 只有"已选中"的格图才能被移动:第一次点击仅选中(并清掉旧拖动态),
                     // 已经选中时按下才进入该格图片的移动
                     if (this._activePuzzleSlot !== hp.slot) {
@@ -268,6 +487,19 @@ window.App = {
             }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
         });
+        // 鼠标移出窗口/窗口失焦时,强制清理所有拖动态(防止卡住)
+        const cancelDrags = () => {
+            if (this._dragPz) {
+                this._puzzlePick = null;
+                this._dragPzInitOff = null;
+                this._dragPz = null;
+                canvas.style.cursor = '';
+            }
+            if (this._dragEl) { this._dragEl = null; }
+            if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
+        };
+        window.addEventListener('blur', cancelDrags);
+        canvas.addEventListener('mouseleave', cancelDrags);
         canvas.addEventListener('dblclick', e => {
             const pk = this.tplPuzzle();
             if (!pk) return;
@@ -277,18 +509,34 @@ window.App = {
             this.setActivePuzzleSlot(si);
             this.openSlotImage(si);
         });
-        // 桌面右键菜单:拼图格子
+        // 桌面右键菜单:拼图格子 / 画布空白处
         canvas.addEventListener('contextmenu', e => {
             const pk = this.tplPuzzle();
-            if (!pk) return;
-            const hp = this.puzzleHitTest(e);
-            if (!hp) return;
+            if (pk) {
+                const hp = this.puzzleHitTest(e);
+                if (hp) {
+                    e.preventDefault();
+                    this.setActivePuzzleSlot(hp.slot);
+                    this.openCtx(e.clientX, e.clientY, [
+                        ['替换照片(打开图片)', () => this.openSlotImage(hp.slot)],
+                        ['在此位置插入照片', () => this.insertImageFromPick(hp.slot)],
+                        ['旋转 90°', () => this.rotatePuzzleSlot(hp.slot)],
+                        ['重置本格', () => this.resetPuzzleSlot(hp.slot)],
+                        ['清空该格', () => this.clearSlotImage(hp.slot)],
+                    ]);
+                    return;
+                }
+            }
             e.preventDefault();
-            this.setActivePuzzleSlot(hp.slot);
             this.openCtx(e.clientX, e.clientY, [
-                ['替换照片(打开图片)', () => this.openSlotImage(hp.slot)],
-                ['在此位置插入照片', () => this.insertImageFromPick(hp.slot)],
-                ['清空该格', () => this.clearSlotImage(hp.slot)],
+                ['适应窗口', () => this.fitZoom && this.fitZoom()],
+                ['1:1 实际大小', () => this.zoomActual && this.zoomActual()],
+                ['对比原图', () => this.toggleCompare && this.toggleCompare()],
+                ['—', null],
+                ['撤销 (Ctrl+Z)', () => this.undo()],
+                ['重做 (Ctrl+Y)', () => this.redo()],
+                ['—', null],
+                ['导出图片', () => this.doExport && this.doExport()],
             ]);
         });
         document.addEventListener('mousedown', e => {
@@ -385,7 +633,7 @@ window.App = {
         if (el.kind === 'logo') {
             if (typeof e.x !== 'number') { e.x = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cx; e.y = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cy; }
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
-            else e.size = clampNum((e.size || 60) + dir * 6, 8, 400);
+            else e.size = clampNum((e.size || 60) + dir * 25, 8, 1200);
         } else if (el.kind === 'sticker') {
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
             else e.scale = clampNum((e.scale || 1) * (dir > 0 ? 1.1 : 0.9), 0.02, 3);
@@ -394,14 +642,17 @@ window.App = {
             else { e.fontSize = clampNum((e.fontSize || 18) + dir * 2, 6, 300); if (e.autoSize) e.autoSize = 0; }
         }
         this.syncSliderFromEl(el);
-        this.onSettingChanged();
+        this.saveCurrentTemplate();
+        this.scheduleRender();
     },
+
+    rebindSelectedEls() { /* template引用稳定,无需重绑 */ },
 
     moveElement(drag, x, y) {
         const e = drag.ref;
         const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
         const clampV = (v, max, half) => half > 0 ? Math.max(half, Math.min(v, max - half)) : Math.max(0, Math.min(v, max));
-        if (drag.kind === 'logo') { e.x = clampV(x, cw, (e.size || 60) / 2); e.y = clampV(y, ch, (e.size || 60) / 2); e.offsetX = 0; e.offsetY = 0; }
+        if (drag.kind === 'logo') { e.x = x; e.y = y; e.offsetX = 0; e.offsetY = 0; }
         else if (drag.kind === 'sticker') { e.x = clampV(x, cw, 20); e.y = clampV(y, ch, 20); }
         else if (drag.kind === 'text') { e.x = clampV(x, cw, 30); e.y = clampV(y, ch, 20); }
         this.onSettingChanged();
@@ -429,6 +680,36 @@ window.App = {
         this.updateLabel('lblElementRotation', ((e.rotation || 0) % 360 + 360) % 360 + '°');
         this.updateLabel('lblActiveIconOpacity', Math.round(e.opacity != null ? e.opacity : 100) + '%');
         this.updateLabel('lblElementSize', sizeVal);
+    },
+
+    drawSelectionBox() {
+        try {
+            const canvas = this.dom.canvas;
+            if (!canvas || !this.selectedEls || !this.selectedEls.length) return;
+            const ctx = canvas.getContext('2d');
+            for (const sel of this.selectedEls) {
+                const e = sel.obj;
+                if (!e) continue;
+                let cx = e.x, cy = e.y, size = e.size || 60;
+                if (typeof cx !== 'number' || typeof cy !== 'number') {
+                    const p = this.logoPos(e, canvas.width, canvas.height, size);
+                    cx = p.cx; cy = p.cy;
+                }
+                ctx.save();
+                ctx.strokeStyle = '#00e5a0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.strokeRect(cx - size / 2 - 6, cy - size / 2 - 6, size + 12, size + 12);
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#00e5a0';
+                const h = 5;
+                [[cx-size/2-6, cy-size/2-6],[cx+size/2+6-h, cy-size/2-6],
+                 [cx-size/2-6, cy+size/2+6-h],[cx+size/2+6-h, cy+size/2+6-h]].forEach(([x,y])=>{
+                    ctx.fillRect(x, y, h, h);
+                });
+                ctx.restore();
+            }
+        } catch(err) { console.warn('drawSelectionBox', err); }
     },
 
     /* ══ 默认模板 ══ */
@@ -526,6 +807,7 @@ window.App = {
 
         this.template.paramPosition = $('cbParamPosition') ? $('cbParamPosition').value : 'CENTER';
         this.template.paramFontSize = $('slParamFontSize') ? parseInt($('slParamFontSize').value, 10) : 33;
+        this.template.userSignature = $('inpSignature') ? $('inpSignature').value : '';
         this.template.paramType = $('cbParamType') ? parseInt($('cbParamType').value, 10) : 0;
         this.syncManualExif();
 
@@ -645,6 +927,23 @@ window.App = {
         if ($('slGlobalMargin')) { const g = m.globalMargin != null ? m.globalMargin : 1; $('slGlobalMargin').value = Math.round(g * 100); this.updateLabel('lblGlobalMargin', Math.round(g * 100) + '%'); }
     },
 
+    updatePersonalVisibility() {
+        const grp = document.getElementById('grpPersonal');
+        if (!grp || !this.template) return;
+        const s = this.template.photoFrameStyle || '';
+        const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC'].includes(s);
+        grp.style.display = isPersonal ? '' : 'none';
+        // 印象留白预设也显示背景模糊开关
+        const isOverlay = ['OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
+        const rowBgBlur = document.getElementById('rowBgBlur');
+        if (rowBgBlur) rowBgBlur.style.display = (isPersonal || isOverlay) ? '' : 'none';
+        const rowPos = document.getElementById('rowParamPos');
+        const rowType = document.getElementById('rowParamType');
+        const isBottomBar = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO'].includes(s);
+        if (rowPos) rowPos.style.display = isBottomBar ? '' : 'none';
+        if (rowType) rowType.style.display = isBottomBar ? '' : 'none';
+    },
+
     // 回显:模板 -> 控件
     refreshUI() {
         if (!this.template) return;
@@ -670,6 +969,9 @@ window.App = {
             const r = cc.cornerRadiusAll != null ? cc.cornerRadiusAll : 0;
             if ($('slCornerRadius')) $('slCornerRadius').value = r;
             this.updateLabel('lblCornerRadius', r);
+            const br = this.template.borderRadius || 0;
+            if ($('slBorderRadius')) $('slBorderRadius').value = br;
+            this.updateLabel('lblBorderRadius', br);
             if ($('slCornerTL')) $('slCornerTL').value = cc.cornerRadiusTL || 0;
             if ($('slCornerTR')) $('slCornerTR').value = cc.cornerRadiusTR || 0;
             if ($('slCornerBL')) $('slCornerBL').value = cc.cornerRadiusBL || 0;
@@ -679,6 +981,19 @@ window.App = {
 
             if ($('cbParamPosition')) $('cbParamPosition').value = this.template.paramPosition || 'CENTER';
             if ($('slParamFontSize')) $('slParamFontSize').value = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
+            if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
+            if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
+            if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
+            if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
+            if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
+            if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;
+            if ($('cbParamColor')) $('cbParamColor').value = this.template.paramColor || 'auto';
+            this.updatePersonalVisibility();
+            if (this.template.userAvatar) {
+                const img = new Image();
+                img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };
+                img.src = this.template.userAvatar;
+            }
             this.updateParamFontLabel();
             if ($('cbParamType')) $('cbParamType').value = String(this.template.paramType != null ? this.template.paramType : 0);
 
@@ -873,12 +1188,13 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if (token !== this.renderToken) return;
             // 交互进行中(格内拖动/平移/拖元素/手势)不得用旧快照替换当前模板,否则会将正在编辑的
             // 拼图平移/缩放瞬时回退到保存前的状态
-            if (this.image && this.image.customSettings && !this._dragPz && !this._dragEl && !this._pan && !this._gesture) this.template = this.image.customSettings;
+            // 不再用 customSettings 替换 this.template,保持编辑对象引用稳定
             this.normalizeTemplate();
             this.dom.stage.classList.toggle('has-img', !!this.image);
             const puzzle = this.template && this.template.puzzle && this.template.puzzle.enabled;
             if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
             else window.__render(this, false);
+            this.drawSelectionBox();
             if (this.autoFit) {
                 this.autoFit = false;
                 requestAnimationFrame(() => this.fitZoom());
@@ -937,7 +1253,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (!this.image) return;
         const snap = this.cloneTemplate();
         this.imageTemplates.set(this.image, snap);
-        this.image.customSettings = snap;
+        // customSettings 保持指向当前 this.template,避免克隆后 selectedEls 引用失效
+        // undo/redo 时才会把 customSettings 换成新快照
         this.queueThumb(this.image);
         if (typeof this.scheduleDraft === 'function') this.scheduleDraft();
     },
@@ -952,6 +1269,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         const saved = this.imageTemplates.get(this.image);
         if (saved) this.template = saved;
         else this.normalizeTemplate();
+        // 拼图模式下:如果当前已启用拼图,切换照片时保持拼图配置不丢失
+        if (this.template && this.template.puzzle && this.template.puzzle.enabled) {
+            // 确保 puzzle.enabled 保持(新照片的 normalizeTemplate 可能把它设为0)
+            this.template.puzzle.enabled = 1;
+        }
         this.selectedEls = [];
         this.updateStatusBar();
         this.refreshUI();
@@ -1399,7 +1721,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             'slParamFontSize', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
             'slShadowX', 'slShadowY', 'slShadowBlur', 'slShadowSpread', 'slShadowOpacity', 'slGlowBlur', 'slGlowOpacity',
             'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
-            'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap',
+            'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap', 'slPuzzleCorner',
             'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
         ]);
@@ -1480,8 +1802,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnLoadPreset', () => this.loadPresetFromList());
         bindBtn('btnEditGapCaption', () => this.addEditGapCaption());
         bindBtn('btnDeleteGapCaption', () => this.deleteCaption());
-        bindBtn('btnClearCapSlot', () => this.clearCaption());
-        bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
+bindBtn('btnResetAllSlots', () => this.resetAllSlots());
+                bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
         bindBtn('btnPuzzleDisable', () => this.disablePuzzle());
         bindBtn('btnExportPuzzle', () => this.exportPuzzle());
         bindBtn('btnPuzzleAddImg', () => this.openImage());
@@ -1503,9 +1825,9 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if ($('slElementSize')) $('slElementSize').addEventListener('input', () => {
             const v = parseInt($('slElementSize').value, 10);
             this.updateLabel('lblElementSize', v);
-            this.applyToSelectedEls(el => {
-                if (el.kind === 'logo') el.size = v;
-                else if (el.kind === 'sticker') el.scale = clampNum(v / 60, 0.02, 3);
+            this.applyToSelectedEls((el, kind) => {
+                if (kind === 'logo') el.size = v;
+                else if (kind === 'sticker') el.scale = clampNum(v / 60, 0.02, 3);
             });
             this.batchElOps();
         });
@@ -1668,7 +1990,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             slVignetteStrength: ['lblVignetteStrength', v + '%'], slVignetteFeather: ['lblVignetteFeather', v],
             slLeakOpacity: ['lblLeakOpacity', v + '%'], slLeakAngle: ['lblLeakAngle', v + '°'],
             slCornerDecorSize: ['lblCornerDecorSize', v], slTextSize: ['lblTextSize', v],
-            slPuzzleGap: ['lblPuzzleGap', v], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
+            slPuzzleGap: ['lblPuzzleGap', v], slPuzzleCorner: ['lblPuzzleCorner', v + '%'], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
             slCapSpacing: ['lblCapSpacing', v + '%'], slSlotOffsetX: ['lblSlotOffsetX', v], slSlotOffsetY: ['lblSlotOffsetY', v],
             slSlotZoom: ['lblSlotZoom', v + '%'],
         };
@@ -1680,7 +2002,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
         if (id === 'slTextSize') { this.previewDraftText(); return; }
-        if (id === 'slPuzzleGap' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
+        if (id === 'slPuzzleGap' || id === 'slPuzzleCorner' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
             this.syncPuzzleFromUI(); this.onSettingChanged(); return;
         }
         this.onSettingChanged();
@@ -1837,6 +2159,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         this.setStatus('已添加贴纸(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
     },
 
+
+    _brandRank(n) {
+        const ranking = {"APPLE":100,"SAMSUNG":95,"XIAOMI":90,"VIVO":80,"OPPO":78,"HONOR":72,"HUAWEI":70,"GOOGLE":65,"ONEPLUS":62,"REALME":58,"MOTOROLA":55,"LENOVO":50,"ASUS":48,"NOTHING":45,"NUBIA":42,"REDMI":88,"REDMAGIC":38,"IQOO":52,"TECNO":38,"INFINIX":35,"ITEL":33,"DOOGEE":25,"ULEFONE":22,"BLACKSHARK":30,"VERTU":20,"NOKIA":48,"LG":45,"HTC":40,"MEIZU":35,"CANON":98,"SONY":92,"FUJIFILM":85,"NIKON":80,"PANASONIC":60,"RICOH":45,"OLYMPUS":42,"PENTAX":38,"SIGMA":40,"LEICA":55,"HASSELBLAD":48,"POLAROID":50,"GOPRO":52,"DJI":58,"INSTA360":50,"RED":35,"CONTAX":25,"ALPA":15,"LINHOF":12,"MAMIYA":18,"ROLLEI":20,"PHASEONE":25,"HORSEMAN":10,"TOYO":8,"VOIGTLÄNDER":15,"SEAGULL":20,"TAMRON":30,"AGFA":18,"KODAK":45,"LOMO":30,"BLACKMAGIC":42,"ZEISS":50,"CASIO":25,"CAT":5};
+        return ranking[(n||'').replace(/\.png$/i,'').toUpperCase()] ?? 5;
+    },
     /* ══ Logo 页签 ══ */
     renderLogoPools() {
         const $ = this.$;
@@ -1844,32 +2171,53 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         // 简单分类:前四类按名称关键字,自定义留空待用户添加
         const cats = { brandIconBox: [], photoDecorBox: [], simpleIconBox: [], weatherIconBox: [], customIconBox: [] };
         this.logos.forEach(l => {
-            const n = l.name || '';
-            if (/brand|logo|品牌/i.test(n)) cats.brandIconBox.push(l);
-            else if (/weather|天/i.test(n)) cats.weatherIconBox.push(l);
-            else if (/deco|decor|装饰|花/i.test(n)) cats.photoDecorBox.push(l);
-            else cats.simpleIconBox.push(l);
+            // 自定义图标归到自定义图标池
+            if (l.custom) { cats.customIconBox.push(l); return; }
+            // 其余品牌logo归到品牌Logo池,按市场热度排序
+            cats.brandIconBox.push(l);
         });
+        cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
         pools.forEach((boxId, pi) => {
             const box = $(boxId);
             if (!box) return;
             box.innerHTML = '';
-            const list = pi === 4 ? [] : cats[boxId];
+            const list = cats[boxId];
             if (!list.length) {
-                const e = document.createElement('div');
-                e.className = 'icon-cell empty';
-                e.textContent = pi === 4 ? '点击下方添加' : '无';
-                box.appendChild(e);
+                // 空池隐藏整个组
+                const title = box.previousElementSibling;
+                if (title) title.style.display = 'none';
+                box.style.display = 'none';
                 return;
             }
+            // 有数据则显示
+            const title = box.previousElementSibling;
+            if (title) title.style.display = '';
+            box.style.display = '';
             list.forEach(l => {
                 const c = document.createElement('div');
                 c.className = 'icon-cell';
-                c.title = l.name;
+                c.title = l.custom ? (l.name + '(点×删除)') : l.name;
                 const img = document.createElement('img');
                 img.src = l.dataUrl;
                 c.appendChild(img);
-                c.addEventListener('click', () => this.addLogoElement(l));
+                c.addEventListener('click', () => this.armLogoPlacement(l));
+                // 自定义图标右上角加×删除按钮
+                if (l.custom) {
+                    const del = document.createElement('span');
+                    del.textContent = '×';
+                    del.style.cssText = 'position:absolute;top:2px;right:4px;font-size:14px;line-height:1;color:#ea6668;cursor:pointer;font-weight:bold;';
+                    del.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm('删除自定义图标「' + l.name + '」?')) {
+                            this.deleteCustomIcon(l);
+                            this.logos = this.logos.filter(x => x !== l);
+                            this.renderLogoPools();
+                            this.setStatus('已删除');
+                        }
+                    });
+                    c.style.position = 'relative';
+                    c.appendChild(del);
+                }
                 box.appendChild(c);
             });
             const cnt = this.$({ brandIconBox: 'brandCnt', photoDecorBox: 'photoDecorCnt', simpleIconBox: 'simpleIconCnt', weatherIconBox: 'weatherIconCnt', customIconBox: 'customIconCnt' }[boxId]);
@@ -1877,7 +2225,12 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
     },
 
-    async addLogoElement(logo) {
+    armLogoPlacement(logo) {
+        // 直接加到画布中央,然后用户可拖动
+        this.addLogoElement(logo);
+    },
+
+    async addLogoElement(logo, px, py) {
         if (!logo) return;
         this.onSettingCommit();
         if (!this.template) return;
@@ -1889,10 +2242,12 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         }
         if (!this.template.logoElements) this.template.logoElements = [];
         const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
+        // 以宽度为基准,按原图比例
         const size = Math.max(48, Math.round(Math.min(cw, ch) * 0.07));
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
-            x: Math.round(cw / 2), y: Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
+            x: px != null ? px : Math.round(cw / 2), y: py != null ? py : Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
+            ratio: bmp.naturalHeight / bmp.naturalWidth || 1,
         };
         this.template.logoElements.push(el);
         this.selectedEls = [{ kind: 'logo', obj: el }];
@@ -1900,7 +2255,6 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         this.saveCurrentTemplate();
         this.scheduleRender(true);
         this.setStatus(`已添加 Logo「${logo.name}」`);
-        requestAnimationFrame(() => this.focusElement(el, 2.5));
     },
 
     focusElement(el, factor) {
@@ -1925,8 +2279,9 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         const im = new Image();
         await new Promise(r => { im.onload = r; im.onerror = r; im.src = dataUrl; });
         if (!im.naturalWidth) { this.setStatus('图片加载失败'); return; }
-        const logo = { name: res.name || '自定义', dataUrl };
+        const logo = { name: res.name || '自定义', dataUrl, custom: true };
         this.logos.push(logo);
+        this.saveCustomIcon(logo);
         this.addLogoElement(logo);
         this.renderLogoPools();
     },
@@ -1988,7 +2343,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     },
 
     applyToSelectedEls(fn) {
-        this.selectedEls.forEach(s => fn(s.obj));
+        this.selectedEls.forEach(s => fn(s.obj, s.kind));
     },
 
     batchElOps() {
@@ -2140,14 +2495,56 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
     setupShortcuts() {
         document.addEventListener('keydown', e => {
+            // 输入框/文本域聚焦时不触发快捷键(避免打字冲突)
+            const tag = (document.activeElement && document.activeElement.tagName) || '';
+            const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+            if (typing && !e.ctrlKey) return;
+
             if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openImages(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
             else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); this.redo(); }
-            else if (e.ctrlKey && e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAllEls(); }
-            else if (e.ctrlKey && e.key.toLowerCase() === 'c') { this.copyElement(); }
-            else if (e.ctrlKey && e.key.toLowerCase() === 'v') { e.preventDefault(); this.pasteElement(); }
-            else if (e.key === 'Delete' && this.selectedEls.length) { e.preventDefault(); this.deleteElement(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                // 鼠标在缩略图条上 → 全选缩略图
+                const ts = document.getElementById('thumbStrip');
+                if (ts && (e.target === ts || ts.contains(e.target))) {
+                    this.batchSel = this.images.map((_, i) => i);
+                    this.updateThumbSel();
+                    this.setStatus('已全选 ' + this.images.length + ' 张图片');
+                } else {
+                    this.selectAllEls();
+                }
+            }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'c') { if (!typing) this.copyElement(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'v') { if (typing) return; e.preventDefault(); this.pasteElement(); }
+            else if (e.key === 'Delete' && !typing) {
+                e.preventDefault();
+                // 优先删拼图字幕(字幕面板打开时)
+                if (this.template && this.template.puzzle && $('cbPuzzleGapPick') && $('cbPuzzleGapPick').value) {
+                    this.deleteCaption();
+                } else if (this.selectedEls.length) {
+                    this.deleteElement();
+                }
+            }
+            // 新增快捷键
+            else if (e.ctrlKey && e.key.toLowerCase() === 'e') { e.preventDefault(); this.exportImage(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'd') { e.preventDefault(); this.applyBorderToSelected(); }
+            else if (e.ctrlKey && e.key === '0') { e.preventDefault(); this.fitZoom(); }
+            else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.saveTemplate(); }
+            else if (e.key === 'ArrowLeft' && this.images && this.images.length > 1) { e.preventDefault(); this.selectImage((this.currentIdx - 1 + this.images.length) % this.images.length); }
+            else if (e.key === 'ArrowRight' && this.images && this.images.length > 1) { e.preventDefault(); this.selectImage((this.currentIdx + 1) % this.images.length); }
         });
+    },
+
+    // 把当前边框参数应用到所有勾选的照片
+    applyBorderToSelected() {
+        if (!this.image) { this.setStatus('请先打开一张照片'); return; }
+        const targets = (this.batchSel && this.batchSel.length) ? this.batchSel.slice() : [this.currentIdx];
+        let n = 0;
+        targets.forEach(i => {
+            if (i !== this.currentIdx) { this.syncBorderTo(i); n++; }
+        });
+        this.setStatus(n ? `已把当前边框同步到 ${n} 张选中照片` : '没有需要同步的选中照片(仅当前张)');
     },
 
     selectAllEls() {
@@ -2233,7 +2630,9 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     renderProfile() {
         const d = this.dom;
         const name = (this.user.nickname || this.user.username).trim();
-        d.loginAvatar.textContent = name.charAt(0).toUpperCase();
+        const av = localStorage.getItem('qfs_user_avatar');
+        if (av) { d.loginAvatar.style.background = 'url(' + av + ') center/cover'; d.loginAvatar.textContent = ''; }
+        else { d.loginAvatar.style.background = '#444'; d.loginAvatar.textContent = ''; }
         d.loginDisplayName.textContent = name;
         d.loginUsernameDisplay.textContent = '@' + this.user.username;
     },
