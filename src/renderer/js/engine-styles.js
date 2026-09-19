@@ -1495,24 +1495,10 @@ AV_OVERLAY_BC2:67 };
             const h = ih + topBotPad * 2;
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-            // 照片带圆角阴影(和毛玻璃一致)
+            // 照片严格垂直居中
             const px = leftW + 40;
-            const shY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
-            const py = Math.round((h - ih) / 2) - shY;
-            g.save();
-            g.shadowColor = 'rgba(0,0,0,0.15)';
-            g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.05));
-            g.shadowOffsetY = shY;
-            g.fillStyle = '#ffffff';
-            const r = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
-            if (typeof g.roundRect === 'function') {
-                g.beginPath(); g.roundRect(px, py, iw, ih, r); g.fill();
-            } else { g.fillRect(px, py, iw, ih); }
-            g.restore();
-            g.save();
-            if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(px, py, iw, ih, r); g.clip(); }
+            const py = Math.round((h - ih) / 2);
             g.drawImage(img, px, py);
-            g.restore();
             // 左侧品牌名(和毛玻璃一致)
             const tx = Math.round(leftW * 0.25) + 40;
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
@@ -1620,24 +1606,10 @@ AV_OVERLAY_BC2:67 };
             const h = ih + topBotPad * 2;
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-            // 照片带圆角阴影
+            // 照片严格垂直居中
             const px = leftPad + 40;
-            const shY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
             const py = Math.round((h - ih) / 2);
-            g.save();
-            g.shadowColor = 'rgba(0,0,0,0.15)';
-            g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.05));
-            g.shadowOffsetY = shY;
-            g.fillStyle = '#ffffff';
-            const r = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
-            if (typeof g.roundRect === 'function') {
-                g.beginPath(); g.roundRect(px, py, iw, ih, r); g.fill();
-            } else { g.fillRect(px, py, iw, ih); }
-            g.restore();
-            g.save();
-            if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(px, py, iw, ih, r); g.clip(); }
             g.drawImage(img, px, py);
-            g.restore();
             // 右侧品牌名(和毛玻璃镜像,边距一致)
             const tx = px + iw + Math.round(rightW * 0.10);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
