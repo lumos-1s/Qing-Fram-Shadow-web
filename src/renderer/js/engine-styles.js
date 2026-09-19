@@ -1617,7 +1617,7 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, px, py);
             g.restore();
             // 右侧品牌名(和毛玻璃一样的间距)
-            const tx = px + iw + Math.round(rightW * 0.25);
+            const tx = px + iw + Math.round(rightW * 0.15);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
             g.fillStyle = '#1a1a1a';
