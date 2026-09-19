@@ -3199,10 +3199,9 @@ AV_OVERLAY_BC2:67 };
                 }
                 draw(img, size, g, iw, ih, S);
                 g.drawImage = origDrawImage;
-                // 整体画布圆角(保留ROUNDED样式)
-                if (styleName === 'ROUNDED' && photoRAll === 0) {
-                    if (photoTl > 0 || photoTr > 0 || photoBl > 0 || photoBr > 0) out = cornerClip(out, photoTl, photoTr, photoBl, photoBr);
-                }
+                // 整体画布边框圆角
+                const borderR = t.borderRadius || 0;
+                if (borderR > 0) out = singleCornerClip(out, borderR);
 
                 const decor = t.decorConfig || {};
                 if ((decor.cornerDecorEnable || 0) === 1 && typeof window.drawCornerDecor === 'function') {

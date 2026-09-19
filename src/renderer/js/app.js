@@ -937,6 +937,9 @@ window.App = {
             const r = cc.cornerRadiusAll != null ? cc.cornerRadiusAll : 0;
             if ($('slCornerRadius')) $('slCornerRadius').value = r;
             this.updateLabel('lblCornerRadius', r);
+            const br = this.template.borderRadius || 0;
+            if ($('slBorderRadius')) $('slBorderRadius').value = br;
+            this.updateLabel('lblBorderRadius', br);
             if ($('slCornerTL')) $('slCornerTL').value = cc.cornerRadiusTL || 0;
             if ($('slCornerTR')) $('slCornerTR').value = cc.cornerRadiusTR || 0;
             if ($('slCornerBL')) $('slCornerBL').value = cc.cornerRadiusBL || 0;
