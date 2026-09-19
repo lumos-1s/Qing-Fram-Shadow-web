@@ -104,7 +104,8 @@ window.App = {
     cacheDom() {
         const $ = id => document.getElementById(id);
         this.dom = {
-            btnOpen: $('btnOpen'), btnSave: $('btnSave'), selFormat: $('selFormat'),
+            btnOpen: $('btnOpen'), btnSave: $('btnSave'), selFormat: $('selFormat'), selExportSize: $('selExportSize'),
+            slExportQuality: $('slExportQuality'),
             btnSyncSel: $('btnSyncSel'), btnUndo: $('btnUndo'), btnRedo: $('btnRedo'),
             btnReset: $('btnReset'), btnRandom: $('btnRandom'), btnFit: $('btnFit'),
             zoomInput: $('zoomInput'), zoomRange: $('zoomRange'), btnTheme: $('btnTheme'),
@@ -191,8 +192,19 @@ window.App = {
         const chkBB = document.getElementById('chkBgBlur');
         if (chkBB) chkBB.addEventListener('change', () => {
             this.template.signBgBlur = chkBB.checked ? 1 : 0;
+            const rowBI = document.getElementById('rowBgBlurInt');
+            if (rowBI) rowBI.style.display = chkBB.checked ? '' : 'none';
             this.onSettingChanged();
         });
+        const slBI = document.getElementById('slBgBlurInt');
+        if (slBI) {
+            this.updateLabel('lblBgBlurInt', slBI.value + '%');
+            slBI.addEventListener('input', () => {
+                this.template.blurIntensity = Number(slBI.value);
+                this.updateLabel('lblBgBlurInt', slBI.value + '%');
+                this.onSettingChanged();
+            });
+        }
         const cbPC = document.getElementById('cbParamColor');
         if (cbPC) cbPC.addEventListener('change', () => {
             this.template.paramColor = cbPC.value;
@@ -987,6 +999,11 @@ window.App = {
             if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
             if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;
+            const biV = this.template.blurIntensity != null ? this.template.blurIntensity : 50;
+            if ($('slBgBlurInt')) $('slBgBlurInt').value = biV;
+            this.updateLabel('lblBgBlurInt', biV + '%');
+            const rowBI2 = document.getElementById('rowBgBlurInt');
+            if (rowBI2) rowBI2.style.display = $('chkBgBlur') && $('chkBgBlur').checked ? '' : 'none';
             if ($('cbParamColor')) $('cbParamColor').value = this.template.paramColor || 'auto';
             this.updatePersonalVisibility();
             if (this.template.userAvatar) {
@@ -1180,6 +1197,18 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         try { es.clearCaches(); } catch (e) {}
     },
 
+    // 模板是否已含有效边框设置(区别于默认原图模板)
+    hasBorderSettings(t) {
+        if (!t) return false;
+        if (t.templateName || t.templateTag || t.photoFrameStyle) return true;
+        const m = t.baseMargin;
+        if (m) {
+            if (m.marginTop || m.marginBottom || m.marginLeft || m.marginRight) return true;
+            if (m.imgScale && m.imgScale !== 1) return true;
+        }
+        return false;
+    },
+
     renderPreview() {
         if (!this.image) return;
         const token = ++this.renderToken;
@@ -1191,9 +1220,24 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             // 不再用 customSettings 替换 this.template,保持编辑对象引用稳定
             this.normalizeTemplate();
             this.dom.stage.classList.toggle('has-img', !!this.image);
-            const puzzle = this.template && this.template.puzzle && this.template.puzzle.enabled;
-            if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
-            else window.__render(this, false);
+            // 未使用预设的图:画布直接展示原图;当前图只要有边框设置,就把最新模板写回该图记录
+            // (既标记“已用预设”,也保证切走再切回时保留最新编辑)
+            const im = this.image;
+            if (this.hasBorderSettings(this.template)) {
+                im.customSettings = JSON.parse(JSON.stringify(this.template));
+                this.imageTemplates.set(im, im.customSettings);
+            }
+            const assigned = !!(im.customSettings || this.imageTemplates.get(im));
+            const previewTpl = assigned ? this.template : this.defaultTemplate();
+            const prevTpl = this.template;
+            this.template = previewTpl;
+            try {
+                const puzzle = previewTpl && previewTpl.puzzle && previewTpl.puzzle.enabled;
+                if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
+                else window.__render(this, false);
+            } finally {
+                this.template = prevTpl;
+            }
             this.drawSelectionBox();
             if (this.autoFit) {
                 this.autoFit = false;
@@ -1283,8 +1327,13 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
     selectImage(idx) {
         this.selectedIdx = [idx];
+        // 普通单击/切换 = 单选:连批量勾选也一并取消,只保留当前这张
+        this.batchSel = [idx];
         this.currentIdx = idx;
         this.image = this.images[idx];
+        // 有独立预设的图恢复其自身模板;没有独立预设的以默认(原图)开始,画布显示原图
+        const saved = this.image && (this.image.customSettings || this.imageTemplates.get(this.image));
+        this.template = saved ? JSON.parse(JSON.stringify(saved)) : this.defaultTemplate();
         this.invalidateStyleCaches();
         this.buildThumbnails();
         this.afterImageSelect();
@@ -1625,8 +1674,10 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             wrap.draggable = false;
             const t = document.createElement('img');
             const isSel = this.batchSel.includes(i);
+            const isSrc = isSel && this.batchSel.length > 1 && this.selectedIdx[0] === i;
             const cls = ['thumb'];
             if (isSel) cls.push('active');
+            if (isSrc) cls.push('src');
             if (this.image && this.images.indexOf(this.image) === i) cls.push('main');
             t.className = cls.join(' ');
             t.draggable = false;
@@ -1656,6 +1707,13 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             });
             wrap.appendChild(t);
             wrap.appendChild(cb);
+            if (isSrc) {
+                const tag = document.createElement('span');
+                tag.className = 'thumb-src';
+                tag.textContent = '源';
+                tag.title = '同步源：选中图片中的第一张（同步时以它为准）';
+                wrap.appendChild(tag);
+            }
             strip.appendChild(wrap);
         });
         strip.style.display = this.images.length > 1 ? 'flex' : 'none';
@@ -2505,12 +2563,13 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); this.redo(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'a') {
                 e.preventDefault();
-                // 鼠标在缩略图条上 → 全选缩略图
-                const ts = document.getElementById('thumbStrip');
-                if (ts && (e.target === ts || ts.contains(e.target))) {
-                    this.batchSel = this.images.map((_, i) => i);
-                    this.updateThumbSel();
-                    this.setStatus('已全选 ' + this.images.length + ' 张图片');
+                // 有图片时全选缩略图(批量勾选),再按一次取消全选;无图片则回退画布元素全选
+                if (this.images && this.images.length) {
+                    const allSel = this.images.every((_, i) => this.batchSel.includes(i));
+                    this.batchSel = allSel ? [] : this.images.map((_, i) => i);
+                    this.selectedIdx = this.batchSel.slice();
+                    this.buildThumbnails();
+                    this.setStatus(allSel ? '已取消全选' : '已全选 ' + this.images.length + ' 张图片');
                 } else {
                     this.selectAllEls();
                 }

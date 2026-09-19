@@ -310,7 +310,11 @@ ipcMain.handle('save-image-base64', async (_e, { data, filename }) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
         title: '导出图片',
         defaultPath: def,
-        filters: [{ name: 'PNG 图片', extensions: ['png'] }, { name: 'JPEG 图片', extensions: ['jpg'] }]
+        filters: [
+            { name: 'PNG 图片', extensions: ['png'] },
+            { name: 'JPEG 图片', extensions: ['jpg'] },
+            { name: 'WebP 图片', extensions: ['webp'] }
+        ]
     });
     if (canceled || !filePath) return false;
     fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
@@ -347,6 +351,63 @@ ipcMain.handle('save-images-batch', async (_e, files) => {
         }
     } catch (e) { return { ok, fail, error: String(e) }; }
     return { ok, fail, dir };
+});
+
+// 先选好保存位置再导出:多文件选目录,单文件选文件(带默认文件名)
+ipcMain.handle('pick-export-location', async (_e, { count, hintName }) => {
+    const st = loadState();
+    const dir0 = validDir(st.lastExportDir) ? st.lastExportDir : undefined;
+    if (count > 1) {
+        const res = await dialog.showOpenDialog({
+            title: '选择导出目录',
+            defaultPath: dir0,
+            properties: ['openDirectory', 'createDirectory']
+        });
+        if (res.canceled || !res.filePaths.length) return { canceled: true };
+        const dir = res.filePaths[0];
+        saveState({ lastExportDir: dir });
+        return { mode: 'dir', dir };
+    }
+    const def = dir0 ? freeFilePath(dir0, hintName || 'photo.jpg') : (hintName || 'photo.jpg');
+    const { canceled, filePath } = await dialog.showSaveDialog({
+        title: '导出图片',
+        defaultPath: def,
+        filters: [
+            { name: 'PNG 图片', extensions: ['png'] },
+            { name: 'JPEG 图片', extensions: ['jpg'] },
+            { name: 'WebP 图片', extensions: ['webp'] }
+        ]
+    });
+    if (canceled || !filePath) return { canceled: true };
+    saveState({ lastExportDir: path.dirname(filePath) });
+    return { mode: 'file', filePath };
+});
+
+// 把已渲染好的导出数据写入选好的位置
+ipcMain.handle('write-export-files', async (_e, { location, files }) => {
+    if (!location || !files || !files.length) return { ok: 0, fail: files ? files.length : 0 };
+    if (location.mode === 'file') {
+        try {
+            fs.writeFileSync(location.filePath, Buffer.from(files[0].data, 'base64'));
+            return { ok: 1, fail: 0 };
+        } catch (e) {
+            return { ok: 0, fail: 1, error: String(e) };
+        }
+    }
+    let ok = 0, fail = 0;
+    const written = new Set();
+    try {
+        for (const f of files) {
+            if (!f || !f.data) { fail++; continue; }
+            try {
+                const dest = freeFilePath(location.dir, f.filename, written);
+                fs.writeFileSync(dest, Buffer.from(f.data, 'base64'));
+                written.add(path.basename(dest));
+                ok++;
+            } catch (e) { fail++; }
+        }
+    } catch (e) { return { ok, fail, error: String(e) }; }
+    return { ok, fail };
 });
 
     app.on('second-instance', () => {

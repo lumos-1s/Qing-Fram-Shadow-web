@@ -900,6 +900,11 @@ AV_OVERLAY_BC2:67 };
         return Math.max(2, Math.min(800, Math.round(paramFs * k)));
     }
     function scaledBlurRadius(blurIntensity) { return Math.max(6, Math.round((50 + blurIntensity / 2.0) * 1.0)); }
+    // 个性签名/大标题背景模糊(z=42)半径:由滑块 blurIntensity(0-100) 线性映射,默认 50 → 30px
+    function signBlurRad(S) {
+        const b = (S && typeof S.blurIntensity === 'number') ? S.blurIntensity : 50;
+        return Math.max(0, Math.round(b * 0.6));
+    }
     // 模糊留白带:上/左/右/下的解析度统一,由"模糊半径"兜底,边框粗细不超过图片短边的 7%,避免大边框预设把照片框出大片空白
     function blurBand(size, iw, ih, intensity) {
         const blurRadius = scaledBlurRadius(intensity);
@@ -1493,17 +1498,18 @@ AV_OVERLAY_BC2:67 };
             const topBotPad = Math.max(50, Math.round(size * 1.2));
             const w = leftW + iw + rightPad;
             const h = ih + topBotPad * 2;
-            // 背景:白底或模糊照片(50%模糊)
+            // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
             if (S.signBgBlur) {
+                const cw = g.canvas.width, ch = g.canvas.height;
                 g.save();
-                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-                g.filter = 'blur(24px) brightness(0.68)';
-                const bs = Math.max(w / iw, h / ih);
-                g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
+                g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.68)';
+                const bs = Math.max(cw / iw, ch / ih);
+                g.drawImage(img, (cw - iw * bs) / 2, (ch - ih * bs) / 2, iw * bs, ih * bs);
                 g.filter = 'none';
                 g.restore();
             } else {
-                g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, g.canvas.width, g.canvas.height);
             }
             // 照片严格垂直居中(用画布实际高度),支持缩放/偏移/圆角
             const px = leftW + 40;
@@ -1570,7 +1576,7 @@ AV_OVERLAY_BC2:67 };
             if (S.signBgBlur) {
                 g.save();
                 g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-                g.filter = 'blur(24px) brightness(0.68)';
+                g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.68)';
                 const bs = Math.max(w / iw, h / ih);
                 g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
                 g.filter = 'none';
@@ -1643,17 +1649,18 @@ AV_OVERLAY_BC2:67 };
             const topBotPad = Math.max(50, Math.round(size * 1.2));
             const w = iw + rightW + leftPad;
             const h = ih + topBotPad * 2;
-            // 背景:白底或模糊照片(50%模糊)
+            // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
             if (S.signBgBlur) {
+                const cw = g.canvas.width, ch = g.canvas.height;
                 g.save();
-                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-                g.filter = 'blur(24px) brightness(0.68)';
-                const bs = Math.max(w / iw, h / ih);
-                g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
+                g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.68)';
+                const bs = Math.max(cw / iw, ch / ih);
+                g.drawImage(img, (cw - iw * bs) / 2, (ch - ih * bs) / 2, iw * bs, ih * bs);
                 g.filter = 'none';
                 g.restore();
             } else {
-                g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, g.canvas.width, g.canvas.height);
             }
             // 照片严格垂直居中(用画布实际高度),支持缩放/偏移/圆角
             const px = Math.round(leftPad / 3);
@@ -2550,7 +2557,7 @@ AV_OVERLAY_BC2:67 };
         if (S.signBgBlur) {
             g.save();
             g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-            g.filter = 'blur(30px) brightness(0.6)';
+            g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
             const bs = Math.max(w / iw, h / ih);
             g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
@@ -2581,7 +2588,7 @@ AV_OVERLAY_BC2:67 };
         if (S.signBgBlur) {
             g.save();
             g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-            g.filter = 'blur(30px) brightness(0.6)';
+            g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
             const bs = Math.max(w / iw, h / ih);
             g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
@@ -2659,7 +2666,7 @@ AV_OVERLAY_BC2:67 };
         if (S.signBgBlur) {
             g.save();
             g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-            g.filter = 'blur(30px) brightness(0.6)';
+            g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
             const bs = Math.max(w / iw, h / ih);
             g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
@@ -2708,7 +2715,7 @@ AV_OVERLAY_BC2:67 };
         // 模糊背景:把照片放大铺满画布
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-        g.filter = 'blur(30px) brightness(0.6)';
+        g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
         const bs = Math.max(w / iw, h / ih);
         g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
         g.filter = 'none';
@@ -2773,7 +2780,7 @@ AV_OVERLAY_BC2:67 };
         const w = iw + pad * 2, h = ih + pad + bottomH;
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-        g.filter = 'blur(30px) brightness(0.6)';
+        g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
         const bs = Math.max(w / iw, h / ih);
         g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
         g.filter = 'none';
@@ -2802,7 +2809,7 @@ AV_OVERLAY_BC2:67 };
         const w = iw + pad * 2, h = ih + pad * 2 + bottomH;
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-        g.filter = 'blur(30px) brightness(0.6)';
+        g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
         const bs = Math.max(w / iw, h / ih);
         g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
         g.filter = 'none';

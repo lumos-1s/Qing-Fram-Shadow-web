@@ -370,10 +370,9 @@ window.App = Object.assign(window.App || {}, {
     syncToSelected() {
         if (this.selectedIdx.length <= 1) { this.setStatus('请先在胶片条中多选需要同步的照片(Ctrl/Shift+点击)'); return; }
         const srcIdx = this.selectedIdx[0];
-        const srcIm = this.images[srcIdx];
-        const srcTpl = srcIm && (srcIm.customSettings || this.imageTemplates.get(srcIm));
-        // 同步内容 = 边框/照片/光影等参数;Logo/贴纸/自由文字/拼图布局按“每张图片独立记忆”不随同步迁移
-        const applied = JSON.parse(JSON.stringify(srcTpl || this.template));
+        // 源模板 = 当前编辑中模板(含全部最新修改)。不要用 customSettings/imageTemplates 旧快照,
+        // 否则第一张带过独立设置/保存过之后,再次修改第一张再点同步仍会同步旧参数
+        const applied = JSON.parse(JSON.stringify(this.template));
         if (Array.isArray(applied.logoElements)) applied.logoElements = [];
         if (applied.decorConfig) { delete applied.decorConfig.stickers; delete applied.decorConfig.textLines; }
         delete applied.puzzle;

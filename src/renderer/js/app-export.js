@@ -1,17 +1,46 @@
 // 导出模块：图片导出 —— 从 app.js 拆分
 window.App = Object.assign(window.App || {}, {
-    /* ── 导出 ── */
+    /* ── 导出:先选保存位置,再渲染导出画面,最后写盘 ── */
     async exportImage() {
         if (!this.image) { this.setStatus('请先导入照片'); return; }
-        const EXPORT_MAX = 8192;
         const fmt = this.dom.selFormat.value;
-        const mime = fmt === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const ext = fmt === 'jpeg' ? 'jpg' : 'png';
+        const mime = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[fmt] || 'image/jpeg';
+        const lossy = fmt === 'jpeg' || fmt === 'webp';
+        const ext = fmt === 'jpeg' ? 'jpg' : fmt;
+        const quality = lossy ? Math.min(1, Math.max(0.6, (parseInt(this.dom.slExportQuality.value, 10) || 92) / 100)) : 1;
+        const sizeOpt = parseInt(this.dom.selExportSize.value, 10) || 0;
+        const needsBg = fmt === 'jpeg';
         const targets = this.selectedIdx.length > 1 ? this.selectedIdx : [this.currentIdx];
+        const jobs = [];
+        targets.forEach(idx => {
+            const im = this.images[idx];
+            if (!im) return;
+            const tpl = im.customSettings || this.imageTemplates.get(im) ||
+                (this.currentIdx === idx ? this.template : this.defaultTemplate());
+            const puzzle = !!(tpl && tpl.puzzle && tpl.puzzle.enabled);
+            jobs.push({ im, puzzle });
+        });
+        if (!jobs.length) { this.setStatus('请先导入照片'); return; }
+
+        // ① 先在画布外准备好文件名(不触发任何渲染),单文件时作为默认名
+        const files = jobs.map(j => {
+            const baseName = (j.im.name || 'photo').replace(/\.[^.]+$/, '');
+            return { data: null, stem: `${baseName}${j.puzzle ? '_拼图' : '_边框'}`, ext };
+        });
+        this.dedupeExportNames(files);
+
+        // ② 先弹出保存位置:多文件选目录,单文件选文件
+        let loc;
+        try {
+            loc = await window.qingframe.pickExportLocation({ count: jobs.length, hintName: files[0].filename });
+        } catch (e) { loc = null; }
+        if (!loc || loc.canceled) { this.setStatus('已取消导出'); return; }
+
+        // ③ 再逐张渲染导出画面(展示画布同步变大),期间无渲染的确认框
         const originalIdx = this.currentIdx;
         const baseTemplate = this.template;
         const prevMax = this.displayMax;
-        const files = [];
+        const uiMaxSave = this.dom.canvas.width;
         const scaleElPix = (tpl, k) => {
             if (k === 1) return false;
             let any = false;
@@ -33,18 +62,16 @@ window.App = Object.assign(window.App || {}, {
             return any;
         };
         try {
-            for (let n = 0; n < targets.length; n++) {
-                const idx = targets[n];
-                const im = this.images[idx];
-                if (!im) continue;
+            for (let n = 0; n < jobs.length; n++) {
+                const { im, puzzle } = jobs[n];
                 this.image = im;
                 this.invalidateStyleCaches();
-                this.currentIdx = idx;
-                this.template = im.customSettings || baseTemplate;
+                this.currentIdx = this.images.indexOf(im);
+                // 每张图用各自预设:已自定义/记忆过的用其自身;当前主图用正在编辑的模板;其余未设置的用各自默认边框(不跟随第一张)
+                this.template = im.customSettings || this.imageTemplates.get(im) ||
+                    (this.images.indexOf(im) === originalIdx ? baseTemplate : this.defaultTemplate());
                 this.normalizeTemplate();
-                const puzzle = !!(this.template && this.template.puzzle && this.template.puzzle.enabled);
                 // 先按 UI 默认尺寸渲染一次,取得元素坐标的"基准画布宽度"
-                const uiMaxSave = this.displayMax;
                 this.displayMax = undefined;
                 await new Promise(res => requestAnimationFrame(() => {
                     if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
@@ -52,7 +79,7 @@ window.App = Object.assign(window.App || {}, {
                     res();
                 }));
                 const beforeW = Math.max(1, this.dom.canvas.width || 1);
-                this.displayMax = EXPORT_MAX;
+                this.displayMax = sizeOpt > 0 ? sizeOpt : Math.max(1, im.w || 1, im.h || 1);
                 await new Promise(res => requestAnimationFrame(() => {
                     if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
                     else window.__render(this, false);
@@ -70,7 +97,7 @@ window.App = Object.assign(window.App || {}, {
                 }
                 this.displayMax = uiMaxSave;
                 let src = this.dom.canvas;
-                if (fmt === 'jpeg') {
+                if (needsBg) {
                     const bg = document.createElement('canvas');
                     bg.width = src.width; bg.height = src.height;
                     const bgx = bg.getContext('2d');
@@ -79,13 +106,14 @@ window.App = Object.assign(window.App || {}, {
                     bgx.drawImage(src, 0, 0);
                     src = bg;
                 }
-                const dataUrl = src.toDataURL(mime, fmt === 'jpeg' ? 0.92 : 1);
-                const base64 = dataUrl.split(',')[1];
-                const baseName = (im.name || 'photo').replace(/\.[^.]+$/, '');
-                files.push({ data: base64, stem: `${baseName}${puzzle ? '_拼图' : '_边框'}`, ext });
+                files[n].data = src.toDataURL(mime, quality).split(',')[1];
                 const bar = document.getElementById('progressBar');
-                if (bar) bar.style.width = Math.round(((n + 1) / targets.length) * 100) + '%';
+                if (bar) bar.style.width = Math.round(((n + 1) / jobs.length) * 100) + '%';
             }
+            // ④ 渲染完毕,直接写入已选定的目录/文件
+            const r = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
+            const m = `导出完成：成功 ${r.ok || 0}${r.fail ? `，失败 ${r.fail}` : ''}`;
+            this.setStatus(m);
         } finally {
             this.currentIdx = originalIdx;
             this.image = this.images[this.currentIdx];
@@ -96,20 +124,6 @@ window.App = Object.assign(window.App || {}, {
         }
 
         if (this.image) this.scheduleRender(true);
-
-        this.dedupeExportNames(files);
-
-        let result;
-        if (files.length > 1 && window.qingframe.saveImagesBatch) {
-            result = await window.qingframe.saveImagesBatch(files);
-            if (result && result.canceled) { this.setStatus('已取消导出'); this.resetProgress(); return; }
-        } else if (files.length === 1) {
-            result = await window.qingframe.saveImage(files[0].data, files[0].filename) ? { ok: 1 } : { ok: 0 };
-        } else {
-            result = { ok: 0, fail: files.length };
-        }
-        const r = result || {};
-        this.setStatus(`导出完成：成功 ${r.ok || 0}${r.fail ? `，失败 ${r.fail}` : ''}`);
         this.resetProgress();
         this.updateStatusBar();
     },
