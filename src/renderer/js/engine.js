@@ -667,23 +667,6 @@ function applyGlobalLight(ctx, light, cw, ch) {
     }
 }
 
-// EXIF 底条(原版 drawDecoration ??exifAutoText 逻辑)
-function drawExifBar(ctx, decor, cw, ch) {
-    if ((decor.exifAutoText || 0) !== 1) return;
-    let exifLine = null;
-    for (const l of (decor.textLines || [])) {
-        if (l.text && (l.align === 'bottom' || l.align === 'exif')) { exifLine = l; break; }
-    }
-    if (!exifLine) return;
-    const fs = autoExifTextSize(exifLine, cw);
-    const pad = Math.max(6, fs * 0.25);
-    const baseY = ch - fs - 10;
-    const top = baseY - fs * 0.9 - pad;
-    const bottom = Math.min(ch, baseY + fs * 0.25 + pad);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(0, top, cw, bottom - top);
-}
-
 // 文字字号:exif 自适行??2000px 基准缩放(0.5~2.5 ??,其余保持原??原版 autoExifTextSize)
 function autoExifTextSize(textLine, canvasW) {
     let fs = Math.max(1, textLine.fontSize || 1);
@@ -1152,60 +1135,6 @@ function clampPuzzleAxes(layoutType, axes) {
         out[dim] = vals;
     }
     return out;
-}
-
-function puzzleRects(layout, W, H, g) {
-    const g2 = g / 2, rows = (hx) => { const a = []; for (let i = 0; i < hx; i++) a.push(i); return a; };
-    switch (layout) {
-        case 'h2': return [[0, 0, (W - g) / 2, H], [(W - g) / 2 + g, 0, (W - g) / 2, H]];
-        case 'v2': return [[0, 0, W, (H - g) / 2], [0, (H - g) / 2 + g, W, (H - g) / 2]];
-        case 'as2': {
-            const w1 = Math.round(W * 2 / 3 - g2), w2 = W - w1 - g;
-            return [[0, 0, w1, H], [w1 + g, 0, w2, H]];
-        }
-        case 'h3': {
-            const cw = (W - 2 * g) / 3; const a = [];
-            for (const i of rows(3)) a.push([i * (cw + g), 0, cw, H]);
-            return a;
-        }
-        case 'v3': {
-            const chh = (H - 2 * g) / 3; const a = [];
-            for (const i of rows(3)) a.push([0, i * (chh + g), W, chh]);
-            return a;
-        }
-        case 'grid4': {
-            const cw = (W - g) / 2, chh = (H - g) / 2; const a = [];
-            for (const rr of rows(2)) for (const c of rows(2)) a.push([c * (cw + g), rr * (chh + g), cw, chh]);
-            return a;
-        }
-        case 'as4': {
-            const w1 = Math.round(W * 3 / 5 - g2), w2 = W - w1 - g, chh = (H - 2 * g) / 3;
-            const a = [[0, 0, w1, H]];
-            for (const i of rows(3)) a.push([w1 + g, i * (chh + g), w2, chh]);
-            return a;
-        }
-        case 'h4': {
-            const cw = (W - 3 * g) / 4; const a = [];
-            for (const i of rows(4)) a.push([i * (cw + g), 0, cw, H]);
-            return a;
-        }
-        case 'v4': {
-            const chh = (H - 3 * g) / 4; const a = [];
-            for (const i of rows(4)) a.push([0, i * (chh + g), W, chh]);
-            return a;
-        }
-        case 'grid6': {
-            const cw = (W - 2 * g) / 3, chh = (H - g) / 2; const a = [];
-            for (const rr of rows(2)) for (const c of rows(3)) a.push([c * (cw + g), rr * (chh + g), cw, chh]);
-            return a;
-        }
-        case 'grid9': {
-            const cw = (W - 2 * g) / 3, chh = (H - 2 * g) / 3; const a = [];
-            for (const rr of rows(3)) for (const c of rows(3)) a.push([c * (cw + g), rr * (chh + g), cw, chh]);
-            return a;
-        }
-        default: return [[0, 0, W, H]];
-    }
 }
 
 // 槽内图片适配:cover/contain + 槽位缩放/偏移
