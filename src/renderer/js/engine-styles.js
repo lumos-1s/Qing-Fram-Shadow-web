@@ -1493,8 +1493,18 @@ AV_OVERLAY_BC2:67 };
             const topBotPad = Math.max(50, Math.round(size * 1.2));
             const w = leftW + iw + rightPad;
             const h = ih + topBotPad * 2;
-            // 白底
-            g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            // 背景:白底或模糊照片(50%模糊)
+            if (S.signBgBlur) {
+                g.save();
+                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+                g.filter = 'blur(15px) brightness(0.8)';
+                const bs = Math.max(w / iw, h / ih);
+                g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+                g.filter = 'none';
+                g.restore();
+            } else {
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            }
             // 照片严格垂直居中(用画布实际高度)
             const px = leftW + 40;
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
@@ -1503,7 +1513,7 @@ AV_OVERLAY_BC2:67 };
             const tx = Math.round(leftW * 0.25) + 40;
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale));
-            g.fillStyle = '#1a1a1a';
+            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.letterSpacing = Math.round(fBrand * 0.15);
             g.textAlign = 'left'; g.textBaseline = 'alphabetic';
@@ -1604,8 +1614,18 @@ AV_OVERLAY_BC2:67 };
             const topBotPad = Math.max(50, Math.round(size * 1.2));
             const w = iw + rightW + leftPad;
             const h = ih + topBotPad * 2;
-            // 白底
-            g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            // 背景:白底或模糊照片(50%模糊)
+            if (S.signBgBlur) {
+                g.save();
+                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+                g.filter = 'blur(15px) brightness(0.8)';
+                const bs = Math.max(w / iw, h / ih);
+                g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+                g.filter = 'none';
+                g.restore();
+            } else {
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            }
             // 照片严格垂直居中(用画布实际高度)
             const px = Math.round(leftPad / 3);
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
@@ -1614,7 +1634,7 @@ AV_OVERLAY_BC2:67 };
             const tx = px + iw + Math.round(rightW * 0.10);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
-            g.fillStyle = '#1a1a1a';
+            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.letterSpacing = Math.round(fBrand * 0.15);
             g.textAlign = 'left';
