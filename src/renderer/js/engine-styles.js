@@ -2338,13 +2338,13 @@ AV_OVERLAY_BC2:67 };
             }
             case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
-                const gm = (t.baseMargin && t.baseMargin.globalMargin) || 1;
+                const gm = (S && S.globalMargin) || 1;
                 const leftW = Math.max(160, Math.round(iw * 0.35 * gm));
                 const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
                 return { w: leftW + iw + sidePad, h: Math.round(ih * 1.08) + sidePad };
             }
             case 'OVERLAY_PARAM_BOTTOM': {
-                const gm = (t.baseMargin && t.baseMargin.globalMargin) || 1;
+                const gm = (S && S.globalMargin) || 1;
                 const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
                 const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
                 return { w: iw + sidePad * 2, h: ih + bottomH + sidePad };
