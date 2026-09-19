@@ -1941,10 +1941,20 @@ AV_OVERLAY_BC2:67 };
     function drawLogo(g, brand, x, y, logoFs) {
         const b = String(brand || 'CAMERA').toUpperCase();
         const fs = logoFs;
+        // 统一用印象毛玻璃同款衬线字体:Georgia + 字间距
+        g.font = 'bold ' + fs + "px Georgia, 'Times New Roman', serif";
+        g.letterSpacing = Math.round(fs * 0.15);
+        g.fillStyle = g.fillStyle; // 保留调用方设的颜色
+        g.fillText(b, x, y);
+        g.letterSpacing = 0;
+        return textMetrics(g, b, fs, false, true, 0).w;
+    }
+    function _oldDrawLogo(g, brand, x, y, logoFs) {
+        const b = String(brand || 'CAMERA').toUpperCase();
+        const fs = logoFs;
         const txtL = (s, bold, subFs) => { const f = subFs || fs; setFont(g, f, false, bold); g.fillText(s, x, y); };
         const txtW = (s, bold) => textMetrics(g, s, logoFs, false, bold, 0).w;
         const total = logoWidth(brand, fs);
-        // 每个品牌按 LogoResource.java 规则绘制(文字+矢量图形近似)
         if (b === 'LEICA') {
             const dotR = Math.round(fs / 3);
             g.fillStyle = 'rgb(200,30,30)';
