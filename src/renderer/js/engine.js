@@ -1330,12 +1330,9 @@ function renderPuzzle(app, compare, noSelection) {
     const shiftX = shift / Wn, shiftY = shift / Hn;
     const EPS = 1e-6;
     slots0 = slots0.map(r => {
-        let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3], ch = false;
-        if (x0 <= EPS) { x0 += shiftX; ch = true; }
-        if (x1 >= 1 - EPS) { x1 -= shiftX; ch = true; }
-        if (y0 <= EPS) { y0 += shiftY; ch = true; }
-        if (y1 >= 1 - EPS) { y1 -= shiftY; ch = true; }
-        return ch ? [x0, y0, x1 - x0, y1 - y0] : r;
+        let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3];
+        x0 += shiftX; x1 -= shiftX; y0 += shiftY; y1 -= shiftY;
+        return [x0, y0, x1 - x0, y1 - y0];
     });
     // 字幕字号:画布长边基准 + 受字幕带高度(gth)约束,gap 小则字号自动缩小,避免行间重叠
     const gthBase = Math.max(2, gapPx * 2);
