@@ -2994,7 +2994,8 @@ AV_OVERLAY_BC:66 };
         g.fillStyle = S.signColor || '#fff';
         let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
         const signTxt = S.userSignature || '— my memory —';
-        const maxSignW = iw - 20;
+        const availL = ax - pad - 10, availR = (pad + iw) - ax - 10;
+        const maxSignW = 2 * Math.max(20, Math.min(availL, availR));
         g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         let tw = g.measureText(signTxt).width;
         if (tw > maxSignW) { signFs = Math.max(10, Math.round(signFs * maxSignW / tw)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
@@ -3064,10 +3065,11 @@ AV_OVERLAY_BC:66 };
         g.fillStyle = S.signColor || '#fff';
         let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
         const signTxt = S.userSignature || '— my memory —';
-        const maxSignW = iw - 20;
+        const availL2 = ax - pad - 10, availR2 = (pad + iw) - ax - 10;
+        const maxSignW2 = 2 * Math.max(20, Math.min(availL2, availR2));
         g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
-        let tw = g.measureText(signTxt).width;
-        if (tw > maxSignW) { signFs = Math.max(10, Math.round(signFs * maxSignW / tw)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
+        let tw2 = g.measureText(signTxt).width;
+        if (tw2 > maxSignW2) { signFs = Math.max(10, Math.round(signFs * maxSignW2 / tw2)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
         g.textAlign = 'center';
         g.textBaseline = 'top';
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
