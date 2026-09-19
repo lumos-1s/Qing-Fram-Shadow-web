@@ -703,13 +703,58 @@ AV_OVERLAY_BC2:67 };
 
     // 网络 EXIF(± 字段)映射为相机规格;无数据走 Java 同 seed 随机
     function camHasData(exif) { return !!(exif && (exif.make || exif.model || exif.focal || exif.aperture || exif.iso || exif.shutter)); }
+    // 品牌名规范化:把EXIF里的make字段映射成简洁品牌名
+    function normalizeBrand(make, model) {
+        const s = (make + ' ' + model).toLowerCase();
+        if (!make && !model) return '';
+        const map = [
+            [/sony|sony corporation|sony corp/i, 'SONY'],
+            [/canon|canon inc.|canon inc/i, 'Canon'],
+            [/nikon|nikon corporation|nikon corp/i, 'Nikon'],
+            [/fujifilm|fuji photo|fujinon|fuji/i, 'FUJIFILM'],
+            [/leica|leica camera|leica geosystems/i, 'Leica'],
+            [/panasonic|lumix|panasonic corp/i, 'Panasonic'],
+            [/olympus|olympus imaging|om system|om digital/i, 'OM System'],
+            [/pentax|ricoh|ricoh imaging|asahi pentax/i, 'PENTAX'],
+            [/hasselblad/i, 'HASSELBLAD'],
+            [/phase one|phaseone/i, 'Phase One'],
+            [/samsung|samsung techwin/i, 'SAMSUNG'],
+            [/xiaomi|xiaomi inc.|mi / |redmi/i, 'Xiaomi'],
+            [/huawei|huawei device/i, 'HUAWEI'],
+            [/apple|iphone|apple inc./i, 'Apple'],
+            [/google|pixel/i, 'Google'],
+            [/oneplus|one+/i, 'OnePlus'],
+            [/oppo|bbk electronic/i, 'OPPO'],
+            [/vivo|vivoelectronics/i, 'vivo'],
+            [/dji|dji/|shenzhen dj/i, 'DJI'],
+            [/gopro/i, 'GoPro'],
+            [/zeiss|carl zeiss/i, 'ZEISS'],
+            [/contax|kyocera/i, 'CONTAX'],
+            [/konica|minolta|konica minolta/i, 'KONICA MINOLTA'],
+            [/mamiya/i, 'Mamiya'],
+            [/sinar/i, 'Sinar'],
+            [/alpa/i, 'ALPA'],
+            [/fujifilm|gfx/i, 'FUJIFILM'],
+        ];
+        for (const [re, name] of map) {
+            if (re.test(s)) return name;
+        }
+        // 没匹配到就原样返回make的前20字符
+        return (make || '').trim().substring(0, 20);
+    }
+
     function cameraFor(styleName, iw, ih, exif) {
         const noBrandModel = (styleName === 'SIMPLE_FILM' || styleName === 'PARAM_BOTTOM_SINGLE');
         if (camHasData(exif)) {
             const focal = exif.focal || '50mm', aper = exif.aperture || 'f/2.8';
             const iso = exif.iso || 'ISO 400', shut = exif.shutter || '1/125';
             if (noBrandModel) return { brand: '', model: '', focal, aperture: aper, iso: '', shutter: '' };
-            let b = exif.make || '', m = exif.model || '';
+            let b = normalizeBrand(exif.make, exif.model);
+            let m = (exif.model || '').trim();
+            // model里去掉品牌名重复部分
+            if (m && b && m.toLowerCase().includes(b.toLowerCase())) {
+                m = m.replace(new RegExp(b, 'gi'), '').trim();
+            }
             if (!b && !m) b = 'CAMERA';
             return { brand: b, model: m, focal, aperture: aper, iso, shutter: shut };
         }
