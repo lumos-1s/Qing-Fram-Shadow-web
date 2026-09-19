@@ -1589,8 +1589,10 @@ AV_OVERLAY_BC2:67 };
         }
         // RIGHT(pos=1): 白底+照片在左+右侧品牌名和参数(印象右留白)
         if (pos === 1) {
-            const rightW = Math.max(160, Math.round(iw * 0.35));
-            const sidePad = Math.max(30, Math.round(size * 0.8));
+            const gm = S.globalMargin || 1;
+            const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
+            const rightW = Math.max(160, Math.round(iw * 0.35 * gm));
+            const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
             const w = iw + rightW + sidePad;
             const h = Math.round(ih * 1.08) + sidePad;
             // 白底
@@ -1601,7 +1603,7 @@ AV_OVERLAY_BC2:67 };
             // 右侧文字
             const tx = sidePad + iw + Math.round(rightW * 0.15);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-            const fBrand = Math.max(22, Math.round(rightW * 0.16));
+            const fBrand = Math.max(22, Math.round(rightW * 0.16 * pfScale));
             g.fillStyle = '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.textAlign = 'left';
@@ -1609,10 +1611,10 @@ AV_OVERLAY_BC2:67 };
             g.fillText(brand, tx, Math.round(h * 0.28));
             // 三行圆角方框参数
             if (S.useExif && S.cam) {
-                const boxW = Math.round(rightW * 0.3);
+                const boxW = Math.round(rightW * 0.3 * pfScale);
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
-                const fVal = Math.max(13, Math.round(rightW * 0.09));
+                const fVal = Math.max(13, Math.round(rightW * 0.09 * pfScale));
                 const rows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
