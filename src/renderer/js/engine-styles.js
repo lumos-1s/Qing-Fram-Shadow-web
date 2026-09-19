@@ -2336,6 +2336,24 @@ AV_OVERLAY_BC2:67 };
                 const p = Math.max(20, Math.round(iw * 0.03));
                 return { w: iw + p * 2, h: ih + p * 2 };
             }
+            case 'OVERLAY_PARAM_LEFT':
+            case 'OVERLAY_PARAM_RIGHT': {
+                const gm = (t.baseMargin && t.baseMargin.globalMargin) || 1;
+                const leftW = Math.max(160, Math.round(iw * 0.35 * gm));
+                const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
+                return { w: leftW + iw + sidePad, h: Math.round(ih * 1.08) + sidePad };
+            }
+            case 'OVERLAY_PARAM_BOTTOM': {
+                const gm = (t.baseMargin && t.baseMargin.globalMargin) || 1;
+                const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
+                const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
+                return { w: iw + sidePad * 2, h: ih + bottomH + sidePad };
+            }
+            case 'OVERLAY_LOGO_BOTTOM': {
+                const p = Math.max(30, Math.round(iw * 0.05));
+                const bh = Math.round(iw * 0.15);
+                return { w: iw + p * 2, h: ih + p + bh };
+            }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
