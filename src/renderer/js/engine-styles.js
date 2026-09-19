@@ -726,7 +726,7 @@ AV_OVERLAY_BC2:67 };
             [/oneplus|one+/i, 'OnePlus'],
             [/oppo|bbk electronic/i, 'OPPO'],
             [/vivo|vivoelectronics/i, 'vivo'],
-            [/dji|dji/|shenzhen dj/i, 'DJI'],
+            [/dji|shenzhen dj/i, 'DJI'],
             [/gopro/i, 'GoPro'],
             [/zeiss|carl zeiss/i, 'ZEISS'],
             [/contax|kyocera/i, 'CONTAX'],
