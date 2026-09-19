@@ -1249,7 +1249,8 @@ AV_OVERLAY_BC2:67 };
     }
     function styleImpFrosted(img, size, g, iw, ih, S) {
         // 横版:左侧文字区,右侧照片
-        const leftW = Math.max(180, Math.round(iw * 0.35));
+        const gm = S.globalMargin || 1;
+        const leftW = Math.max(180, Math.round(iw * 0.35 * gm));
         const rightPad = Math.round(leftW / 2);
         const topBotPad = Math.max(50, Math.round(size * 1.2));
         const w = leftW + iw + rightPad;
@@ -1880,6 +1881,7 @@ AV_OVERLAY_BC2:67 };
             imgScale: (t.baseMargin && (t.baseMargin.imgScale || 1)) || 1,
             imgOffsetX: (t.baseMargin && t.baseMargin.imgOffsetX) || 0,
             imgOffsetY: (t.baseMargin && t.baseMargin.imgOffsetY) || 0,
+            globalMargin: (t.baseMargin && t.baseMargin.globalMargin) || 1,
             shadowSize: clampP(t.shadowSize != null ? t.shadowSize : 0, 0, 80),
             shadowDepth: clampP(t.shadowDepth != null ? t.shadowDepth : 30, 0, 100),
             shadowAlpha: 80,
