@@ -1591,28 +1591,42 @@ AV_OVERLAY_BC2:67 };
         if (pos === 1) {
             const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
-            // 和印象毛玻璃同款比例
+            // 完全对齐印象毛玻璃,只是镜像+白底黑字
             const rightW = Math.max(180, Math.round(iw * 0.35 * gm));
             const leftPad = Math.round(rightW / 2);
-            const topBotPad = Math.max(50, Math.round(size * 1.2 * gm));
+            const topBotPad = Math.max(50, Math.round(size * 1.2));
             const w = iw + rightW + leftPad;
             const h = ih + topBotPad * 2;
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-            // 照片垂直居中在左侧
-            const px = leftPad;
+            // 照片垂直居中在左侧,带圆角阴影(和毛玻璃一致)
+            const px = leftPad + 40;
             const py = Math.round((h - ih) / 2);
+            g.save();
+            g.shadowColor = 'rgba(0,0,0,0.15)';
+            g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.05));
+            g.shadowOffsetY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
+            g.fillStyle = '#ffffff';
+            const r = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
+            if (typeof g.roundRect === 'function') {
+                g.beginPath(); g.roundRect(px, py, iw, ih, r); g.fill();
+            } else { g.fillRect(px, py, iw, ih); }
+            g.restore();
+            g.save();
+            if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(px, py, iw, ih, r); g.clip(); }
             g.drawImage(img, px, py);
-            // 右侧文字
-            const tx = px + iw + Math.round(rightW * 0.15);
+            g.restore();
+            // 右侧品牌名(和毛玻璃一样的间距)
+            const tx = px + iw + Math.round(rightW * 0.25);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
             g.fillStyle = '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.letterSpacing = Math.round(fBrand * 0.15);
             g.textAlign = 'left';
             g.textBaseline = 'alphabetic';
             g.fillText(brand, tx, Math.round(h * 0.28));
-            // 三行圆角方框参数
+            // 三行圆角方框参数(和毛玻璃一样的间距)
             if (S.useExif && S.cam) {
                 const boxW = Math.round(rightW * 0.28 * pfScale);
                 const boxH = Math.round(boxW * 0.55);
@@ -1638,7 +1652,7 @@ AV_OVERLAY_BC2:67 };
                     g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
                     g.textAlign = 'left';
-                    g.fillText(row.val, tx + boxW + Math.round(rightW * 0.06), ry - boxH / 2);
+                    g.fillText(row.val, tx + boxW + Math.round(rightW * 0.05), ry - boxH / 2);
                     ry += Math.round(boxH * 1.9);
                 });
             }
