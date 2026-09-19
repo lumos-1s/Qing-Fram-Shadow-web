@@ -1279,7 +1279,7 @@ AV_OVERLAY_BC2:67 };
         // 3. 左侧品牌名
         const ml = Math.round(leftW * 0.25) + 40;
         const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-        const fBrand = Math.max(22, Math.round(leftW * 0.14));
+        const fBrand = Math.max(22, Math.round(leftW * 0.14 * (S.paramFs || 12) / 12));
         g.fillStyle = '#ffffff';
         g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand * 0.15);
@@ -1291,7 +1291,7 @@ AV_OVERLAY_BC2:67 };
             const boxW = Math.round(leftW * 0.28);
             const boxH = Math.round(boxW * 0.55);
             const fBox = Math.max(11, Math.round(boxH * 0.45));
-            const fVal = Math.max(13, Math.round(leftW * 0.08));
+            const fVal = Math.max(13, Math.round(leftW * 0.08 * (S.paramFs || 12) / 12));
             const rows = [
                 { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                 { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
