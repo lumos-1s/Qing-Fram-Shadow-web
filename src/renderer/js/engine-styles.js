@@ -1505,10 +1505,12 @@ AV_OVERLAY_BC2:67 };
             } else {
                 g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             }
-            // 照片严格垂直居中(用画布实际高度)
+            // 照片严格垂直居中(用画布实际高度),支持缩放/偏移/圆角
             const px = leftW + 40;
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
-            g.drawImage(img, px, py);
+            const pscL = S.imgScale || 1;
+            const pdwL = Math.round(iw * pscL), pdhL = Math.round(ih * pscL);
+            g.drawImage(img, px + Math.round((iw - pdwL) / 2) + (S.imgOffsetX || 0), py + Math.round((ih - pdhL) / 2) + (S.imgOffsetY || 0), pdwL, pdhL);
             // 左侧品牌名(和毛玻璃一致)
             const tx = Math.round(leftW * 0.25) + 40;
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
@@ -1572,7 +1574,9 @@ AV_OVERLAY_BC2:67 };
             }
             const px = Math.round((w - iw) / 2);
             const py = Math.round(sidePad * 0.5);
-            g.drawImage(img, px, py);
+            const pscB = S.imgScale || 1;
+            const pdwB = Math.round(iw * pscB), pdhB = Math.round(ih * pscB);
+            g.drawImage(img, px + Math.round((iw - pdwB) / 2) + (S.imgOffsetX || 0), py + Math.round((ih - pdhB) / 2) + (S.imgOffsetY || 0), pdwB, pdhB);
             const by = py + ih + Math.round(bottomH * 0.3);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale));
@@ -1639,10 +1643,12 @@ AV_OVERLAY_BC2:67 };
             } else {
                 g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             }
-            // 照片严格垂直居中(用画布实际高度)
+            // 照片严格垂直居中(用画布实际高度),支持缩放/偏移/圆角
             const px = Math.round(leftPad / 3);
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
-            g.drawImage(img, px, py);
+            const pscR = S.imgScale || 1;
+            const pdwR = Math.round(iw * pscR), pdhR = Math.round(ih * pscR);
+            g.drawImage(img, px + Math.round((iw - pdwR) / 2) + (S.imgOffsetX || 0), py + Math.round((ih - pdhR) / 2) + (S.imgOffsetY || 0), pdwR, pdhR);
             // 右侧品牌名(和毛玻璃镜像,边距一致)
             const tx = px + iw + Math.round(rightW * 0.10);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
