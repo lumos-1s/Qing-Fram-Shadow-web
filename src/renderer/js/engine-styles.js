@@ -1510,7 +1510,13 @@ AV_OVERLAY_BC2:67 };
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
             const pscL = S.imgScale || 1;
             const pdwL = Math.round(iw * pscL), pdhL = Math.round(ih * pscL);
-            g.drawImage(img, px + Math.round((iw - pdwL) / 2) + (S.imgOffsetX || 0), py + Math.round((ih - pdhL) / 2) + (S.imgOffsetY || 0), pdwL, pdhL);
+            const dpxL = px + Math.round((iw - pdwL) / 2) + (S.imgOffsetX || 0);
+            const dpyL = py + Math.round((ih - pdhL) / 2) + (S.imgOffsetY || 0);
+            const crL = S.cornerAll || 0;
+            g.save();
+            if (crL > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxL, dpyL, pdwL, pdhL, crL); g.clip(); }
+            g.drawImage(img, dpxL, dpyL, pdwL, pdhL);
+            g.restore();
             // 左侧品牌名(和毛玻璃一致)
             const tx = Math.round(leftW * 0.25) + 40;
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
@@ -1576,7 +1582,13 @@ AV_OVERLAY_BC2:67 };
             const py = Math.round(sidePad * 0.5);
             const pscB = S.imgScale || 1;
             const pdwB = Math.round(iw * pscB), pdhB = Math.round(ih * pscB);
-            g.drawImage(img, px + Math.round((iw - pdwB) / 2) + (S.imgOffsetX || 0), py + Math.round((ih - pdhB) / 2) + (S.imgOffsetY || 0), pdwB, pdhB);
+            const dpxB = px + Math.round((iw - pdwB) / 2) + (S.imgOffsetX || 0);
+            const dpyB = py + Math.round((ih - pdhB) / 2) + (S.imgOffsetY || 0);
+            const crB = S.cornerAll || 0;
+            g.save();
+            if (crB > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxB, dpyB, pdwB, pdhB, crB); g.clip(); }
+            g.drawImage(img, dpxB, dpyB, pdwB, pdhB);
+            g.restore();
             const by = py + ih + Math.round(bottomH * 0.3);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale));
@@ -1648,7 +1660,13 @@ AV_OVERLAY_BC2:67 };
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
             const pscR = S.imgScale || 1;
             const pdwR = Math.round(iw * pscR), pdhR = Math.round(ih * pscR);
-            g.drawImage(img, px + Math.round((iw - pdwR) / 2) + (S.imgOffsetX || 0), py + Math.round((ih - pdhR) / 2) + (S.imgOffsetY || 0), pdwR, pdhR);
+            const dpxR = px + Math.round((iw - pdwR) / 2) + (S.imgOffsetX || 0);
+            const dpyR = py + Math.round((ih - pdhR) / 2) + (S.imgOffsetY || 0);
+            const crR = S.cornerAll || 0;
+            g.save();
+            if (crR > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxR, dpyR, pdwR, pdhR, crR); g.clip(); }
+            g.drawImage(img, dpxR, dpyR, pdwR, pdhR);
+            g.restore();
             // 右侧品牌名(和毛玻璃镜像,边距一致)
             const tx = px + iw + Math.round(rightW * 0.10);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
