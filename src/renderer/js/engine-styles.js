@@ -1,4 +1,4 @@
-// 相框样式引擎(原版 BorderProcessor.java 移植,阶段一)
+﻿// 相框样式引擎(原版 BorderProcessor.java 移植,阶段一)
 // 严格对齐原版:BorderProcessor.apply() 的 size 折算(size*2 → min边/1000 缩放)、cornerRadius 后处理
 // (ROUNDED 用四角、其余统一圆角且 BLUR_CLASSIC/BLUR_DATE 不裁角)、try/catch 失败回退原图、
 // addGradient 用 extractDominantColors(直方图 16bin + 平均亮度 35~225 + bin 距离≥30)。
@@ -1497,7 +1497,7 @@ AV_OVERLAY_BC2:67 };
             if (S.signBgBlur) {
                 g.save();
                 g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-                g.filter = 'blur(15px) brightness(0.8)';
+                g.filter = 'blur(24px) brightness(0.68)';
                 const bs = Math.max(w / iw, h / ih);
                 g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
                 g.filter = 'none';
@@ -1618,7 +1618,7 @@ AV_OVERLAY_BC2:67 };
             if (S.signBgBlur) {
                 g.save();
                 g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
-                g.filter = 'blur(15px) brightness(0.8)';
+                g.filter = 'blur(24px) brightness(0.68)';
                 const bs = Math.max(w / iw, h / ih);
                 g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
                 g.filter = 'none';
