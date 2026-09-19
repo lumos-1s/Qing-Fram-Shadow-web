@@ -1604,7 +1604,7 @@ AV_OVERLAY_BC2:67 };
             const py = Math.round((h - ih) / 2);
             g.drawImage(img, px, py);
             // 右侧文字
-            const tx = sidePad + iw + Math.round(rightW * 0.15);
+            const tx = px + iw + Math.round(rightW * 0.15);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
             g.fillStyle = '#1a1a1a';
