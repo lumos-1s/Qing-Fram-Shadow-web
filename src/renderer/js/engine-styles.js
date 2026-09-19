@@ -2955,13 +2955,18 @@ AV_OVERLAY_BC:66 };
             g.stroke();
             g.shadowBlur = 0;
         }
-        // 签名在头像右边
+        // 签名在头像右边(自动适配宽度)
         g.fillStyle = S.signColor || '#fff';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        const signTxt = S.userSignature || '— my memory —';
+        const maxSignW = pad + iw - (ax + avatarR + 12) - 10;
+        g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let tw = g.measureText(signTxt).width;
+        if (tw > maxSignW && maxSignW > 0) { signFs = Math.max(10, Math.round(signFs * maxSignW / tw)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
-        g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
+        g.fillText(signTxt, ax + avatarR + 12, ay);
         g.shadowBlur = 0;
     }
 
