@@ -2378,8 +2378,8 @@ AV_OVERLAY_BC2:67 };
                 const gm = Math.min(1.1, (S && S.globalMargin) || 1);
                 const sideW = Math.max(180, Math.round(iw * 0.35 * gm));
                 const oppPad = Math.round(sideW / 2);
-                const topBotPad = Math.max(50, Math.round(size * 1.2 * gm));
-                return { w: sideW + iw + oppPad, h: ih + topBotPad * 2 };
+                const topBotPad = Math.max(50, Math.round(size * 1.2));
+                return { w: sideW + iw + oppPad + 40, h: ih + topBotPad * 2 };
             }
             case 'OVERLAY_PARAM_BOTTOM': {
                 const gm = Math.min(1.1, (S && S.globalMargin) || 1);
