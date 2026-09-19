@@ -1665,14 +1665,15 @@ AV_OVERLAY_BC2:67 };
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
                 let ry = Math.round(h * 0.48);
+                const boxColorR = S.signBgBlur ? '#ffffff' : '#333333';
                 rows.forEach(row => {
-                    g.strokeStyle = '#333333';
+                    g.strokeStyle = boxColorR;
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                     g.beginPath();
                     if (typeof g.roundRect === 'function') g.roundRect(tx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
                     else g.rect(tx, ry - boxH, boxW, boxH);
                     g.stroke();
-                    g.fillStyle = '#333333';
+                    g.fillStyle = boxColorR;
                     g.font = 'bold ' + fBox + 'px sans-serif';
                     g.textAlign = 'center';
                     g.textBaseline = 'middle';
