@@ -940,6 +940,7 @@ window.App = {
             if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
             if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;
             if ($('cbParamColor')) $('cbParamColor').value = this.template.paramColor || 'auto';
+            this.updatePersonalVisibility();
             if (this.template.userAvatar) {
                 const img = new Image();
                 img.onload = () => { this.avatarImg = img; window.__qfsAvatarImg = img; this.renderPreview(); };
