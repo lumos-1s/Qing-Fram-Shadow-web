@@ -1607,7 +1607,7 @@ AV_OVERLAY_BC2:67 };
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             // 照片严格垂直居中(用画布实际高度)
-            const px = leftPad;
+            const px = Math.round(leftPad / 3);
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
             g.drawImage(img, px, py);
             // 右侧品牌名(和毛玻璃镜像,边距一致)
