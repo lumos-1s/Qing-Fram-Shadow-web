@@ -1485,7 +1485,7 @@ AV_OVERLAY_BC2:67 };
     function styleOverlayParams(img, size, g, iw, ih, S, pos) {
         // LEFT(pos=0): 白底+照片在右+左侧品牌名和参数
         if (pos === 0) {
-            const gm = S.globalMargin || 1;
+            const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             const leftW = Math.max(160, Math.round(iw * 0.35 * gm));
             const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
@@ -1534,7 +1534,7 @@ AV_OVERLAY_BC2:67 };
         }
         // BOTTOM(pos=2): 白底+照片在上+底部品牌名和参数
         if (pos === 2) {
-            const gm = S.globalMargin || 1;
+            const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
             const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
@@ -2338,13 +2338,13 @@ AV_OVERLAY_BC2:67 };
             }
             case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
-                const gm = (S && S.globalMargin) || 1;
+                const gm = Math.min(1.1, (S && S.globalMargin) || 1);
                 const leftW = Math.max(160, Math.round(iw * 0.35 * gm));
                 const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
                 return { w: leftW + iw + sidePad, h: Math.round(ih * 1.08) + sidePad };
             }
             case 'OVERLAY_PARAM_BOTTOM': {
-                const gm = (S && S.globalMargin) || 1;
+                const gm = Math.min(1.1, (S && S.globalMargin) || 1);
                 const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
                 const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
                 return { w: iw + sidePad * 2, h: ih + bottomH + sidePad };
