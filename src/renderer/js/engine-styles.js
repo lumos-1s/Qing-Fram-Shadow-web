@@ -2712,7 +2712,7 @@ AV_OVERLAY_BC:66 };
         }
         // 签名(头像右边)
         g.fillStyle = S.signColor || '#444';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.022 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
@@ -2781,7 +2781,7 @@ AV_OVERLAY_BC:66 };
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
         }
         g.fillStyle = S.signColor || '#555';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.022 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 16, ay);
@@ -2830,7 +2830,7 @@ AV_OVERLAY_BC:66 };
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
         }
         g.fillStyle = '#fff';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.022 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 12, ay);
@@ -2920,7 +2920,7 @@ AV_OVERLAY_BC:66 };
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
         }
         g.fillStyle = '#fff';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        g.font = 'italic ' + Math.round(iw * 0.022 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'left';
         g.textBaseline = 'middle';
         g.fillText(S.userSignature || '— my memory —', ax + avatarR + 16, ay);
@@ -2957,7 +2957,7 @@ AV_OVERLAY_BC:66 };
         }
         // 签名在头像右边(自动适配宽度)
         g.fillStyle = S.signColor || '#fff';
-        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        let signFs = Math.round(iw * 0.022 * (S.signSize || 1));
         const signTxt = S.userSignature || '— my memory —';
         const maxSignW = pad + iw - (ax + avatarR + 12) - 10;
         g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
@@ -2992,7 +2992,7 @@ AV_OVERLAY_BC:66 };
         }
         // 签名在头像下方居中(自动缩窄)
         g.fillStyle = S.signColor || '#fff';
-        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        let signFs = Math.round(iw * 0.022 * (S.signSize || 1));
         const signTxt = S.userSignature || '— my memory —';
         const availL = ax - pad - 10, availR = (pad + iw) - ax - 10;
         const maxSignW = 2 * Math.max(20, Math.min(availL, availR));
@@ -3028,7 +3028,7 @@ AV_OVERLAY_BC:66 };
         }
         // 签名在头像左边(自动缩窄)
         g.fillStyle = S.signColor || '#fff';
-        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        let signFs = Math.round(iw * 0.022 * (S.signSize || 1));
         const signTxt = S.userSignature || '— my memory —';
         const maxSignW = ax - avatarR - 12 - pad - 10;
         g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
@@ -3063,7 +3063,7 @@ AV_OVERLAY_BC:66 };
         }
         // 签名在头像下方居中(自动缩窄)
         g.fillStyle = S.signColor || '#fff';
-        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        let signFs = Math.round(iw * 0.022 * (S.signSize || 1));
         const signTxt = S.userSignature || '— my memory —';
         const availL2 = ax - pad - 10, availR2 = (pad + iw) - ax - 10;
         const maxSignW2 = 2 * Math.max(20, Math.min(availL2, availR2));
