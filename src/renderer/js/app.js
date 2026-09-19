@@ -2471,7 +2471,18 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openImages(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
             else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); this.redo(); }
-            else if (e.ctrlKey && e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAllEls(); }
+            else if (e.ctrlKey && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                // 鼠标在缩略图条上 → 全选缩略图
+                const ts = document.getElementById('thumbStrip');
+                if (ts && (e.target === ts || ts.contains(e.target))) {
+                    this.batchSel = this.images.map((_, i) => i);
+                    this.updateThumbSel();
+                    this.setStatus('已全选 ' + this.images.length + ' 张图片');
+                } else {
+                    this.selectAllEls();
+                }
+            }
             else if (e.ctrlKey && e.key.toLowerCase() === 'c') { if (!typing) this.copyElement(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'v') { if (typing) return; e.preventDefault(); this.pasteElement(); }
             else if (e.key === 'Delete' && !typing) {
