@@ -1495,9 +1495,9 @@ AV_OVERLAY_BC2:67 };
             const h = ih + topBotPad * 2;
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-            // 照片严格垂直居中
+            // 照片严格垂直居中(用画布实际高度)
             const px = leftW + 40;
-            const py = Math.round((h - ih) / 2);
+            const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
             g.drawImage(img, px, py);
             // 左侧品牌名(和毛玻璃一致)
             const tx = Math.round(leftW * 0.25) + 40;
@@ -1606,9 +1606,9 @@ AV_OVERLAY_BC2:67 };
             const h = ih + topBotPad * 2;
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-            // 照片严格垂直居中
+            // 照片严格垂直居中(用画布实际高度)
             const px = leftPad + 40;
-            const py = Math.round((h - ih) / 2);
+            const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
             g.drawImage(img, px, py);
             // 右侧品牌名(和毛玻璃镜像,边距一致)
             const tx = px + iw + Math.round(rightW * 0.10);
