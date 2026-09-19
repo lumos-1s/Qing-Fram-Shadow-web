@@ -1536,7 +1536,7 @@ AV_OVERLAY_BC2:67 };
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
             const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
-            const w = Math.round(iw * 1.05) + sidePad * 2;
+            const w = iw + sidePad * 2;
             const h = ih + bottomH + sidePad;
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             const px = Math.round((w - iw) / 2);
