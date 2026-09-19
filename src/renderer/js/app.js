@@ -40,11 +40,39 @@ window.App = {
     _puzzleDropTarget: null, // 拖拽互换预备目标格
     _skipPuzzleCapture: false,
 
+    restoreLastState() {
+        try {
+            const raw = localStorage.getItem('qfs_last_state');
+            if (!raw) return;
+            const s = JSON.parse(raw);
+            // 找到对应预设并选中
+            if (s.presetName && this.presets) {
+                const p = this.presets.find(x => x.name === s.presetName);
+                if (p) { this.selectPreset(p); return; }
+            }
+            // 没找到预设就只恢复关键字段
+            if (s.photoFrameStyle && this.template) {
+                this.template.photoFrameStyle = s.photoFrameStyle;
+                if (s.userSignature) this.template.userSignature = s.userSignature;
+                if (s.signFont) this.template.signFont = s.signFont;
+                if (s.signColor) this.template.signColor = s.signColor;
+                if (s.avatarScale) this.template.avatarScale = s.avatarScale;
+                if (s.signSize) this.template.signSize = s.signSize;
+                if (s.signBgBlur != null) this.template.signBgBlur = s.signBgBlur;
+                if (s.paramColor) this.template.paramColor = s.paramColor;
+                if (s.paramFontSize) this.template.paramFontSize = s.paramFontSize;
+                this.refreshUI();
+                this.scheduleRender();
+            }
+        } catch (_) {}
+    },
+
     init() {
         this.initSplash();
         this.cacheDom();
         this.bind();
         this.loadPresets();
+        this.restoreLastState();
         this.loadLogos();
         this.loadTextures();
         this.populateFonts();

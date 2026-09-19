@@ -6,6 +6,29 @@ window.App = Object.assign(window.App || {}, {
         this.syncModelFromUI();
         this.saveCurrentTemplate();
         this.scheduleRender();
+        this._autoSaveTimer && clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = setTimeout(() => this.autoSaveState(), 800);
+    },
+
+    autoSaveState() {
+        try {
+            if (!this.template) return;
+            const s = {
+                presetName: this.currentPresetName || '',
+                photoFrameStyle: this.template.photoFrameStyle || '',
+                userSignature: this.template.userSignature || '',
+                signFont: this.template.signFont || '',
+                signColor: this.template.signColor || '',
+                avatarScale: this.template.avatarScale || 0.85,
+                signSize: this.template.signSize || 1,
+                signBgBlur: this.template.signBgBlur || 0,
+                paramColor: this.template.paramColor || 'auto',
+                cornerRadiusAll: (this.template.cornerConfig || {}).cornerRadiusAll || 0,
+                borderRadius: this.template.borderRadius || 0,
+                paramFontSize: this.template.paramFontSize || 33,
+            };
+            localStorage.setItem('qfs_last_state', JSON.stringify(s));
+        } catch (_) {}
     },
 
     // 一次性提交(切换/勾选/按钮/change):压撤销栈 -> 清重做 -> 同步 -> 立即渲染
