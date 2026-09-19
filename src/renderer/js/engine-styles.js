@@ -1603,7 +1603,7 @@ AV_OVERLAY_BC2:67 };
             // 右侧文字
             const tx = sidePad + iw + Math.round(rightW * 0.15);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-            const fBrand = Math.max(22, Math.round(rightW * 0.16 * pfScale));
+            const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
             g.fillStyle = '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.textAlign = 'left';
@@ -1611,10 +1611,10 @@ AV_OVERLAY_BC2:67 };
             g.fillText(brand, tx, Math.round(h * 0.28));
             // 三行圆角方框参数
             if (S.useExif && S.cam) {
-                const boxW = Math.round(rightW * 0.3 * pfScale);
+                const boxW = Math.round(rightW * 0.28 * pfScale);
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
-                const fVal = Math.max(13, Math.round(rightW * 0.09 * pfScale));
+                const fVal = Math.max(13, Math.round(rightW * 0.08 * pfScale));
                 const rows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
