@@ -1497,11 +1497,12 @@ AV_OVERLAY_BC2:67 };
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             // 照片带圆角阴影(和毛玻璃一致)
             const px = leftW + 40;
-            const py = Math.round((h - ih) / 2);
+            const shY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
+            const py = Math.round((h - ih) / 2) - Math.round(shY / 2);
             g.save();
             g.shadowColor = 'rgba(0,0,0,0.15)';
             g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.05));
-            g.shadowOffsetY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
+            g.shadowOffsetY = shY;
             g.fillStyle = '#ffffff';
             const r = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
             if (typeof g.roundRect === 'function') {
@@ -1621,11 +1622,12 @@ AV_OVERLAY_BC2:67 };
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             // 照片带圆角阴影
             const px = leftPad + 40;
-            const py = Math.round((h - ih) / 2);
+            const shY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
+            const py = Math.round((h - ih) / 2) - Math.round(shY / 2);
             g.save();
             g.shadowColor = 'rgba(0,0,0,0.15)';
             g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.05));
-            g.shadowOffsetY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
+            g.shadowOffsetY = shY;
             g.fillStyle = '#ffffff';
             const r = Math.max(8, Math.round(Math.min(iw, ih) * 0.02));
             if (typeof g.roundRect === 'function') {
