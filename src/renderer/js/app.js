@@ -899,6 +899,19 @@ window.App = {
         if ($('slGlobalMargin')) { const g = m.globalMargin != null ? m.globalMargin : 1; $('slGlobalMargin').value = Math.round(g * 100); this.updateLabel('lblGlobalMargin', Math.round(g * 100) + '%'); }
     },
 
+    updatePersonalVisibility() {
+        const grp = document.getElementById('grpPersonal');
+        if (!grp || !this.template) return;
+        const s = this.template.photoFrameStyle || '';
+        const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC'].includes(s);
+        grp.style.display = isPersonal ? '' : 'none';
+        const rowPos = document.getElementById('rowParamPos');
+        const rowType = document.getElementById('rowParamType');
+        const isBottomBar = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO'].includes(s);
+        if (rowPos) rowPos.style.display = isBottomBar ? '' : 'none';
+        if (rowType) rowType.style.display = isBottomBar ? '' : 'none';
+    },
+
     // 回显:模板 -> 控件
     refreshUI() {
         if (!this.template) return;
