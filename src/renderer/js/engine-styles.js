@@ -1579,7 +1579,7 @@ AV_OVERLAY_BC2:67 };
                 g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             }
             const px = Math.round((w - iw) / 2);
-            const py = Math.round(sidePad * 0.5);
+            const py = sidePad;
             const pscB = S.imgScale || 1;
             const pdwB = Math.round(iw * pscB), pdhB = Math.round(ih * pscB);
             const dpxB = px + Math.round((iw - pdwB) / 2) + (S.imgOffsetX || 0);
