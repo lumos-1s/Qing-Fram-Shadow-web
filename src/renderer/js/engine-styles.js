@@ -1532,8 +1532,10 @@ AV_OVERLAY_BC2:67 };
         }
         // BOTTOM(pos=2): 白底+照片在上+底部品牌名和参数
         if (pos === 2) {
-            const bottomH = Math.max(120, Math.round(ih * 0.25));
-            const sidePad = Math.max(30, Math.round(size * 0.8));
+            const gm = S.globalMargin || 1;
+            const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
+            const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
+            const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
             const w = Math.round(iw * 1.05) + sidePad * 2;
             const h = ih + bottomH + sidePad;
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
@@ -1542,13 +1544,13 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, px, py);
             const by = py + ih + Math.round(bottomH * 0.3);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-            const fBrand = Math.max(18, Math.round(bottomH * 0.2));
+            const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale));
             g.fillStyle = '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
             if (S.useExif && S.cam) {
-                const boxW = Math.round(Math.max(280, Math.min(w * 0.35, 440)));
+                const boxW = Math.round(Math.max(280, Math.min(w * 0.35, 440)) * pfScale);
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
                 const fVal = Math.max(14, Math.round(boxH * 0.6));
