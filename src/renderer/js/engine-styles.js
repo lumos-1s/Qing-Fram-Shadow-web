@@ -1498,7 +1498,7 @@ AV_OVERLAY_BC2:67 };
             // 照片带圆角阴影(和毛玻璃一致)
             const px = leftW + 40;
             const shY = Math.max(6, Math.round(Math.min(iw, ih) * 0.02));
-            const py = Math.round((h - ih) / 2) + shY;
+            const py = Math.round((h - ih) / 2);
             g.save();
             g.shadowColor = 'rgba(0,0,0,0.15)';
             g.shadowBlur = Math.max(16, Math.round(Math.min(iw, ih) * 0.05));
