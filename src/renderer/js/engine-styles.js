@@ -1591,15 +1591,18 @@ AV_OVERLAY_BC2:67 };
         if (pos === 1) {
             const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
-            const rightW = Math.max(160, Math.round(iw * 0.35 * gm));
-            const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
-            const w = iw + rightW + sidePad;
-            const h = Math.round(ih * 1.08) + sidePad;
+            // 和印象毛玻璃同款比例
+            const rightW = Math.max(180, Math.round(iw * 0.35 * gm));
+            const leftPad = Math.round(rightW / 2);
+            const topBotPad = Math.max(50, Math.round(size * 1.2 * gm));
+            const w = iw + rightW + leftPad;
+            const h = ih + topBotPad * 2;
             // 白底
             g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
             // 照片垂直居中在左侧
+            const px = leftPad;
             const py = Math.round((h - ih) / 2);
-            g.drawImage(img, sidePad, py);
+            g.drawImage(img, px, py);
             // 右侧文字
             const tx = sidePad + iw + Math.round(rightW * 0.15);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
@@ -2339,9 +2342,10 @@ AV_OVERLAY_BC2:67 };
             case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
                 const gm = Math.min(1.1, (S && S.globalMargin) || 1);
-                const leftW = Math.max(160, Math.round(iw * 0.35 * gm));
-                const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
-                return { w: leftW + iw + sidePad, h: Math.round(ih * 1.08) + sidePad };
+                const sideW = Math.max(180, Math.round(iw * 0.35 * gm));
+                const oppPad = Math.round(sideW / 2);
+                const topBotPad = Math.max(50, Math.round(size * 1.2 * gm));
+                return { w: sideW + iw + oppPad, h: ih + topBotPad * 2 };
             }
             case 'OVERLAY_PARAM_BOTTOM': {
                 const gm = Math.min(1.1, (S && S.globalMargin) || 1);
