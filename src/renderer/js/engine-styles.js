@@ -1589,7 +1589,7 @@ AV_OVERLAY_BC2:67 };
         }
         // RIGHT(pos=1): 白底+照片在左+右侧品牌名和参数(印象右留白)
         if (pos === 1) {
-            const gm = S.globalMargin || 1;
+            const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             const rightW = Math.max(160, Math.round(iw * 0.35 * gm));
             const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
