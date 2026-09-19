@@ -933,6 +933,10 @@ window.App = {
         const s = this.template.photoFrameStyle || '';
         const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC'].includes(s);
         grp.style.display = isPersonal ? '' : 'none';
+        // 印象留白预设也显示背景模糊开关
+        const isOverlay = ['OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
+        const rowBgBlur = document.getElementById('rowBgBlur');
+        if (rowBgBlur) rowBgBlur.style.display = (isPersonal || isOverlay) ? '' : 'none';
         const rowPos = document.getElementById('rowParamPos');
         const rowType = document.getElementById('rowParamType');
         const isBottomBar = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO'].includes(s);
