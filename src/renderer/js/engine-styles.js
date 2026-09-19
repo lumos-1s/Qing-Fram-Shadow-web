@@ -1672,7 +1672,7 @@ AV_OVERLAY_BC2:67 };
                     g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
                     g.textAlign = 'left';
-                    g.fillText(row.val, tx + boxW + Math.round(rightW * 0.05), ry - boxH / 2);
+                    g.fillText(row.val, tx + boxW + Math.round(rightW * 0.03), ry - boxH / 2);
                     ry += Math.round(boxH * 1.9);
                 });
             }
