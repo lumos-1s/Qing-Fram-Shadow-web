@@ -1557,14 +1557,25 @@ AV_OVERLAY_BC2:67 };
             const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
             const w = iw + sidePad * 2;
             const h = ih + bottomH + sidePad;
-            g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            // 背景:白底或模糊照片(80%模糊)
+            if (S.signBgBlur) {
+                g.save();
+                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+                g.filter = 'blur(24px) brightness(0.68)';
+                const bs = Math.max(w / iw, h / ih);
+                g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+                g.filter = 'none';
+                g.restore();
+            } else {
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            }
             const px = Math.round((w - iw) / 2);
             const py = Math.round(sidePad * 0.5);
             g.drawImage(img, px, py);
             const by = py + ih + Math.round(bottomH * 0.3);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale));
-            g.fillStyle = '#1a1a1a';
+            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
@@ -1585,14 +1596,15 @@ AV_OVERLAY_BC2:67 };
                 const totalW = rows.length * itemW + (rows.length - 1) * between;
                 let bx = Math.round((w - totalW) / 2);
                 const ry = by + Math.round(bottomH * 0.4);
+                const boxColor = S.signBgBlur ? '#ffffff' : '#333333';
                 rows.forEach(row => {
-                    g.strokeStyle = '#333333';
+                    g.strokeStyle = boxColor;
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                     g.beginPath();
                     if (typeof g.roundRect === 'function') g.roundRect(bx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
                     else g.rect(bx, ry - boxH, boxW, boxH);
                     g.stroke();
-                    g.fillStyle = '#333333';
+                    g.fillStyle = boxColor;
                     g.font = 'bold ' + fBox + 'px sans-serif';
                     g.textAlign = 'center'; g.textBaseline = 'middle';
                     g.fillText(row.label, bx + boxW / 2, ry - boxH / 2);
