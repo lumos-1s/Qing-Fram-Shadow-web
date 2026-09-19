@@ -2990,13 +2990,18 @@ AV_OVERLAY_BC:66 };
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
             g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 6; g.stroke(); g.shadowBlur = 0;
         }
-        // 签名在头像下方居中
+        // 签名在头像下方居中(自动缩窄)
         g.fillStyle = S.signColor || '#fff';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        const signTxt = S.userSignature || '— my memory —';
+        const maxSignW = iw - 20;
+        g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let tw = g.measureText(signTxt).width;
+        if (tw > maxSignW) { signFs = Math.max(10, Math.round(signFs * maxSignW / tw)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
         g.textAlign = 'center';
         g.textBaseline = 'top';
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
-        g.fillText(S.userSignature || '— my memory —', ax, ay + avatarR + Math.round(iw * 0.015));
+        g.fillText(signTxt, ax, ay + avatarR + Math.round(iw * 0.015));
         g.shadowBlur = 0;
     }
 
@@ -3020,13 +3025,18 @@ AV_OVERLAY_BC:66 };
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
             g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 6; g.stroke(); g.shadowBlur = 0;
         }
-        // 签名在头像左边
+        // 签名在头像左边(自动缩窄)
         g.fillStyle = S.signColor || '#fff';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        const signTxt = S.userSignature || '— my memory —';
+        const maxSignW = ax - avatarR - 12 - pad - 10;
+        g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let tw = g.measureText(signTxt).width;
+        if (tw > maxSignW && maxSignW > 0) { signFs = Math.max(10, Math.round(signFs * maxSignW / tw)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
         g.textAlign = 'right';
         g.textBaseline = 'middle';
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
-        g.fillText(S.userSignature || '— my memory —', ax - avatarR - 12, ay);
+        g.fillText(signTxt, ax - avatarR - 12, ay);
         g.shadowBlur = 0;
     }
 
@@ -3050,13 +3060,18 @@ AV_OVERLAY_BC:66 };
             g.beginPath(); g.arc(ax, ay, avatarR, 0, Math.PI * 2); g.stroke();
             g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 6; g.stroke(); g.shadowBlur = 0;
         }
-        // 签名在头像下方居中
+        // 签名在头像下方居中(自动缩窄)
         g.fillStyle = S.signColor || '#fff';
-        g.font = 'italic ' + Math.round(iw * 0.035 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let signFs = Math.round(iw * 0.035 * (S.signSize || 1));
+        const signTxt = S.userSignature || '— my memory —';
+        const maxSignW = iw - 20;
+        g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
+        let tw = g.measureText(signTxt).width;
+        if (tw > maxSignW) { signFs = Math.max(10, Math.round(signFs * maxSignW / tw)); g.font = 'italic ' + signFs + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive'; }
         g.textAlign = 'center';
         g.textBaseline = 'top';
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
-        g.fillText(S.userSignature || '— my memory —', ax, ay + avatarR + Math.round(iw * 0.012));
+        g.fillText(signTxt, ax, ay + avatarR + Math.round(iw * 0.012));
         g.shadowBlur = 0;
     }
 
