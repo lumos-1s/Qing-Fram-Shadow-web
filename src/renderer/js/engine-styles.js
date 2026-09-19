@@ -719,7 +719,7 @@ AV_OVERLAY_BC2:67 };
             [/hasselblad/i, 'HASSELBLAD'],
             [/phase one|phaseone/i, 'Phase One'],
             [/samsung|samsung techwin/i, 'SAMSUNG'],
-            [/xiaomi|xiaomi inc.|mi / |redmi/i, 'Xiaomi'],
+            [/xiaomi|xiaomi inc|redmi/i, 'Xiaomi'],
             [/huawei|huawei device/i, 'HUAWEI'],
             [/apple|iphone|apple inc./i, 'Apple'],
             [/google|pixel/i, 'Google'],
