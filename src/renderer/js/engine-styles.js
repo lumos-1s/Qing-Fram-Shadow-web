@@ -1290,7 +1290,7 @@ AV_OVERLAY_BC2:67 };
         g.fillText(brand, ml, Math.round(h * 0.28));
         // 4. 三行圆角方框参数
         if (true && S.useExif && S.cam) {
-            const boxW = Math.round(leftW * 0.28);
+            const boxW = Math.round(leftW * 0.28 * pfScale);
             const boxH = Math.round(boxW * 0.55);
             const fBox = Math.max(11, Math.round(boxH * 0.45));
             const fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale));
