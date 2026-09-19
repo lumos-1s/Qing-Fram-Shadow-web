@@ -1024,10 +1024,20 @@ AV_OVERLAY_BC2:67 };
         g.clip();
         g.fillStyle = '#ffffff';
         let textY = my + 8 + fm.ascent;
-        for (const l of lines) {
+        for (let li = 0; li < lines.length; li++) {
+            const l = lines[li];
+            if (li === 0) {
+                // 品牌名用Georgia衬线字体
+                g.font = 'bold ' + fs + "px Georgia, 'Times New Roman', serif";
+                g.letterSpacing = Math.round(fs * 0.15);
+            } else {
+                g.font = 'bold ' + fs + 'px sans-serif';
+                g.letterSpacing = 0;
+            }
             g.fillText(l, mx + 12, textY);
             textY += lineH + 16;
         }
+        g.letterSpacing = 0;
         g.restore();
     }
 
