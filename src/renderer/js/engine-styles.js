@@ -1266,8 +1266,8 @@ AV_OVERLAY_BC2:67 };
         // 压暗
         g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(0, 0, w, h);
         // 2. 右侧照片(垂直居中,带圆角阴影)
-        const px = leftW + 40;
-        const py = Math.round((h - ih) / 2);
+        const px = leftW + 40 + (S.imgOffsetX || 0);
+        const py = Math.round((h - ih) / 2) + (S.imgOffsetY || 0);
         g.save();
         g.shadowColor = 'rgba(0,0,0,0.6)';
         g.shadowBlur = Math.max(24, Math.round(Math.min(iw, ih) * 0.07));
