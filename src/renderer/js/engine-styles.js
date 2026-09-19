@@ -3106,18 +3106,39 @@ AV_OVERLAY_BC:66 };
                 out = newCanvas(dims.w, dims.h);
                 const g = out.getContext('2d');
                 g.imageSmoothingEnabled = true;
-                draw(img, size, g, iw, ih, S);
-
-                // 圆角后处理(原版 apply 末尾)
+                // 劫持drawImage:画原始照片时自动应用cornerConfig圆角
                 const cc = t.cornerConfig || {};
-                const tl = cc.cornerRadiusTL || 0, tr = cc.cornerRadiusTR || 0;
-                const bl = cc.cornerRadiusBL || 0, br = cc.cornerRadiusBR || 0;
-                const rAll = cc.cornerRadiusAll || 0;
-                if (styleName === 'ROUNDED') {
-                    if (tl > 0 || tr > 0 || bl > 0 || br > 0) out = cornerClip(out, tl, tr, bl, br);
-                    else if (rAll > 0) out = singleCornerClip(out, rAll);
-                } else if (rAll > 0 && styleName !== 'BLUR_CLASSIC' && styleName !== 'BLUR_DATE') {
-                    out = singleCornerClip(out, rAll);
+                const photoTl = cc.cornerRadiusTL || 0, photoTr = cc.cornerRadiusTR || 0;
+                const photoBl = cc.cornerRadiusBL || 0, photoBr = cc.cornerRadiusBR || 0;
+                const photoRAll = cc.cornerRadiusAll || 0;
+                const hasPhotoRound = photoRAll > 0 || photoTl > 0 || photoTr > 0 || photoBl > 0 || photoBr > 0;
+                const origDrawImage = g.drawImage.bind(g);
+                if (hasPhotoRound) {
+                    g.drawImage = function(src, ...args) {
+                        if (src === img) {
+                            // 计算照片在画布上的位置和尺寸
+                            let dx, dy, dw, dh;
+                            if (args.length === 3) { dx = args[0]; dy = args[1]; dw = img.width; dh = img.height; }
+                            else if (args.length === 5) { dx = args[0]; dy = args[1]; dw = args[2]; dh = args[3]; }
+                            else if (args.length === 9) { dx = args[4]; dy = args[5]; dw = args[6]; dh = args[7]; }
+                            else { origDrawImage(src, ...args); return; }
+                            const r = photoRAll > 0 ? photoRAll : Math.min(photoTl, photoTr, photoBl, photoBr);
+                            g.save();
+                            if (r > 0 && g.roundRect) {
+                                g.beginPath(); g.roundRect(dx, dy, dw, dh, r); g.clip();
+                            }
+                            origDrawImage(src, ...args);
+                            g.restore();
+                        } else {
+                            origDrawImage(src, ...args);
+                        }
+                    };
+                }
+                draw(img, size, g, iw, ih, S);
+                g.drawImage = origDrawImage;
+                // 整体画布圆角(保留ROUNDED样式)
+                if (styleName === 'ROUNDED' && photoRAll === 0) {
+                    if (photoTl > 0 || photoTr > 0 || photoBl > 0 || photoBr > 0) out = cornerClip(out, photoTl, photoTr, photoBl, photoBr);
                 }
 
                 const decor = t.decorConfig || {};
