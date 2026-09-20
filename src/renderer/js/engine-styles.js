@@ -1238,10 +1238,11 @@ AV_OVERLAY_BC2:67 };
         g.fillText(brand, ml, Math.round(h * 0.28));
         // 4. 三行圆角方框参数
         if (true && S.useExif && S.cam) {
-            const boxW = Math.round(leftW * 0.28 * pfScale);
+            const ps = S.paramScale || 1;
+            const boxW = Math.round(leftW * 0.28 * pfScale * ps);
             const boxH = Math.round(boxW * 0.55);
             const fBox = Math.max(11, Math.round(boxH * 0.45));
-            const fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale));
+            const fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale * ps));
             const rows = [
                 { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                 { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
@@ -1262,7 +1263,7 @@ AV_OVERLAY_BC2:67 };
                 g.fillText(row.label, ml + boxW / 2, ry - boxH / 2);
                 g.font = 'bold ' + fVal + 'px sans-serif';
                 g.textAlign = 'left';
-                g.fillText(row.val, ml + boxW + Math.round(leftW * 0.05), ry - boxH / 2);
+                g.fillText(row.val, ml + boxW + Math.round(leftW * 0.05 * ps), ry - boxH / 2);
                 ry += Math.round(boxH * 1.9);
             });
         }
@@ -1455,9 +1456,10 @@ AV_OVERLAY_BC2:67 };
             const exifOn = S.useExif && S.cam;
             let boxW = 0, fVal = 0, valGap = 0, maxValW = 0, paramRows = [];
             if (exifOn) {
-                boxW = Math.round(leftW * 0.28 * pfScale);
-                fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale));
-                valGap = Math.round(leftW * 0.05);
+                const ps = S.paramScale || 1;
+                boxW = Math.round(leftW * 0.28 * pfScale * ps);
+                fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale * ps));
+                valGap = Math.round(leftW * 0.05 * ps);
                 paramRows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
@@ -1539,7 +1541,7 @@ AV_OVERLAY_BC2:67 };
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
             g.fillText(brand, w / 2, by);
             if (S.useExif && S.cam) {
-                const boxW = Math.round(Math.max(280, Math.min(w * 0.35, 440)) * pfScale);
+                const boxW = Math.round(Math.max(280, Math.min(w * 0.35, 440)) * pfScale * (S.paramScale || 1));
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
                 const fVal = Math.max(14, Math.round(boxH * 0.6));
@@ -1617,9 +1619,10 @@ AV_OVERLAY_BC2:67 };
             const exifOn = S.useExif && S.cam;
             let boxW = 0, fVal = 0, valGap = 0, maxValW = 0, paramRows = [];
             if (exifOn) {
-                boxW = Math.round(rightW * 0.28 * pfScale);
-                fVal = Math.max(13, Math.round(rightW * 0.08 * pfScale));
-                valGap = Math.round(rightW * 0.03);
+                const ps = S.paramScale || 1;
+                boxW = Math.round(rightW * 0.28 * pfScale * ps);
+                fVal = Math.max(13, Math.round(rightW * 0.08 * pfScale * ps));
+                valGap = Math.round(rightW * 0.03 * ps);
                 paramRows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
@@ -1929,6 +1932,7 @@ AV_OVERLAY_BC2:67 };
             avatarSelected: !!t.avatarSelected,
             logoSize: clampP(t.logoSize != null ? t.logoSize : 14, 0, 200),
             brandScale: clampP(t.brandSize != null ? t.brandSize : 1, 0.5, 3),
+            paramScale: clampP(t.paramScale != null ? t.paramScale : 1, 0.5, 3),
         };
     }
 

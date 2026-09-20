@@ -61,6 +61,7 @@ window.App = {
                 if (s.paramColor) this.template.paramColor = s.paramColor;
                 if (s.paramFontSize) this.template.paramFontSize = s.paramFontSize;
                 if (s.brandSize) this.template.brandSize = s.brandSize;
+                if (s.paramScale) this.template.paramScale = s.paramScale;
                 this.refreshUI();
                 this.scheduleRender();
             }
@@ -987,6 +988,8 @@ window.App = {
         const isImpression = ['IMP_FROSTED','OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
         const rowBrand = document.getElementById('rowBrandSize');
         if (rowBrand) rowBrand.style.display = isImpression ? '' : 'none';
+        const rowParamScale = document.getElementById('rowParamScale');
+        if (rowParamScale) rowParamScale.style.display = isImpression ? '' : 'none';
     },
 
     // 回显:模板 -> 控件
@@ -1030,6 +1033,11 @@ window.App = {
                 const bs = Math.round((this.template.brandSize != null ? this.template.brandSize : 1) * 100);
                 $('slBrandSize').value = bs;
                 this.updateLabel('lblBrandSize', bs + '%');
+            }
+            if ($('slParamScale')) {
+                const psc = Math.round((this.template.paramScale != null ? this.template.paramScale : 1) * 100);
+                $('slParamScale').value = psc;
+                this.updateLabel('lblParamScale', psc + '%');
             }
             if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
             if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
@@ -1835,14 +1843,14 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         // 通用:range 拖拽时即时同步,change/pointerup 提交;select/checkbox 变更即提交
         this.bindRanges([
             'slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius',
-            'slParamFontSize', 'slBrandSize', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
+            'slParamFontSize', 'slBrandSize', 'slParamScale', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
             'slShadowX', 'slShadowY', 'slShadowBlur', 'slShadowSpread', 'slShadowOpacity', 'slGlowBlur', 'slGlowOpacity',
             'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
             'slCornerDecorSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap', 'slPuzzleCorner',
             'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
         ]);
-        const onEdit = ['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize', 'slBrandSize',
+        const onEdit = ['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize', 'slBrandSize', 'slParamScale',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'];
         (onEdit).forEach(id => {
             const el = $(id);
@@ -1999,6 +2007,12 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 this.onSettingChanged();
                 break;
             }
+            case 'slParamScale': {
+                this.template.paramScale = v / 100;
+                this.updateLabel('lblParamScale', v + '%');
+                this.onSettingChanged();
+                break;
+            }
             case 'slLayerCornerTL': case 'slLayerCornerTR': case 'slLayerCornerBL': case 'slLayerCornerBR': {
                 const layer = this.currentLayer ? this.currentLayer() : null;
                 if (!layer) break;
@@ -2071,7 +2085,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             slGlowBlur: ['lblGlowBlur', v], slGlowOpacity: ['lblGlowOpacity', v + '%'],
             slTearStrength: ['lblTearStrength', v], slTearDensity: ['lblTearDensity', v],
             slVignetteStrength: ['lblVignetteStrength', v + '%'], slVignetteFeather: ['lblVignetteFeather', v],
-            slBrandSize: ['lblBrandSize', v + '%'],
+            slBrandSize: ['lblBrandSize', v + '%'], slParamScale: ['lblParamScale', v + '%'],
             slLeakOpacity: ['lblLeakOpacity', v + '%'], slLeakAngle: ['lblLeakAngle', v + '°'],
             slCornerDecorSize: ['lblCornerDecorSize', v],
             slPuzzleGap: ['lblPuzzleGap', v], slPuzzleCorner: ['lblPuzzleCorner', v + '%'], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
@@ -2083,7 +2097,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
     onSliderLive(id) {
-        if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize', 'slBrandSize',
+        if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize', 'slBrandSize', 'slParamScale',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
         if (id === 'slPuzzleGap' || id === 'slPuzzleCorner' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
             this.syncPuzzleFromUI(); this.onSettingChanged(); return;
