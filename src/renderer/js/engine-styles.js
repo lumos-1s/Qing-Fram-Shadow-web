@@ -701,6 +701,7 @@ AV_OVERLAY_BC2:67 };
             [/vivo|vivoelectronics/i, 'vivo'],
             [/dji|shenzhen dj/i, 'DJI'],
             [/gopro/i, 'GoPro'],
+            [/insta360|insta 360|arcsoft/i, 'Insta360'],
             [/zeiss|carl zeiss/i, 'ZEISS'],
             [/contax|kyocera/i, 'CONTAX'],
             [/konica|minolta|konica minolta/i, 'KONICA MINOLTA'],
