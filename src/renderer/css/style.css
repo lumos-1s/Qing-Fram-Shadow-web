@@ -533,7 +533,7 @@ html.dark .mini-btn.primary { color: #0c1914; }
     padding: 7px 10px; margin: 4px 0;
     background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px;
 }
-.tpl-row > span { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpl-row > span { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .tpl-row > div { display: flex; gap: 6px; flex: 0 0 auto; }
 
 /* ── 静态控件骨架 ── */
@@ -597,7 +597,25 @@ html.dark .mini-btn.primary { color: #0c1914; }
     color: var(--text-2); flex: 0 0 auto;
 }
 
-.tpl-list { max-height: 170px; overflow-y: auto; margin: 6px 0; }
+.tpl-list { max-height: 220px; overflow-y: auto; margin: 6px 0 2px; }
+
+.tpl-search { width: 100%; box-sizing: border-box; margin-top: 6px; }
+.tpl-group { margin-bottom: 2px; }
+.tpl-group-name {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 8px; margin: 3px 0 2px;
+    font-size: 11px; color: var(--text-2); cursor: pointer;
+    border-radius: 7px; user-select: none;
+}
+.tpl-group-name:hover { background: var(--surface-alt); }
+.tpl-group-name .caret { transition: transform .15s; font-size: 9px; color: var(--text-3); }
+.tpl-group.open .tpl-group-name .caret { transform: rotate(90deg); }
+.tpl-group:not(.open) .tpl-row { display: none; }
+.tpl-thumb {
+    width: 44px; height: 44px; flex: 0 0 auto;
+    object-fit: cover; border-radius: 8px; border: 1px solid var(--border-strong);
+    background: var(--surface); cursor: pointer;
+}
 
 /* 状态栏 */
 #statusbar {

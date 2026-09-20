@@ -96,6 +96,8 @@ window.App = {
                 if (g) g.classList.toggle('collapsed');
             });
         });
+        const tplSearch = document.getElementById('tfTemplateSearch');
+        if (tplSearch) tplSearch.addEventListener('input', () => this._applyTplFilter());
         this.updateHistoryButtons();
         this.initLogin();
         this.initDraft();
@@ -1800,7 +1802,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         // select 变更 -> commit
         const sels = ['cbCanvasRatio', 'cbParamPosition', 'cbParamType', 'cbFillType', 'cbGradientType', 'cbTextureBlend',
             'cbStrokePos', 'cbLeakType', 'cbCornerDecorType', 'cbPuzzleBg', 'cbPuzzleCanvas',
-            'cbSlotFill', 'cbCapFont1', 'cbCapFont2', 'cbRecipeFilter'];
+            'cbSlotFill', 'cbCapFont1', 'cbCapFont2'];
         sels.forEach(id => {
             const el = $(id);
             if (el) el.addEventListener('change', () => this.onSelectCustom(id));
@@ -1841,14 +1843,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnZOrderUp', () => this.moveZOrder(1));
         bindBtn('btnZOrderDown', () => this.moveZOrder(-1));
         bindBtn('btnSaveTemplate', () => this.saveTemplate());
-        bindBtn('btnLoadTemplate', () => this.loadTemplate());
         bindBtn('btnExportTemplate', () => this.exportTemplate());
         bindBtn('btnImportTemplate', () => this.importTemplate());
         bindBtn('btnQuickFilm', () => this.applyQuickPreset('film'));
         bindBtn('btnQuickIdCard', () => this.applyQuickPreset('idcard'));
         bindBtn('btnAutoColorBorder', () => this.autoColorBorder());
-        bindBtn('btnOpenMarket', () => this.setStatus('云市场：WEB 版未接入(可导出/导入 .qfs)'));
-        bindBtn('btnLoadPreset', () => this.loadPresetFromList());
         bindBtn('btnEditGapCaption', () => this.addEditGapCaption());
         bindBtn('btnDeleteGapCaption', () => this.deleteCaption());
 bindBtn('btnResetAllSlots', () => this.resetAllSlots());
@@ -2066,9 +2065,8 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     /* ══ Logo 页签 ══ */
     renderLogoPools() {
         const $ = this.$;
-        const pools = ['brandIconBox', 'photoDecorBox', 'simpleIconBox', 'weatherIconBox', 'customIconBox'];
-        // 简单分类:前四类按名称关键字,自定义留空待用户添加
-        const cats = { brandIconBox: [], photoDecorBox: [], simpleIconBox: [], weatherIconBox: [], customIconBox: [] };
+        const pools = ['brandIconBox', 'customIconBox'];
+        const cats = { brandIconBox: [], customIconBox: [] };
         this.logos.forEach(l => {
             // 自定义图标归到自定义图标池
             if (l.custom) { cats.customIconBox.push(l); return; }
@@ -2119,7 +2117,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 }
                 box.appendChild(c);
             });
-            const cnt = this.$({ brandIconBox: 'brandCnt', photoDecorBox: 'photoDecorCnt', simpleIconBox: 'simpleIconCnt', weatherIconBox: 'weatherIconCnt', customIconBox: 'customIconCnt' }[boxId]);
+            const cnt = this.$({ brandIconBox: 'brandCnt', customIconBox: 'customIconCnt' }[boxId]);
             if (cnt) cnt.textContent = `(${list.length})`;
         });
     },

@@ -13,24 +13,172 @@ window.App = Object.assign(window.App || {}, {
         if (!box) return;
         const names = (await window.qingframe.listTemplates()) || [];
         this._savedTemplates = names;
+        const cache = [];
+        for (const n of names) {
+            try {
+                const data = await window.qingframe.loadTemplate(n);
+                if (!data) continue;
+                cache.push({
+                    name: n,
+                    disp: String(data.templateName || n),
+                    tag: String(data.templateTag || ''),
+                    tpl: data,
+                });
+            } catch (e) { /* 跳过损坏模板 */ }
+        }
+        this._tplCache = cache;
+        if (this.$('tfTemplateSearch')) this.$('tfTemplateSearch').value = '';
+        this._renderTplList(box, cache);
+        this._renderTplThumbs();
+    },
+
+    _applyTplFilter() {
+        const box = this.$('lvPresets');
+        if (!box) return;
+        const q = (this.$('tfTemplateSearch') ? this.$('tfTemplateSearch').value : '').trim().toLowerCase();
+        const src = this._tplCache || [];
+        const rows = !q ? src : src.filter(r => r.disp.toLowerCase().includes(q) || r.tag.toLowerCase().includes(q));
+        this._renderTplList(box, rows);
+        this._renderTplThumbs();
+    },
+
+    _renderTplList(box, rows) {
         box.innerHTML = '';
-        if (!names.length) { box.innerHTML = '<div class="empty">暂无已存模板</div>'; return; }
-        names.forEach(n => {
-            const row = document.createElement('div');
-            row.className = 'tpl-row';
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = n; // 用 textContent,避免恶意名称注入 HTML(XSS)
-            const btnBox = document.createElement('div');
-            const btnLoad = document.createElement('button');
-            btnLoad.className = 'mini-btn'; btnLoad.textContent = '应用';
-            const btnDel = document.createElement('button');
-            btnDel.className = 'mini-btn danger'; btnDel.textContent = '删除';
-            btnBox.appendChild(btnLoad); btnBox.appendChild(btnDel);
-            row.appendChild(nameSpan); row.appendChild(btnBox);
-            btnLoad.addEventListener('click', async () => this.loadTemplateByName(n));
-            btnDel.addEventListener('click', async () => { await window.qingframe.deleteTemplate(n); this.refreshTemplates(); });
-            box.appendChild(row);
+        if (!rows.length) {
+            const has = !!(this._tplCache && this._tplCache.length);
+            box.innerHTML = '<div class="empty">' + (has ? '没有匹配的已存模板' : '暂无已存模板') + '</div>';
+            return;
+        }
+        const groups = new Map();
+        rows.forEach(r => {
+            const g = r.tag || '未分类';
+            if (!groups.has(g)) groups.set(g, []);
+            groups.get(g).push(r);
         });
+        const order = [...groups.keys()].sort((a, b) => (b === '未分类') - (a === '未分类') || a.localeCompare(b, 'zh'));
+        order.forEach((g, gi) => {
+            const gEl = document.createElement('div');
+            gEl.className = 'tpl-group' + (gi === 0 ? ' open' : '');
+            const gn = document.createElement('div');
+            gn.className = 'tpl-group-name';
+            const caret = document.createElement('span');
+            caret.className = 'caret'; caret.textContent = '▸';
+            gn.appendChild(caret);
+            gn.appendChild(document.createTextNode(g + ' · ' + groups.get(g).length));
+            gn.addEventListener('click', () => gEl.classList.toggle('open'));
+            gEl.appendChild(gn);
+            groups.get(g).forEach(r => gEl.appendChild(this._buildTplRow(r)));
+            box.appendChild(gEl);
+        });
+        this._thumbsPending = rows.filter(r => r.tpl);
+    },
+
+    _buildTplRow(r) {
+        const row = document.createElement('div');
+        row.className = 'tpl-row';
+        const thumb = document.createElement('img');
+        thumb.className = 'tpl-thumb';
+        r._thumb = thumb;
+        row.appendChild(thumb);
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = r.disp;
+        nameSpan.title = r.name;
+        row.appendChild(nameSpan);
+        const btnBox = document.createElement('div');
+        const btnLoad = document.createElement('button');
+        btnLoad.className = 'mini-btn'; btnLoad.textContent = '应用';
+        const btnRename = document.createElement('button');
+        btnRename.className = 'mini-btn'; btnRename.textContent = '重命名';
+        const btnDel = document.createElement('button');
+        btnDel.className = 'mini-btn danger'; btnDel.textContent = '删除';
+        btnBox.appendChild(btnLoad); btnBox.appendChild(btnRename); btnBox.appendChild(btnDel);
+        row.appendChild(btnBox);
+        btnLoad.addEventListener('click', async ev => { ev.stopPropagation(); await this.loadTemplateByName(r.name); this.refreshTemplates(); });
+        btnRename.addEventListener('click', async ev => {
+            ev.stopPropagation();
+            await this.renameTemplateItem(r);
+        });
+        btnDel.addEventListener('click', async ev => {
+            ev.stopPropagation();
+            if (!confirm('确定删除模板「' + r.disp + '」？')) return;
+            await window.qingframe.deleteTemplate(r.name);
+            this.setStatus('已删除「' + r.disp + '」');
+            this.refreshTemplates();
+        });
+        row.addEventListener('click', async () => {
+            await this.loadTemplateByName(r.name);
+            this.refreshTemplates();
+        });
+        return row;
+    },
+
+    async renameTemplateItem(r) {
+        const name = window.prompt('重命名模板(另存为新名称并删除旧的):', r.disp);
+        if (!name) return;
+        const safe = String(name).trim();
+        if (!safe || safe === r.name) return;
+        const res = await window.qingframe.renameTemplate(r.name, safe);
+        this.setStatus(res && res.ok ? '已重命名为「' + safe + '」' : '重命名失败：' + ((res && res.error) || ''));
+        this.refreshTemplates();
+    },
+
+    _thumbsPending: [],
+
+    async _renderTplThumbs() {
+        if (!window.__render || !this._thumbsPending.length) return;
+        const prevCanvas = this.dom.canvas;
+        const prevMax = this.displayMax;
+        const prevImg = this.image;
+        const prevTpl = this.template;
+        try {
+            const sample = this._samplePhoto || (this._samplePhoto = this._makeSamplePhoto());
+            for (const r of this._thumbsPending.slice()) {
+                const thumb = r._thumb;
+                if (!thumb || !r.tpl) continue;
+                if (!sample.complete) await new Promise(res => { sample.onload = res; sample.onerror = res; });
+                const cv = document.createElement('canvas');
+                cv.width = 1; cv.height = 1;
+                cv.style.position = 'absolute'; cv.style.visibility = 'hidden';
+                try {
+                    this.dom.canvas = cv;
+                    this.displayMax = 96;
+                    this.image = { el: sample, exif: {}, w: sample.naturalWidth || 1000, h: sample.naturalHeight || 1250 };
+                    this.template = JSON.parse(JSON.stringify(r.tpl));
+                    if (r.tpl.puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
+                    else window.__render(this, false);
+                    thumb.src = cv.toDataURL('image/jpeg', 0.75);
+                } catch (_) { thumb.style.display = 'none'; }
+            }
+        } finally {
+            this.image = prevImg;
+            this.template = prevTpl;
+            if (this.dom.canvas) this.dom.canvas = prevCanvas;
+            if (prevMax === undefined) delete this.displayMax;
+            else this.displayMax = prevMax;
+        }
+        this._thumbsPending = [];
+    },
+
+    _makeSamplePhoto() {
+        const c = document.createElement('canvas');
+        c.width = 1000; c.height = 1250;
+        const g = c.getContext('2d');
+        const grad = g.createLinearGradient(0, 0, 1000, 1250);
+        grad.addColorStop(0, '#dfe9f3'); grad.addColorStop(0.5, '#c1a8e8'); grad.addColorStop(1, '#8b5cf6');
+        g.fillStyle = grad; g.fillRect(0, 0, 1000, 1250);
+        g.fillStyle = 'rgba(255,255,255,.5)';
+        for (let i = 0; i < 16; i++) {
+            g.beginPath();
+            g.arc(Math.random() * 1000, Math.random() * 1250, 20 + Math.random() * 90, 0, Math.PI * 2);
+            g.fill();
+        }
+        g.fillStyle = '#2b2f3a'; g.fillRect(0, 990, 1000, 260);
+        g.strokeStyle = '#ffd166'; g.lineWidth = 6; g.strokeRect(40, 40, 920, 910);
+        g.fillStyle = '#fff'; g.font = 'bold 76px "Microsoft YaHei", sans-serif'; g.textAlign = 'center';
+        g.fillText('SAMPLE', 500, 620);
+        const im = new Image();
+        im.src = c.toDataURL('image/jpeg', 0.8);
+        return im;
     },
 
     async saveTemplate() {
@@ -46,21 +194,6 @@ window.App = Object.assign(window.App || {}, {
         const r = await window.qingframe.saveTemplate(name, this.cloneTemplate());
         this.setStatus(r.ok ? `已保存模板「${name}」` : '保存失败：' + (r.error || ''));
         this.refreshTemplates();
-    },
-
-    async loadTemplate() {
-        if (!this._savedTemplates || !this._savedTemplates.length) {
-            const names = (await window.qingframe.listTemplates()) || [];
-            this._savedTemplates = names;
-        }
-        if (!this._savedTemplates.length) { this.setStatus('暂无已存模板'); return; }
-        const opts = this._savedTemplates.map((n, i) => `${i + 1}. ${n}`).join('\n');
-        const choice = window.prompt('选择要加载的模板(输入序号或名称,留空取消):\n' + opts, '1');
-        if (!choice) { this.setStatus('已取消'); return; }
-        const idx = parseInt(choice, 10) - 1;
-        const name = this._savedTemplates[idx] || String(choice).trim();
-        if (!name) return;
-        await this.loadTemplateByName(name);
     },
 
     async loadTemplateByName(name) {
@@ -125,26 +258,6 @@ window.App = Object.assign(window.App || {}, {
         } catch (e) { this.setStatus('取色失败: ' + e.message); }
     },
 
-    loadPresetFromList() {
-        const li = this.$('lvPresets');
-        const active = li && li.querySelector('.tpl-row span');
-        if (!this._savedTemplates || !this._savedTemplates.length) { this.setStatus('模板列表为空'); return; }
-        // 加载代码预设区:选择左侧预设树当前高亮
-        const activeItem = document.querySelector('.preset-item.active');
-        if (activeItem) { this.selectPresetFromTree(activeItem); return; }
-        this.setStatus('请在左侧预设树选择一个预设');
-    },
-
-    selectPresetFromTree(item) {
-        const label = item.querySelector('span:not(.dot)');
-        const name = label ? label.textContent.trim() : '';
-        const p = this.presets.find(x => x.templateName === name);
-        if (!p) { this.setStatus('未找到该预设'); return; }
-        this.onSettingCommit();
-        this.applyPreset(p);
-        this.refreshTemplates();
-        this.setStatus(`已应用预设「${p.templateName}」`);
-    },
     /* ══ 预设加载 ══ */
     async loadPresets() {
         this.splashStatus('正在加载预设…');

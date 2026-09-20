@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('qingframe', {
     listTemplates: () => ipcRenderer.invoke('list-templates'),
     loadTemplate: (name) => ipcRenderer.invoke('load-template', name),
     deleteTemplate: (name) => ipcRenderer.invoke('delete-template', name),
+    renameTemplate: (oldName, newName) => ipcRenderer.invoke('rename-template', { oldName, newName }),
     exportTemplate: (name, data) => ipcRenderer.invoke('export-template', { name, data }),
     importTemplate: () => ipcRenderer.invoke('import-template'),
     exportQfs: (data) => ipcRenderer.invoke('export-qfs', data),

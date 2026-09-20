@@ -168,6 +168,18 @@ ipcMain.handle('delete-template', (_e, name) => {
     } catch (e) { return { ok: false, error: String(e) }; }
 });
 
+ipcMain.handle('rename-template', (_e, { oldName, newName }) => {
+    try {
+        if (!oldName || !newName) return { ok: false, error: '模板名称为空' };
+        const from = path.join(TEMPLATES_DIR, String(oldName).replace(/[\/\\:*?"<>|]/g, '_') + '.json');
+        const to = path.join(TEMPLATES_DIR, String(newName).replace(/[\/\\:*?"<>|]/g, '_') + '.json');
+        if (!fs.existsSync(from)) return { ok: false, error: '源模板不存在' };
+        if (fs.existsSync(to)) return { ok: false, error: '已存在同名模板' };
+        fs.renameSync(from, to);
+        return { ok: true };
+    } catch (e) { return { ok: false, error: String(e) }; }
+});
+
 ipcMain.handle('export-template', async (_e, { name, data }) => {
     const st = loadState();
     const baseName = (name || 'template') + '.json';
