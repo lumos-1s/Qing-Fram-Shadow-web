@@ -979,6 +979,14 @@ window.App = {
         const isOverlay = ['OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
         const rowBgBlur = document.getElementById('rowBgBlur');
         if (rowBgBlur) rowBgBlur.style.display = (isPersonal || isOverlay) ? '' : 'none';
+        // 背景模糊经典/日期:常驻模糊样式,直接显示"模糊程度"滑块(不设开关)
+        const isBlurStyle = ['BLUR_CLASSIC','BLUR_DATE'].includes(s);
+        if (isBlurStyle) {
+            const rowBgBlurInt = document.getElementById('rowBgBlurInt');
+            if (rowBgBlurInt) rowBgBlurInt.style.display = '';
+            const rowBgBlur2 = document.getElementById('rowBgBlur');
+            if (rowBgBlur2) rowBgBlur2.style.display = 'none';
+        }
         const rowPos = document.getElementById('rowParamPos');
         const rowType = document.getElementById('rowParamType');
         const isBottomBar = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO'].includes(s);
