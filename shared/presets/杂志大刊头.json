@@ -4,11 +4,11 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 240,
-    "marginBottom": 120,
-    "marginLeft": 80,
-    "marginRight": 80,
-    "imgScale": 0.9,
+    "marginTop": 300,
+    "marginBottom": 110,
+    "marginLeft": 64,
+    "marginRight": 64,
+    "imgScale": 0.98,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
     "bgBlurEnable": 0,
@@ -23,19 +23,23 @@
       "marginLeft": 0,
       "marginRight": 0,
       "fillConfig": {
-        "fillType": "solid",
+        "fillType": "gradient",
         "fillHex": "#111111",
         "fillOpacity": 100,
         "gradientType": "linear",
-        "gradientAngle": 0,
+        "gradientAngle": 160,
         "gradientStops": [
           {
             "position": 0,
-            "color": "#ffffff"
+            "color": "#0a0a0a"
+          },
+          {
+            "position": 0.65,
+            "color": "#15151a"
           },
           {
             "position": 1,
-            "color": "#cccccc"
+            "color": "#1e1e26"
           }
         ],
         "gradientOpacity": 100,
@@ -107,17 +111,17 @@
     "lightLeakOpacity": 20,
     "lightLeakAngle": 45,
     "filmGrainEnable": 0,
-    "filmGrainIntensity": 10
+    "filmGrainIntensity": 0
   },
   "decorConfig": {
     "textLines": [
       {
         "text": "MAGAZINE",
-        "fontFamily": "Times New Roman",
-        "fontSize": 64,
-        "fontWeight": 700,
-        "letterSpacing": 10,
-        "colorHex": "#ffffff",
+        "fontFamily": "Impact",
+        "fontSize": 150,
+        "fontWeight": 900,
+        "letterSpacing": 22,
+        "colorHex": "ccff00",
         "opacity": 100,
         "x": 0,
         "y": 0,
@@ -125,12 +129,12 @@
         "enableShadow": 0
       },
       {
-        "text": "VOL.08 — 2026",
-        "fontFamily": "Times New Roman",
-        "fontSize": 22,
-        "fontWeight": 500,
-        "letterSpacing": 6,
-        "colorHex": "#e11d48",
+        "text": "VOL.08 — 2026 · STREET EDITION",
+        "fontFamily": "Arial",
+        "fontSize": 34,
+        "fontWeight": 800,
+        "letterSpacing": 10,
+        "colorHex": "ff4d00",
         "opacity": 100,
         "x": 0,
         "y": 0,
@@ -139,9 +143,9 @@
       }
     ],
     "stickers": [],
-    "cornerDecorEnable": 0,
-    "cornerDecorType": "none",
-    "cornerDecorSize": 30,
+    "cornerDecorEnable": 1,
+    "cornerDecorType": "double",
+    "cornerDecorSize": 72,
     "exifAutoText": 0
   }
 }

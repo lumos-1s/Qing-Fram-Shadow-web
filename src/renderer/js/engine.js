@@ -970,18 +970,16 @@ function renderCardStyle(app) {
     app.applyZoomStyle();
 }
 
-// 模糊背景:用户背景图优??否则照片本身模糊 cover 铺满(原版 drawBlurredBackground)
-// 绘制区四周外??3 倍模糊半??避免模糊核采样到图像边缘造成角部半透明
+// 模糊背景:用户背景图优先,否则照片本身模糊拉伸填满全部画布(原版 drawBlurredBackground)
+// 绘制区四周外扩 3 倍模糊半径,避免模糊核采样到图像边缘造成角部半透明
 function drawBlurredBackground(ctx, img, cw, ch, margin) {
     const imgW = img.naturalWidth, imgH = img.naturalHeight;
     const blurRadius = Math.max(1, margin.bgBlurRadius || 0);
     const pad = Math.ceil(blurRadius * 3);
-    const scale = Math.max((cw + pad * 2) / imgW, (ch + pad * 2) / imgH);
-    const sx = ((cw + pad * 2) - imgW * scale) / 2 - pad;
-    const sy = ((ch + pad * 2) - imgH * scale) / 2 - pad;
+    const sw = cw + pad * 2, sh = ch + pad * 2;
     ctx.save();
     ctx.filter = `blur(${blurRadius}px)`;
-    ctx.drawImage(img, sx, sy, imgW * scale, imgH * scale);
+    ctx.drawImage(img, -pad, -pad, sw, sh);
     ctx.restore();
 }
 

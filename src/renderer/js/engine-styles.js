@@ -1417,10 +1417,9 @@ AV_OVERLAY_BC2:67 };
     function styleOverlayParams(img, size, g, iw, ih, S, pos) {
         // LEFT(pos=0): 白底+照片在右+左侧品牌名和参数
         if (pos === 0) {
-            const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
-            // 完全对齐印象毛玻璃布局,白底黑字
-            const leftW = Math.max(180, Math.round(iw * 0.35 * gm));
+            // 完全对齐印象毛玻璃布局,白底黑字(尺寸公式与 styleDims 一致,无 gm)
+            const leftW = Math.max(180, Math.round(iw * 0.35));
             const topBotPad = Math.max(50, Math.round(size * 1.2));
             const h = ih + topBotPad * 2;
             // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
@@ -1448,29 +1447,40 @@ AV_OVERLAY_BC2:67 };
             if (crL > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxL, dpyL, pdwL, pdhL, crL); g.clip(); }
             g.drawImage(img, dpxL, dpyL, pdwL, pdhL);
             g.restore();
-            // 左侧品牌名(和毛玻璃一致)
-            const tx = Math.round(leftW * 0.25) + 40;
+            // 左侧品牌+三行参数整体在"画布左缘→照片左缘(leftW+40)"空隙中水平居中
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale));
-            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
-            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
-            g.letterSpacing = Math.round(fBrand * 0.15);
-            g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-            g.fillText(brand, tx, Math.round(h * 0.28));
-            // 三行参数(和毛玻璃一致)
-            if (S.useExif && S.cam) {
-                const boxW = Math.round(leftW * 0.28 * pfScale);
-                const boxH = Math.round(boxW * 0.55);
-                const fBox = Math.max(11, Math.round(boxH * 0.45));
-                const fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale));
-                const rows = [
+            const brandTrack = Math.round(fBrand * 0.15);
+            const exifOn = S.useExif && S.cam;
+            let boxW = 0, fVal = 0, valGap = 0, maxValW = 0, paramRows = [];
+            if (exifOn) {
+                boxW = Math.round(leftW * 0.28 * pfScale);
+                fVal = Math.max(13, Math.round(leftW * 0.08 * pfScale));
+                valGap = Math.round(leftW * 0.05);
+                paramRows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
+                let mv = 0;
+                paramRows.forEach(row => { const w = textMetrics(g, row.val, fVal, false, true, 0).w; if (w > mv) mv = w; });
+                maxValW = mv;
+            }
+            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.letterSpacing = brandTrack;
+            const brandW = g.measureText(brand).width;
+            const contentW = Math.max(brandW, exifOn ? boxW + valGap + maxValW : 0);
+            const tx = Math.max(0, Math.round((leftW + 40 - contentW) / 2));
+            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
+            g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+            g.fillText(brand, tx, Math.round(h * 0.28));
+            // 三行参数(和毛玻璃一致)
+            if (exifOn) {
+                const boxH = Math.round(boxW * 0.55);
+                const fBox = Math.max(11, Math.round(boxH * 0.45));
                 let ry = Math.round(h * 0.48);
                 const boxColorL = S.signBgBlur ? '#ffffff' : '#333333';
-                rows.forEach(row => {
+                paramRows.forEach(row => {
                     g.strokeStyle = boxColorL;
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                     g.beginPath();
@@ -1483,7 +1493,7 @@ AV_OVERLAY_BC2:67 };
                     g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
                     g.textAlign = 'left';
-                    g.fillText(row.val, tx + boxW + Math.round(leftW * 0.05), ry - boxH / 2);
+                    g.fillText(row.val, tx + boxW + valGap, ry - boxH / 2);
                     ry += Math.round(boxH * 1.9);
                 });
             }
@@ -1566,10 +1576,9 @@ AV_OVERLAY_BC2:67 };
         }
         // RIGHT(pos=1): 白底+照片在左+右侧品牌名和参数(印象右留白)
         if (pos === 1) {
-            const gm = Math.min(1.1, S.globalMargin || 1);
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
-            // 完全对齐印象毛玻璃镜像版,白底黑字
-            const rightW = Math.max(180, Math.round(iw * 0.35 * gm));
+            // 完全对齐印象毛玻璃镜像版,白底黑字(尺寸公式与 styleDims 一致,无 gm)
+            const rightW = Math.max(180, Math.round(iw * 0.35));
             const leftPad = Math.round(rightW / 2);
             const topBotPad = Math.max(50, Math.round(size * 1.2));
             const h = ih + topBotPad * 2;
@@ -1587,7 +1596,9 @@ AV_OVERLAY_BC2:67 };
                 g.fillStyle = '#ffffff'; g.fillRect(0, 0, g.canvas.width, g.canvas.height);
             }
             // 照片严格垂直居中(用画布实际高度),支持缩放/偏移/圆角
-            const px = Math.round(leftPad / 3);
+            // 以左留白为基准做严格镜像:照片左缘距画布左边 = leftPad(=round(rightW/2)),
+            // 与左留白照片右缘距画布右边(leftW/2)对称,右侧栏从照片右缘+40 起排
+            const px = leftPad;
             const py = Math.round((g.canvas.height / (g.getTransform().a || 1) - ih) / 2);
             const pscR = S.imgScale || 1;
             const pdwR = Math.round(iw * pscR), pdhR = Math.round(ih * pscR);
@@ -1598,44 +1609,55 @@ AV_OVERLAY_BC2:67 };
             if (crR > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxR, dpyR, pdwR, pdhR, crR); g.clip(); }
             g.drawImage(img, dpxR, dpyR, pdwR, pdhR);
             g.restore();
-            // 右侧品牌名(和毛玻璃镜像,边距一致)
-            const tx = px + iw + Math.round(rightW * 0.10);
+            // 右侧品牌+三行参数整体在"照片右缘→画布右缘(rightW+40)"空隙中水平居中(与左留白镜像)
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
-            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
-            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
-            g.letterSpacing = Math.round(fBrand * 0.15);
-            g.textAlign = 'left';
-            g.textBaseline = 'alphabetic';
-            g.fillText(brand, tx, Math.round(h * 0.28));
-            // 三行参数(和毛玻璃一致)
-            if (S.useExif && S.cam) {
-                const boxW = Math.round(rightW * 0.28 * pfScale);
-                const boxH = Math.round(boxW * 0.55);
-                const fBox = Math.max(11, Math.round(boxH * 0.45));
-                const fVal = Math.max(13, Math.round(rightW * 0.08 * pfScale));
-                const rows = [
+            const brandTrack = Math.round(fBrand * 0.15);
+            const exifOn = S.useExif && S.cam;
+            let boxW = 0, fVal = 0, valGap = 0, maxValW = 0, paramRows = [];
+            if (exifOn) {
+                boxW = Math.round(rightW * 0.28 * pfScale);
+                fVal = Math.max(13, Math.round(rightW * 0.08 * pfScale));
+                valGap = Math.round(rightW * 0.03);
+                paramRows = [
                     { label: 'F', val: String(S.cam.aperture || '6.3').replace(/^f\//i, '').replace(/^F\//i, '') },
                     { label: 'ISO', val: String(S.cam.iso || '100').replace(/^iso/i, '') },
                     { label: 'S', val: String(S.cam.shutter || '1/125').replace(/s$/i, '') }
                 ];
+                let mv = 0;
+                paramRows.forEach(row => { const w = textMetrics(g, row.val, fVal, false, true, 0).w; if (w > mv) mv = w; });
+                maxValW = mv;
+            }
+            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.letterSpacing = brandTrack;
+            const brandW = g.measureText(brand).width;
+            const contentW = Math.max(brandW, exifOn ? boxW + valGap + maxValW : 0);
+            const gapW = rightW;
+            const startX = px + iw + Math.round((gapW - contentW) / 2);
+            g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
+            g.textAlign = 'left';
+            g.textBaseline = 'alphabetic';
+            g.fillText(brand, startX, Math.round(h * 0.28));
+            // 三行参数(和左留白镜像)
+            if (exifOn) {
+                const boxH = Math.round(boxW * 0.55);
+                const fBox = Math.max(11, Math.round(boxH * 0.45));
                 let ry = Math.round(h * 0.48);
                 const boxColorR = S.signBgBlur ? '#ffffff' : '#333333';
-                rows.forEach(row => {
+                paramRows.forEach(row => {
                     g.strokeStyle = boxColorR;
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                     g.beginPath();
-                    if (typeof g.roundRect === 'function') g.roundRect(tx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
-                    else g.rect(tx, ry - boxH, boxW, boxH);
+                    if (typeof g.roundRect === 'function') g.roundRect(startX, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                    else g.rect(startX, ry - boxH, boxW, boxH);
                     g.stroke();
                     g.fillStyle = boxColorR;
                     g.font = 'bold ' + fBox + 'px sans-serif';
-                    g.textAlign = 'center';
-                    g.textBaseline = 'middle';
-                    g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
+                    g.textAlign = 'center'; g.textBaseline = 'middle';
+                    g.fillText(row.label, startX + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
                     g.textAlign = 'left';
-                    g.fillText(row.val, tx + boxW + Math.round(rightW * 0.03), ry - boxH / 2);
+                    g.fillText(row.val, startX + boxW + valGap, ry - boxH / 2);
                     ry += Math.round(boxH * 1.9);
                 });
             }
@@ -2144,11 +2166,11 @@ AV_OVERLAY_BC2:67 };
             }
             case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
-                const gm = Math.min(1.1, (S && S.globalMargin) || 1);
-                const sideW = Math.max(180, Math.round(iw * 0.35 * gm));
+                // 与 IMP_FROSTED 印象毛玻璃保持同一套尺寸(lw=max(180,iw*0.35),rp=lw/2,tbp=max(50,size*1.2))
+                const sideW = Math.max(180, Math.round(iw * 0.35));
                 const oppPad = Math.round(sideW / 2);
                 const topBotPad = Math.max(50, Math.round(size * 1.2));
-                return { w: sideW + iw + oppPad + 40, h: ih + topBotPad * 2 };
+                return { w: sideW + iw + oppPad, h: ih + topBotPad * 2 };
             }
             case 'OVERLAY_PARAM_BOTTOM': {
                 const gm = Math.min(1.1, (S && S.globalMargin) || 1);
@@ -2164,6 +2186,46 @@ AV_OVERLAY_BC2:67 };
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
+    }
+
+    // 画布比例(只扩大、不裁切):渲染完成后按目标比例补齐画布,原图水平垂直居中,补边色取四角采样
+    function expandToRatio(out, ratioStr, img, blurRadius) {
+        if (!ratioStr || ratioStr === 'original') return out;
+        const wh = parseRatio(ratioStr);
+        if (!wh || wh[0] <= 0 || wh[1] <= 0) return out;
+        const target = wh[0] / wh[1];
+        const cur = out.width / out.height;
+        let nw = out.width, nh = out.height;
+        if (cur > target) nh = Math.max(1, Math.round(out.width / target));
+        else nw = Math.max(1, Math.round(out.height * target));
+        if (nw <= out.width && nh <= out.height) return out;
+        const big = newCanvas(nw, nh);
+        const g = big.getContext('2d');
+        // 补边:模糊图层直接拉伸填满整张延展画布(等比变形可忽略,模糊后不可感知)
+        if (img && img.naturalWidth > 0) {
+            const br = Math.max(1, Math.round(blurRadius || 30));
+            const pad = Math.ceil(br * 3);
+            const sw = nw + pad * 2, sh = nh + pad * 2;
+            g.save();
+            g.filter = 'blur(' + br + 'px)';
+            g.drawImage(img, -pad, -pad, sw, sh);
+            g.restore();
+        } else {
+            // 无照片回退:四角采样平均色
+            let rs = 0, gs = 0, bs = 0, n = 0;
+            const g0 = out.getContext('2d');
+            try {
+                const pts = [[0, 0], [out.width - 1, 0], [0, out.height - 1], [out.width - 1, out.height - 1]];
+                for (const [px, py] of pts) {
+                    const d = g0.getImageData(Math.max(0, px), Math.max(0, py), 1, 1).data;
+                    if (d[3] > 60) { rs += d[0]; gs += d[1]; bs += d[2]; n++; }
+                }
+            } catch (e) { /* 忽略 */ }
+            g.fillStyle = n > 0 ? 'rgb(' + Math.round(rs / n) + ',' + Math.round(gs / n) + ',' + Math.round(bs / n) + ')' : '#ffffff';
+            g.fillRect(0, 0, nw, nh);
+        }
+        g.drawImage(out, Math.round((nw - out.width) / 2), Math.round((nh - out.height) / 2));
+        return big;
     }
 
     function renderPhotoFrame(app) {
@@ -2996,6 +3058,11 @@ AV_OVERLAY_BC2:67 };
                     window.drawCornerDecor(out.getContext('2d'), decor.cornerDecorType || 'line', decor.cornerDecorSize || 30, out.width, out.height);
                 }
             }
+
+            // 相框样式也支持画布比例(只扩大、不裁切)。仅当用户启用了背景模糊(bgBlurEnable)
+            // 时补边才用模糊照片延伸,否则回退四角采样纯色,避免没开模糊却出现模糊
+            const useBlurFill = (t.baseMargin && (t.baseMargin.bgBlurEnable || 0) === 1);
+            out = expandToRatio(out, t.canvasRatio, useBlurFill ? img : null, (t.baseMargin && t.baseMargin.bgBlurRadius) || 30);
 
             const finalScale = Math.min(1, displayMax / Math.max(out.width, out.height));
             canvas.width = Math.max(1, Math.round(out.width * finalScale));

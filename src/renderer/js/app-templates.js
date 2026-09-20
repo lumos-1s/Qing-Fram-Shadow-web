@@ -499,8 +499,35 @@ window.App = Object.assign(window.App || {}, {
         this.selectedIdx.slice(1).forEach(i => {
             const im = this.images[i];
             if (!im) return;
-            im.customSettings = JSON.parse(JSON.stringify(applied));
-            this.imageTemplates.set(im, JSON.parse(JSON.stringify(applied)));
+            const tgtSnap = JSON.parse(JSON.stringify(applied));
+            // 相机数据与 syncBorderTo 一致:同步只动边框。目标图自己能识别 EXIF → 用自己的;
+            // 没有 EXIF 但手动填过 → 保留该图自己的手动参数;都无 → 沿用源图的有效相机数据
+            const prev = this.imageTemplates.get(im) || (im.customSettings || null);
+            const prevManual = (prev && prev.manualExif && typeof prev.manualExif === 'object') ? prev.manualExif : null;
+            const ownExif = (im.exif && typeof im.exif === 'object') ? im.exif : {};
+            const hasOwn = ['make', 'model', 'focal', 'aperture', 'iso', 'shutter'].some(k => String(ownExif[k] || '').trim() !== '');
+            if (hasOwn) {
+                delete tgtSnap.manualExif;
+            } else if (prevManual) {
+                delete tgtSnap.manualExif;
+                if (Object.keys(prevManual).length) tgtSnap.manualExif = JSON.parse(JSON.stringify(prevManual));
+            } else {
+                const srcManual = (this.template.manualExif && typeof this.template.manualExif === 'object') ? this.template.manualExif : {};
+                const srcAuto = (this.image && this.image.exif && typeof this.image.exif === 'object') ? this.image.exif : {};
+                const base = {
+                    brand: String(srcManual.brand || '').trim() || String(srcAuto.make || '').trim(),
+                    model: String(srcManual.model || '').trim() || String(srcAuto.model || '').trim(),
+                    focal: String(srcManual.focal || '').trim() || String(srcAuto.focal || '').trim(),
+                    aperture: String(srcManual.aperture || '').trim() || String(srcAuto.aperture || '').trim(),
+                    iso: String(srcManual.iso || '').trim() || String(srcAuto.iso || '').trim(),
+                    shutter: String(srcManual.shutter || '').trim() || String(srcAuto.shutter || '').trim()
+                };
+                const hasCam = ['brand', 'model', 'focal', 'aperture', 'iso', 'shutter'].some(k => base[k] !== '');
+                delete tgtSnap.manualExif;
+                if (hasCam) tgtSnap.manualExif = base;
+            }
+            im.customSettings = tgtSnap;
+            this.imageTemplates.set(im, JSON.parse(JSON.stringify(tgtSnap)));
             this.queueThumb(im);
             count++;
         });

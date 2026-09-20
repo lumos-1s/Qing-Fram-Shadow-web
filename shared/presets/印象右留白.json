@@ -63,6 +63,6 @@
   "paramType": 0,
   "paramPosition": "RIGHT",
   "photoFrameStyle": "OVERLAY_PARAM_RIGHT",
-  "photoFrameBorderSize": 60,
+  "photoFrameBorderSize": 100,
   "blurIntensity": 50
 }
