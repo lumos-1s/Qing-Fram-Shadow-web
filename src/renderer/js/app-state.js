@@ -106,5 +106,9 @@ window.App = Object.assign(window.App || {}, {
         this.dom.btnRedo.disabled = !this.redoStack.length;
     },
 
-    cloneTemplate() { return JSON.parse(JSON.stringify(this.template || null)); }
+    cloneTemplate() {
+        const t = JSON.parse(JSON.stringify(this.template || null));
+        if (t && t._draftText) delete t._draftText;
+        return t;
+    }
 });

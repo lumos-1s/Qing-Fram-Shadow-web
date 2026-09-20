@@ -122,14 +122,22 @@ function setupCanvas(app, canvasW, canvasH) {
     const canvas = app.dom.canvas;
     const displayMax = (typeof app.displayMax === 'number' && app.displayMax > 0) ? app.displayMax : 1800;
     // 高分屏(Windows 缩放等 DPR>1)下把后备缓冲区按 devicePixelRatio 放大,避免文字/照片被浏览器放大而发虚
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    // 导出通道(app.uiDprOverride=1)则按逻辑像素渲染,保证导出尺寸与选项/“原图尺寸”一致
+    const dpr = (typeof app.uiDprOverride === 'number' && app.uiDprOverride > 0)
+        ? app.uiDprOverride
+        : ((typeof window !== 'undefined' && window.devicePixelRatio) || 1);
     const ui = Math.min(1, displayMax / Math.max(canvasW, canvasH));
-    const scale = ui * dpr;
+    // 导出大尺寸选项(app.exportScale):把画布长边放大到目标值,小图也能上采样到所选尺寸;
+    // 普通预览/“原图尺寸”仍按 displayMax 封顶(ui≤1),不放大
+    const uiScale = (typeof app.exportScale === 'number' && app.exportScale > 0)
+        ? app.exportScale / Math.max(canvasW, canvasH)
+        : ui;
+    const scale = uiScale * dpr;
     canvas.width = Math.max(1, Math.round(canvasW * scale));
     canvas.height = Math.max(1, Math.round(canvasH * scale));
     // 逻辑显示尺寸(CSS 像素),供 applyZoomStyle 使用(与后备缓冲解耦,不会因 DPR 放得更大)
-    canvas._logW = Math.max(1, Math.round(canvasW * ui));
-    canvas._logH = Math.max(1, Math.round(canvasH * ui));
+    canvas._logW = Math.max(1, Math.round(canvasW * uiScale));
+    canvas._logH = Math.max(1, Math.round(canvasH * uiScale));
     const ctx = canvas.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);

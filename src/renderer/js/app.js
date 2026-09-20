@@ -32,7 +32,6 @@ window.App = {
     _firstRenderDone: false,
     selectedEls: [],      // 画布元素选中集(引用自模板数组)
     _elClip: null,        // 复制的元素快照 {kind, el}
-    _draftPending: false,
     _puzzleSlot: 's0',       // 拼图当前编辑项('s0'..槽位 / 'v0'/'h0'..间隙)
     _editingGap: null,       // 正在编辑的字幕门牌号('H0'/'V1'/'S2'),无则收起编辑器
     _activePuzzleSlot: null, // 画布选中槽位(高亮 + 换图)
@@ -71,6 +70,7 @@ window.App = {
         this.initSplash();
         this.cacheDom();
         this.bind();
+        this.loadPrefs();
         this.loadPresets();
         this.restoreLastState();
         this.loadLogos();
@@ -99,6 +99,16 @@ window.App = {
         this.updateHistoryButtons();
         this.initLogin();
         this.initDraft();
+    },
+
+    // 恢复上次的界面偏好(导出质量等)
+    async loadPrefs() {
+        try {
+            const p = await window.qingframe.getPrefs();
+            if (p && p.exportQuality && this.dom.slExportQuality) {
+                this.dom.slExportQuality.value = p.exportQuality;
+            }
+        } catch (_) {}
     },
 
     cacheDom() {
@@ -138,6 +148,12 @@ window.App = {
         const d = this.dom;
         d.btnOpen.addEventListener('click', () => this.openImages());
         d.btnSave.addEventListener('click', () => this.exportImage());
+        if (d.slExportQuality) {
+            d.slExportQuality.addEventListener('change', () => {
+                // 异步调用,静默忽略失败(旧主进程无该 handler 时不报未处理错误)
+                window.qingframe.savePrefs({ exportQuality: d.slExportQuality.value }).catch(() => {});
+            });
+        }
         d.btnSyncSel.addEventListener('click', () => this.syncToSelected());
         d.btnUndo.addEventListener('click', () => this.undo());
         d.btnRedo.addEventListener('click', () => this.redo());
@@ -809,7 +825,7 @@ window.App = {
         m.imgOffsetX = num($('tfImgOffsetX'), m.imgOffsetX);
         m.imgOffsetY = num($('tfImgOffsetY'), m.imgOffsetY);
 
-        cc.cornerLock = $('cbCornerLock') && $('cbCornerLock').checked ? 1 : 0;
+        if ($('cbCornerLock')) cc.cornerLock = $('cbCornerLock').checked ? 1 : 0;
         const r = $('slCornerRadius') ? parseInt($('slCornerRadius').value, 10) : (cc.cornerRadiusAll || 0);
         cc.cornerRadiusAll = r;
         cc.cornerRadiusTL = num($('slCornerTL'), r);
@@ -823,11 +839,7 @@ window.App = {
         this.template.paramType = $('cbParamType') ? parseInt($('cbParamType').value, 10) : 0;
         this.syncManualExif();
 
-        layer.visible = $('cbLayerVisible') && $('cbLayerVisible').checked ? 1 : 0;
-        layer.marginTop = num($('tfLayerMarginTop'), layer.marginTop);
-        layer.marginRight = num($('tfLayerMarginRight'), layer.marginRight);
-        layer.marginBottom = num($('tfLayerMarginBottom'), layer.marginBottom);
-        layer.marginLeft = num($('tfLayerMarginLeft'), layer.marginLeft);
+        if ($('cbLayerVisible')) layer.visible = $('cbLayerVisible').checked ? 1 : 0;
 
         fill.fillType = $('cbFillType') ? $('cbFillType').value : 'solid';
         fill.fillHex = $('cpFillColor') ? $('cpFillColor').value.replace('#', '') : 'eeeeee';
@@ -845,7 +857,7 @@ window.App = {
         stroke.strokeDashArray = $('tfStrokeDash') ? dashToArray($('tfStrokeDash').value) : [];
 
         const lcc = layer.cornerConfig || (layer.cornerConfig = {});
-        lcc.cornerLock = ($('cbLayerCornerLock') && $('cbLayerCornerLock').checked) ? 1 : 0;
+        if ($('cbLayerCornerLock')) lcc.cornerLock = $('cbLayerCornerLock').checked ? 1 : 0;
         const lr = $('slLayerCornerRadius') ? parseInt($('slLayerCornerRadius').value, 10) : (lcc.cornerRadiusAll || 0);
         lcc.cornerRadiusAll = lr;
         lcc.cornerRadiusTL = num($('slLayerCornerTL'), lr);
@@ -877,7 +889,7 @@ window.App = {
         le.lightLeakOpacity = $('slLeakOpacity') ? parseInt($('slLeakOpacity').value, 10) : 40;
         le.lightLeakAngle = $('slLeakAngle') ? parseInt($('slLeakAngle').value, 10) : 225;
 
-        decor.exifAutoText = ($('cbExifText') && $('cbExifText').checked) ? 1 : 0;
+        if ($('cbExifText')) decor.exifAutoText = $('cbExifText').checked ? 1 : 0;
         decor.cornerDecorEnable = ($('cbCornerDecor') && $('cbCornerDecor').checked) ? 1 : 0;
         decor.cornerDecorType = $('cbCornerDecorType') ? $('cbCornerDecorType').value : 'line';
         decor.cornerDecorSize = $('slCornerDecorSize') ? parseInt($('slCornerDecorSize').value, 10) : 30;
@@ -909,14 +921,7 @@ window.App = {
                 el.style.display = '';
             } else { el.style.display = 'none'; }
         }
-        const de = $('decorExifLine'), dt = $('decorExifLineText');
-        if (de && dt) {
-            const e = this.image && this.image.exif ? this.image.exif : {};
-            const parts = [e.make && e.model ? `${e.make} ${e.model}` : (e.make || e.model), e.shutter, e.aperture, e.iso, e.focal].filter(Boolean);
-            if (parts.length) { dt.textContent = parts.join(' · '); de.style.display = ''; }
-            else de.style.display = 'none';
-        }
-    },
+        },
 
     // 全局边距:按参考值等比缩放四边
     applyGlobalMargin(scale, setSlider) {
@@ -1026,12 +1031,6 @@ window.App = {
                 const el = $(id);
                 if (el) el.value = (manExif[mk] || '').trim() || (autoExif[ek] || '');
             });
-            if ($('cbLayerVisible')) $('cbLayerVisible').checked = (layer.visible || 1) === 1;
-            if ($('tfLayerMarginTop')) $('tfLayerMarginTop').value = layer.marginTop || 0;
-            if ($('tfLayerMarginRight')) $('tfLayerMarginRight').value = layer.marginRight || 0;
-            if ($('tfLayerMarginBottom')) $('tfLayerMarginBottom').value = layer.marginBottom || 0;
-            if ($('tfLayerMarginLeft')) $('tfLayerMarginLeft').value = layer.marginLeft || 0;
-
             if ($('cbFillType')) $('cbFillType').value = fill.fillType || 'solid';
             if ($('cpFillColor')) $('cpFillColor').value = '#' + (fill.fillHex || 'eeeeee');
             if ($('slFillOpacity')) $('slFillOpacity').value = fill.fillOpacity != null ? fill.fillOpacity : 100;
@@ -1088,14 +1087,12 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             this.updateLabel('lblLeakOpacity', (le.lightLeakOpacity != null ? le.lightLeakOpacity : 40) + '%');
             this.updateLabel('lblLeakAngle', (le.lightLeakAngle != null ? le.lightLeakAngle : 225) + '°');
 
-            if ($('cbExifText')) $('cbExifText').checked = (decor.exifAutoText || 0) === 1;
             if ($('cbCornerDecor')) $('cbCornerDecor').checked = (decor.cornerDecorEnable || 0) === 1;
             if ($('cbCornerDecorType')) $('cbCornerDecorType').value = decor.cornerDecorType || 'line';
             if ($('slCornerDecorSize')) $('slCornerDecorSize').value = decor.cornerDecorSize || 30;
             this.updateLabel('lblCornerDecorSize', decor.cornerDecorSize || 30);
 
             this.refreshElList();
-            this.syncLayerSelect();
             this.refreshTemplateFields();
             this.refreshPuzzleUI();
             this.updateHistoryButtons();
@@ -1255,6 +1252,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (!t.filmTearConfig) t.filmTearConfig = {};
         if (!t.lightEffect) t.lightEffect = {};
         if (!t.decorConfig) t.decorConfig = {};
+        if (t._draftText) delete t._draftText;
         if (!t.layerList || !t.layerList.length) t.layerList = [this.defaultTemplate().layerList[0]];
         if (!t.logoElements) t.logoElements = [];
         if (!t.puzzle) t.puzzle = this.defaultTemplate().puzzle;
@@ -1755,7 +1753,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
     /* ══ 字体下拉填充(装饰文字/拼图字幕共用 curatedFonts) ══ */
     populateFonts() {
-        ['cbTextFont', 'cbCapFont1', 'cbCapFont2'].forEach(id => {
+        ['cbCapFont1', 'cbCapFont2'].forEach(id => {
             const sel = this.$(id);
             if (!sel) return;
             sel.innerHTML = '';
@@ -1779,7 +1777,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             'slParamFontSize', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
             'slShadowX', 'slShadowY', 'slShadowBlur', 'slShadowSpread', 'slShadowOpacity', 'slGlowBlur', 'slGlowOpacity',
             'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
-            'slCornerDecorSize', 'slTextSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap', 'slPuzzleCorner',
+            'slCornerDecorSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap', 'slPuzzleCorner',
             'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
         ]);
@@ -1791,8 +1789,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
 
         // 复选框 -> onSettingCommit
-        const chks = ['cbCornerLock', 'cbLayerVisible', 'cbShadow', 'cbGlow', 'cbTearEnable',
-            'cbVignette', 'cbLightLeak', 'cbExifText', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock'];
+        const chks = ['cbCornerLock', 'cbShadow', 'cbGlow', 'cbTearEnable',
+            'cbVignette', 'cbLightLeak', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock'];
         chks.forEach(id => {
             const el = $(id);
             if (el) el.addEventListener('change', () => this.onSettingCommit());
@@ -1801,7 +1799,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
         // select 变更 -> commit
         const sels = ['cbCanvasRatio', 'cbParamPosition', 'cbParamType', 'cbFillType', 'cbGradientType', 'cbTextureBlend',
-            'cbStrokePos', 'cbLeakType', 'cbCornerDecorType', 'cbTextFont', 'cbLayerSelect', 'cbPuzzleBg', 'cbPuzzleCanvas',
+            'cbStrokePos', 'cbLeakType', 'cbCornerDecorType', 'cbPuzzleBg', 'cbPuzzleCanvas',
             'cbSlotFill', 'cbCapFont1', 'cbCapFont2', 'cbRecipeFilter'];
         sels.forEach(id => {
             const el = $(id);
@@ -1809,8 +1807,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         });
 
         // 数字/文本输入:input 即时同步(防抖),change 提交
-        const nums = ['tfImgOffsetX', 'tfImgOffsetY',
-            'tfLayerMarginTop', 'tfLayerMarginRight', 'tfLayerMarginBottom', 'tfLayerMarginLeft'];
+        const nums = ['tfImgOffsetX', 'tfImgOffsetY'];
         nums.forEach(id => {
             const el = $(id);
             if (!el) return;
@@ -1820,7 +1817,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             el.addEventListener('change', () => this.onSettingCommit());
         });
         const texts = ['tfExifBrand', 'tfExifModel', 'tfExifFocal', 'tfExifAperture', 'tfExifIso', 'tfExifShutter',
-            'tfStrokeDash', 'tfCustomText', 'tfTemplateName', 'tfTemplateTag', 'tfCapLine1', 'tfCapLine2'];
+            'tfStrokeDash', 'tfTemplateName', 'tfTemplateTag', 'tfCapLine1', 'tfCapLine2'];
         texts.forEach(id => {
             const el = $(id);
             if (!el) return;
@@ -1832,14 +1829,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
         // 图层按钮
         const bindBtn = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => fn()); };
-        bindBtn('btnAddLayer', () => this.addLayer());
-        bindBtn('btnRemoveLayer', () => this.removeLayer());
-        bindBtn('btnResetLayer', () => this.resetLayer());
         bindBtn('btnBuiltinTexture', () => this.pickBuiltinTexture());
         bindBtn('btnSelectTexture', () => this.pickTexture());
-        bindBtn('btnAddTextLine', () => this.addTextLine());
-        bindBtn('btnDeleteSelectedTextLine', () => this.deleteSelectedTextLine());
-        bindBtn('btnAddSticker', () => this.addSticker());
         bindBtn('btnAddCustomIcon', () => this.addCustomIcon());
         bindBtn('btnCopySelectedElement', () => this.copyElement());
         bindBtn('btnPasteClipboardElement', () => this.pasteElement());
@@ -1983,39 +1974,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
     onSelectCustom(id) {
-        switch (id) {
-            case 'cbLayerSelect':
-                this.selectedLayer = parseInt(this.$('cbLayerSelect').value, 10) || 0;
-                this.refreshUI();
-                break;
-            case 'cbTextFont': this._draftPending = true; this.previewDraftText(); break;
-            default: break;
-        }
         this.onSettingCommit();
     },
 
     onTextCustom(id) {
-        switch (id) {
-            case 'tfCustomText': case 'cbTextFont': this.previewDraftText(); break;
-            default: this.onSettingChanged(); break;
-        }
-    },
-
-    previewDraftText() {
-        if (!this.template) return;
-        const $ = this.$;
-        const t = this.$('tfCustomText') ? this.$('tfCustomText').value : '';
-        if (!t) { this._draftPending = false; this.onSettingChanged(); return; }
-        const fs = this.$('slTextSize') ? parseInt(this.$('slTextSize').value, 10) : 18;
-        this.template._draftText = {
-            text: t, align: 'live', fontSize: fs,
-            colorHex: (this.$('cpTextColor') ? this.$('cpTextColor').value.replace('#', '') : '000000'),
-            opacity: 85, fontFamily: this.$('cbTextFont') ? this.$('cbTextFont').value : 'Microsoft YaHei', fontWeight: 400,
-        };
-        // 写回滑块同步
-        if (this.$('slTextSize')) {
-            // 实时预览字号走草稿
-        }
         this.onSettingChanged();
     },
 
@@ -2047,7 +2009,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             slTearStrength: ['lblTearStrength', v], slTearDensity: ['lblTearDensity', v],
             slVignetteStrength: ['lblVignetteStrength', v + '%'], slVignetteFeather: ['lblVignetteFeather', v],
             slLeakOpacity: ['lblLeakOpacity', v + '%'], slLeakAngle: ['lblLeakAngle', v + '°'],
-            slCornerDecorSize: ['lblCornerDecorSize', v], slTextSize: ['lblTextSize', v],
+            slCornerDecorSize: ['lblCornerDecorSize', v],
             slPuzzleGap: ['lblPuzzleGap', v], slPuzzleCorner: ['lblPuzzleCorner', v + '%'], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
             slCapSpacing: ['lblCapSpacing', v + '%'], slSlotOffsetX: ['lblSlotOffsetX', v], slSlotOffsetY: ['lblSlotOffsetY', v],
             slSlotZoom: ['lblSlotZoom', v + '%'],
@@ -2059,64 +2021,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     onSliderLive(id, v) {
         if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
-        if (id === 'slTextSize') { this.previewDraftText(); return; }
         if (id === 'slPuzzleGap' || id === 'slPuzzleCorner' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
             this.syncPuzzleFromUI(); this.onSettingChanged(); return;
         }
         this.onSettingChanged();
-    },
-
-    /* ══ 图层管理 ══ */
-    addLayer() {
-        this.onSettingCommit();
-        const def = this.defaultTemplate().layerList[0];
-        const layer = JSON.parse(JSON.stringify(def));
-        layer.fillConfig.fillHex = 'eeeeee';
-        this.template.layerList.unshift(layer);
-        this.selectedLayer = 0;
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus('已添加图层');
-    },
-
-    removeLayer() {
-        if (!this.template.layerList || this.template.layerList.length <= 1) { this.setStatus('至少保留一个图层'); return; }
-        this.onSettingCommit();
-        const i = clampNum(this.selectedLayer || 0, 0, this.template.layerList.length - 1);
-        this.template.layerList.splice(i, 1);
-        this.selectedLayer = Math.min(i, this.template.layerList.length - 1);
-        this.refreshUI();
-        this.scheduleRender(true);
-        this.setStatus('已删除图层');
-    },
-
-    resetLayer() {
-        this.onSettingCommit();
-        const layer = this.currentLayer();
-        const def = this.defaultTemplate().layerList[0];
-        layer.fillConfig = JSON.parse(JSON.stringify(def.fillConfig));
-        layer.strokeConfig = JSON.parse(JSON.stringify(def.strokeConfig));
-        layer.shadowGlowConfig = JSON.parse(JSON.stringify(def.shadowGlowConfig));
-        layer.cornerConfig = JSON.parse(JSON.stringify(def.cornerConfig));
-        layer.marginTop = 0; layer.marginRight = 0; layer.marginBottom = 0; layer.marginLeft = 0;
-        layer.visible = 1;
-        this.refreshUI();
-        this.scheduleRender(true);
-    },
-
-    syncLayerSelect() {
-        const $ = this.$;
-        const sel = $('cbLayerSelect');
-        if (!sel || !this.template || !this.template.layerList) return;
-        const n = this.template.layerList.length;
-        sel.innerHTML = '';
-        for (let i = 0; i < n; i++) {
-            const o = document.createElement('option');
-            o.value = i;
-            o.textContent = `图层 ${n - i}${!this.template.layerList[i].visible ? ' (隐藏)' : ''}`;
-            if (i === (this.selectedLayer || 0)) o.selected = true;
-            sel.appendChild(o);
-        }
     },
 
     /* ══ 纹理 ══ */
@@ -2150,73 +2058,6 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         this.scheduleRender(true);
         this.setStatus(`已应用纹理 ${name}`);
     },
-
-    /* ══ 文字 / 贴纸 ══ */
-    addTextLine() {
-        const $ = this.$;
-        const text = $('tfCustomText') ? $('tfCustomText').value.trim() : '';
-        if (!text) { this.setStatus('请先输入文字内容'); return; }
-        this.onSettingCommit();
-        const decor = this.template.decorConfig || (this.template.decorConfig = {});
-        if (!decor.textLines) decor.textLines = [];
-        const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
-        const line = {
-            text, align: 'free', x: cw / 2, y: ch / 2,
-            fontSize: $('slTextSize') ? parseInt($('slTextSize').value, 10) : 24,
-            colorHex: ($('cpTextColor') ? $('cpTextColor').value : '#000000').replace('#', ''),
-            opacity: 100, rotation: 0,
-            fontFamily: $('cbTextFont') ? $('cbTextFont').value : 'Microsoft YaHei', fontWeight: 400,
-        };
-        decor.textLines.push(line);
-        this.selectedEls = [{ kind: 'text', obj: line }];
-        this._draftPending = false;
-        if ($('tfCustomText')) $('tfCustomText').value = '';
-        delete this.template._draftText;
-        this.refreshUI();
-        this.saveCurrentTemplate();
-        this.scheduleRender(true);
-        this.setStatus('已添加文字(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
-    },
-
-    deleteSelectedTextLine() {
-        const selected = this.selectedEls.filter(x => x.kind === 'text');
-        if (!selected.length) { this.setStatus('请先在画布选中文字'); return; }
-        this.onSettingCommit();
-        const decor = this.template.decorConfig || {};
-        const lines = decor.textLines || [];
-        selected.forEach(s => { const i = lines.indexOf(s.obj); if (i >= 0) lines.splice(i, 1); });
-        this.selectedEls = [];
-        this.refreshUI();
-        this.saveCurrentTemplate();
-        this.scheduleRender(true);
-    },
-
-    async addSticker() {
-        const res = await window.qingframe.openStickerImage();
-        if (!res || !res.data) { this.setStatus('已取消添加贴纸'); return; }
-        const dataUrl = 'data:image/jpeg;base64,' + res.data;
-        // 预加载到缓存,避免后续每次渲染重新解码(保持真实 JPEG MIME,不伪造 PNG 头)
-        await new Promise(r => { const im = new Image(); im.onload = r; im.onerror = r; im.src = dataUrl; });
-        if (!this.logoImgCache) this.logoImgCache = {};
-        this.logoImgCache[dataUrl] = new Image();
-        await new Promise(r => { this.logoImgCache[dataUrl].onload = r; this.logoImgCache[dataUrl].onerror = r; this.logoImgCache[dataUrl].src = dataUrl; });
-        this.onSettingCommit();
-        const decor = this.template.decorConfig || (this.template.decorConfig = {});
-        if (!decor.stickers) decor.stickers = [];
-        const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
-        const w = this.image.w || 1000;
-        const scale = clampNum((cw * 0.25) / Math.max(1, Math.max(w, 1000)), 0.02, 3);
-        decor.stickers.push({
-            src: dataUrl,
-            x: cw / 2, y: ch / 2, scale, rotation: 0, opacity: 100, z: 20,
-        });
-        this.selectedEls = [{ kind: 'sticker', obj: decor.stickers[decor.stickers.length - 1] }];
-        this.refreshUI();
-        this.saveCurrentTemplate();
-        this.scheduleRender(true);
-        this.setStatus('已添加贴纸(拖拽移动,滚轮缩放, Ctrl+滚轮旋转)');
-    },
-
 
     _brandRank(n) {
         const ranking = {"APPLE":100,"SAMSUNG":95,"XIAOMI":90,"VIVO":80,"OPPO":78,"HONOR":72,"HUAWEI":70,"GOOGLE":65,"ONEPLUS":62,"REALME":58,"MOTOROLA":55,"LENOVO":50,"ASUS":48,"NOTHING":45,"NUBIA":42,"REDMI":88,"REDMAGIC":38,"IQOO":52,"TECNO":38,"INFINIX":35,"ITEL":33,"DOOGEE":25,"ULEFONE":22,"BLACKSHARK":30,"VERTU":20,"NOKIA":48,"LG":45,"HTC":40,"MEIZU":35,"CANON":98,"SONY":92,"FUJIFILM":85,"NIKON":80,"PANASONIC":60,"RICOH":45,"OLYMPUS":42,"PENTAX":38,"SIGMA":40,"LEICA":55,"HASSELBLAD":48,"POLAROID":50,"GOPRO":52,"DJI":58,"INSTA360":50,"RED":35,"CONTAX":25,"ALPA":15,"LINHOF":12,"MAMIYA":18,"ROLLEI":20,"PHASEONE":25,"HORSEMAN":10,"TOYO":8,"VOIGTLÄNDER":15,"SEAGULL":20,"TAMRON":30,"AGFA":18,"KODAK":45,"LOMO":30,"BLACKMAGIC":42,"ZEISS":50,"CASIO":25,"CAT":5};
@@ -2525,6 +2366,8 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
     fitZoom() {
         if (!this.image) return;
+        // 导出渲染期间不动 CSS/缩放(画布只是临时放大),避免大导出时视图抖动
+        if (this.uiDprOverride === 1) return;
         const canvas = this.dom.canvas;
         if (!canvas.width) return;
         const stage = this.dom.stage;
@@ -2534,6 +2377,8 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         this.setZoom(Math.max(0.1, z));
     },
     applyZoomStyle() {
+        // 导出渲染期间不动 CSS 显示样式(见 fitZoom 守卫)
+        if (this.uiDprOverride === 1) return;
         const canvas = this.dom.canvas;
         const z = this.zoom;
         // 显示尺寸用逻辑像素(backing/DPR),高分屏不放大,文字保持清晰

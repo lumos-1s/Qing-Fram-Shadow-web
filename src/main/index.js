@@ -256,6 +256,17 @@ ipcMain.handle('logout-user', () => {
     return { ok: true };
 });
 
+// 界面偏好(导出质量等),与用户资料分开存
+ipcMain.handle('get-prefs', () => {
+    const st = loadState();
+    return st.prefs || {};
+});
+
+ipcMain.handle('save-prefs', (_e, prefs) => {
+    if (prefs && typeof prefs === 'object') saveState({ prefs });
+    return { ok: true };
+});
+
 ipcMain.handle('open-image', async () => {
     const st = loadState();
     const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -379,8 +390,14 @@ ipcMain.handle('pick-export-location', async (_e, { count, hintName }) => {
         ]
     });
     if (canceled || !filePath) return { canceled: true };
-    saveState({ lastExportDir: path.dirname(filePath) });
-    return { mode: 'file', filePath };
+    // 用户手敲文件名没带扩展名时,按默认导出格式补全,避免写出无法打开的无后缀文件
+    let fp = filePath;
+    if (!/\.[a-zA-Z0-9]{1,5}$/.test(fp)) {
+        const ext0 = (hintName.match(/\.[^.]+$/) || ['.png'])[0];
+        fp += ext0;
+    }
+    saveState({ lastExportDir: path.dirname(fp) });
+    return { mode: 'file', filePath: fp };
 });
 
 // 把已渲染好的导出数据写入选好的位置

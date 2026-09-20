@@ -836,13 +836,21 @@ window.App = Object.assign(window.App || {}, {
         const exportPuzzleNow = () => {
             if (!window.__renderPuzzle) { this.setStatus('拼图渲染不可用'); return Promise.resolve(false); }
             const prev = this.displayMax;
+            const prevDpr = this.uiDprOverride;
+            const prevScale = this.exportScale;
             this.displayMax = 4000;
+            this.uiDprOverride = 1;
+            this.exportScale = 4000;
             return new Promise(res => requestAnimationFrame(() => {
                 window.__renderPuzzle(this, false, true);
                 const data = this.dom.canvas.toDataURL('image/png');
                 const base64 = data.split(',')[1];
                 if (prev === undefined) delete this.displayMax;
                 else this.displayMax = prev;
+                if (prevDpr === undefined) delete this.uiDprOverride;
+                else this.uiDprOverride = prevDpr;
+                if (prevScale === undefined) delete this.exportScale;
+                else this.exportScale = prevScale;
                 res(base64);
             }));
         };

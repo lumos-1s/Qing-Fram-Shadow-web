@@ -348,6 +348,12 @@ window.App = Object.assign(window.App || {}, {
     resetParams() {
         if (!this.template) return;
         this.pushUndo();
+        // 重置后本图不再视为“已用预设”:清理 customSettings 与旧的模板记忆,
+        // 否则切走再切回/导出时仍会取到重置前的旧边框
+        if (this.image) {
+            delete this.image.customSettings;
+            this.imageTemplates.delete(this.image);
+        }
         this.template = this.defaultTemplate();
         this.saveCurrentTemplate();
         this.refreshUI();

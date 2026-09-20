@@ -2301,7 +2301,9 @@ AV_OVERLAY_BC2:67 };
         const canvas = app.dom.canvas;
 
         if (styleName === 'NONE') {
-            const scale = Math.min(1, displayMax / Math.max(iw, ih));
+            // “原图尺寸/预览”按显示上限封顶;选了 4096/8192 等导出选项时上采样到目标长边
+            const exportScale = (typeof app.exportScale === 'number' && app.exportScale > 0) ? app.exportScale : 0;
+            const scale = exportScale > 0 ? exportScale / Math.max(iw, ih) : Math.min(1, displayMax / Math.max(iw, ih));
             canvas.width = Math.max(1, Math.round(iw * scale));
             canvas.height = Math.max(1, Math.round(ih * scale));
             canvas._logW = canvas.width;
@@ -2501,29 +2503,28 @@ AV_OVERLAY_BC2:67 };
     }
 
     // ══ 漫画分镜 ══
+    // 与 styleDims('COMIC_PANEL') 保持同一套尺寸(gap=round(0.015*iw),底部条=round(iw*0.08)),
+    // 保证画面内容不超出画布(修复原实现在固定 gap=8 / +60 下右、下被裁切的问题);
+    // 2×2 照片网格整体在画布中水平垂直居中
     function styleComicPanel(img, size, g, iw, ih, S) {
-        const gap = 8;
+        const gap = Math.round(iw * 0.015);
+        const barH = Math.round(iw * 0.08);
         const cols = 2, rows = 2;
+        const w = iw + gap * 3, h = ih + gap * 3 + barH;
         const cw = Math.floor(iw / cols), ch = Math.floor(ih / rows);
-        const w = iw + gap * (cols + 1), h = ih + gap * (rows + 1) + 60;
         // 黑底
         g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
-        // 切成4格
+        // 切成4格(网格整体含间距,水平垂直居中)
+        const gridW = cw * cols + gap, gridH = ch * rows + gap;
+        const x0 = Math.round((w - gridW) / 2), y0 = Math.round((h - gridH) / 2);
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                const x = gap + c * (cw + gap), y = gap + r * (ch + gap);
+                const x = x0 + c * (cw + gap), y = y0 + r * (ch + gap);
                 g.drawImage(img, c * cw, r * ch, cw, ch, x, y, cw, ch);
                 g.strokeStyle = '#fff'; g.lineWidth = 3;
                 g.strokeRect(x, y, cw, ch);
             }
         }
-        // 气泡框
-        g.fillStyle = '#fff';
-        g.beginPath(); g.arc(w - 80, h - 30, 22, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#000';
-        g.font = 'bold 12px sans-serif';
-        g.textAlign = 'center';
-        g.fillText('!', w - 80, h - 26);
     }
 
     // ══ 复古报纸 ══

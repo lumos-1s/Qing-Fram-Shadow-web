@@ -62,59 +62,86 @@ window.App = Object.assign(window.App || {}, {
             return any;
         };
         try {
+            // 导出按逻辑像素渲染(不乘 devicePixelRatio),保证导出分辨率与该选项/“原图尺寸”一致
+            this.uiDprOverride = 1;
+            let okCount = 0, failCount = 0;
             for (let n = 0; n < jobs.length; n++) {
                 const { im, puzzle } = jobs[n];
                 this.image = im;
                 this.invalidateStyleCaches();
                 this.currentIdx = this.images.indexOf(im);
                 // 每张图用各自预设:已自定义/记忆过的用其自身;当前主图用正在编辑的模板;其余未设置的用各自默认边框(不跟随第一张)
-                this.template = im.customSettings || this.imageTemplates.get(im) ||
+                const srcTpl = im.customSettings || this.imageTemplates.get(im) ||
                     (this.images.indexOf(im) === originalIdx ? baseTemplate : this.defaultTemplate());
+                // 导出专用深拷贝:后续 scaleElPix 的缩放不会污染正在编辑的活模板与已存的 customSettings 快照
+                this.template = JSON.parse(JSON.stringify(srcTpl));
                 this.normalizeTemplate();
                 // 先按 UI 默认尺寸渲染一次,取得元素坐标的"基准画布宽度"
                 this.displayMax = undefined;
-                await new Promise(res => requestAnimationFrame(() => {
-                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
-                    else window.__render(this, false);
-                    res();
-                }));
-                const beforeW = Math.max(1, this.dom.canvas.width || 1);
-                this.displayMax = sizeOpt > 0 ? sizeOpt : Math.max(1, im.w || 1, im.h || 1);
-                await new Promise(res => requestAnimationFrame(() => {
-                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
-                    else window.__render(this, false);
-                    res();
-                }));
-                const afterW = Math.max(1, this.dom.canvas.width || 1);
-                const k = afterW / beforeW;
-                // 元素坐标为基准画布像素:导出画布变大时等比放大,避免缩到角落
-                if (!puzzle && k !== 1 && scaleElPix(this.template, k)) {
+                delete this.exportScale;
+                try {
                     await new Promise(res => requestAnimationFrame(() => {
-                        window.__render(this, false);
+                        if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
+                        else window.__render(this, false);
                         res();
                     }));
-                    scaleElPix(this.template, 1 / k);
+                    const beforeW = Math.max(1, this.dom.canvas.width || 1);
+                    const targetPx = sizeOpt > 0 ? sizeOpt : Math.max(1, im.w || 1, im.h || 1);
+                    this.displayMax = targetPx;
+                    // 选了大尺寸选项时交出目标长边,由引擎上采样到该值(小图也能导出到所选尺寸)
+                    if (sizeOpt > 0) this.exportScale = sizeOpt;
+                    await new Promise(res => requestAnimationFrame(() => {
+                        if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
+                        else window.__render(this, false);
+                        res();
+                    }));
+                    const afterW = Math.max(1, this.dom.canvas.width || 1);
+                    const k = afterW / beforeW;
+                    // 元素坐标为基准画布像素:导出画布变大时等比放大,避免缩到角落
+                    // (this.template 是导出专用拷贝,副本随本循环丢弃,无需再按 1/k 还原)
+                    if (!puzzle && k !== 1 && scaleElPix(this.template, k)) {
+                        await new Promise(res => requestAnimationFrame(() => {
+                            window.__render(this, false);
+                            res();
+                        }));
+                    }
+                    this.displayMax = uiMaxSave;
+                    let src = this.dom.canvas;
+                    if (needsBg) {
+                        const bg = document.createElement('canvas');
+                        bg.width = src.width; bg.height = src.height;
+                        const bgx = bg.getContext('2d');
+                        bgx.fillStyle = '#ffffff';
+                        bgx.fillRect(0, 0, bg.width, bg.height);
+                        bgx.drawImage(src, 0, 0);
+                        src = bg;
+                    }
+                    files[n].data = src.toDataURL(mime, quality).split(',')[1];
+                } catch (e) {
+                    files[n].data = null;
                 }
-                this.displayMax = uiMaxSave;
-                let src = this.dom.canvas;
-                if (needsBg) {
-                    const bg = document.createElement('canvas');
-                    bg.width = src.width; bg.height = src.height;
-                    const bgx = bg.getContext('2d');
-                    bgx.fillStyle = '#ffffff';
-                    bgx.fillRect(0, 0, bg.width, bg.height);
-                    bgx.drawImage(src, 0, 0);
-                    src = bg;
+                // 目录模式多张时逐张写盘并及时释放内存,避免全部 base64 同时驻留
+                if (files[n].data && loc.mode === 'dir' && jobs.length > 1) {
+                    const wr = await window.qingframe.writeExportFiles({ location: loc, files: [files[n]] }) || {};
+                    if (wr.ok) okCount++; else failCount++;
+                    files[n].data = null;
+                } else if (!files[n].data) {
+                    failCount++;
                 }
-                files[n].data = src.toDataURL(mime, quality).split(',')[1];
                 const bar = document.getElementById('progressBar');
                 if (bar) bar.style.width = Math.round(((n + 1) / jobs.length) * 100) + '%';
             }
-            // ④ 渲染完毕,直接写入已选定的目录/文件
-            const r = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
-            const m = `导出完成：成功 ${r.ok || 0}${r.fail ? `，失败 ${r.fail}` : ''}`;
+            // 剩余文件(单文件模式 / 目录模式仅一张)统一写出
+            const pending = files.filter(f => !!f.data);
+            if (pending.length) {
+                const r = await window.qingframe.writeExportFiles({ location: loc, files: pending }) || {};
+                okCount += r.ok || 0; failCount += r.fail || 0;
+            }
+            const m = `导出完成：成功 ${okCount}${failCount ? `，失败 ${failCount}` : ''}`;
             this.setStatus(m);
         } finally {
+            delete this.uiDprOverride;
+            delete this.exportScale;
             this.currentIdx = originalIdx;
             this.image = this.images[this.currentIdx];
             this.invalidateStyleCaches();

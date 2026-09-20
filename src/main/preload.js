@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('qingframe', {
     getUser: () => ipcRenderer.invoke('get-user'),
     saveUser: (user) => ipcRenderer.invoke('save-user', user),
     logoutUser: () => ipcRenderer.invoke('logout-user'),
+    getPrefs: () => ipcRenderer.invoke('get-prefs'),
+    savePrefs: (prefs) => ipcRenderer.invoke('save-prefs', prefs),
     readExif: (filePath) => ipcRenderer.invoke('read-exif', filePath),
     openStickerImage: () => ipcRenderer.invoke('open-sticker-image')
 });
