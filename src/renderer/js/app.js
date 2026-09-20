@@ -951,7 +951,17 @@ window.App = {
         if (!grp || !this.template) return;
         const s = this.template.photoFrameStyle || '';
         const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC'].includes(s);
-        grp.style.display = isPersonal ? '' : 'none';
+        const showSig = isPersonal || s === 'CARD_3D';
+        grp.style.display = showSig ? '' : 'none';
+        // 传统个人样式:全部签名/头像/参数行显示; CARD_3D 只用签名文字,隐藏其余
+        const personalRows = ['rowSignText','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos'];
+        personalRows.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+        if (s === 'CARD_3D') {
+            ['rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos','rowBgBlur','rowBgBlurInt'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+        }
         // 印象留白预设也显示背景模糊开关
         const isOverlay = ['OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
         const rowBgBlur = document.getElementById('rowBgBlur');

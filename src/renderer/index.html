@@ -203,11 +203,11 @@
                                 <span class="pval" id="lblParamFontSize"></span>
                             </div>
                             <div id="grpPersonal" style="display:none;">
-                            <div class="param-row">
+                            <div class="param-row" id="rowSignText">
                                 <label>个性签名</label>
                                 <input type="text" id="inpSignature" placeholder="输入你的签名文字" style="width:100%;padding:6px 8px;background:#2a2a35;border:1px solid #444;border-radius:6px;color:#eee;font-size:13px;box-sizing:border-box;" />
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowSignFont">
                                 <label>签名字体</label>
                                 <select id="cbSignFont" class="ctl-sel">
                                     <option value="cursive">手写斜体</option>
@@ -220,7 +220,7 @@
                                     <option value="Mistral">Mistral飘逸</option>
                                 </select>
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowSignColor">
                                 <label>签名颜色</label>
                                 <select id="cbSignColor" class="ctl-sel">
                                     <option value="#555">深灰</option>
@@ -233,15 +233,15 @@
                                     <option value="#e67e22">橙色</option>
                                 </select>
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowAvatarScale">
                                 <label>头像大小 <span id="valAvatarScale" style="float:right;color:#10b981;font-weight:600;">85%</span></label>
                                 <input type="range" id="rgAvatarScale" min="50" max="200" value="85" style="width:100%;" />
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowSignSize">
                                 <label>签名大小 <span id="valSignSize" style="float:right;color:#10b981;font-weight:600;">100%</span></label>
                                 <input type="range" id="rgSignSize" min="50" max="200" value="100" style="width:100%;" />
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowParamColor">
                                 <label>参数颜色</label>
                                 <select id="cbParamColor" class="ctl-sel">
                                     <option value="auto">自动</option>
