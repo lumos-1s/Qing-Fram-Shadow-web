@@ -963,7 +963,7 @@ window.App = {
         const grp = document.getElementById('grpPersonal');
         if (!grp || !this.template) return;
         const s = this.template.photoFrameStyle || '';
-        const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC'].includes(s);
+        const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC','AV_OVERLAY_BC2'].includes(s);
         const showSig = isPersonal || s === 'CARD_3D';
         grp.style.display = showSig ? '' : 'none';
         // 传统个人样式:全部签名/头像/参数行显示; CARD_3D 只用签名文字,隐藏其余
