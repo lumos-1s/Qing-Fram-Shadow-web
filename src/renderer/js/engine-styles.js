@@ -1026,10 +1026,20 @@ AV_OVERLAY_BC2:67 };
         styleBlurCommon(img, size, g, iw, ih, S, side, bottom, true);
     }
     function styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurBottom, dateLayout) {
-        const backing = createBlurBacking(img, blurMargin, blurMargin, blurBottom, S.blurIntensity);
-        const cx = blurMargin, cy = blurMargin, cw = backing.width, ch = backing.height;
-        drawBlurBackground(g, backing, img, cx, cy, blurMargin);
+        const cw = blurMargin + iw + blurMargin;
+        const ch = blurMargin + ih + blurBottom;
+        // 印象式模糊底:照片 cover 铺满整张画布,整体高斯模糊后压暗
+        g.save();
+        g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
+        const scale = Math.max(cw / iw, ch / ih);
+        const dw = iw * scale, dh = ih * scale;
+        g.filter = 'blur(' + scaledBlurRadius(S.blurIntensity) + 'px)';
+        g.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+        g.filter = 'none';
+        g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(0, 0, cw, ch);
+        g.restore();
         const photoCr = Math.min(S.cornerAll, Math.min(iw, ih) / 2);
+        const cx = blurMargin, cy = blurMargin;
         drawMainPhoto(g, img, cx, cy, photoCr, S.imgScale, S.imgOffsetX, S.imgOffsetY);
 
         if (!S.useExif) return;
