@@ -1229,7 +1229,7 @@ AV_OVERLAY_BC2:67 };
         const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
         // 默认自适应:按照片宽度比例算,用户调参数字号时按比例缩放
         const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
-        const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale));
+        const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale * (S.brandScale || 1)));
         g.fillStyle = '#ffffff';
         g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand * 0.15);
@@ -1450,7 +1450,7 @@ AV_OVERLAY_BC2:67 };
             g.restore();
             // 左侧品牌+三行参数整体在"画布左缘→照片左缘(leftW+40)"空隙中水平居中
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-            const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale));
+            const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale * (S.brandScale || 1)));
             const brandTrack = Math.round(fBrand * 0.15);
             const exifOn = S.useExif && S.cam;
             let boxW = 0, fVal = 0, valGap = 0, maxValW = 0, paramRows = [];
@@ -1533,7 +1533,7 @@ AV_OVERLAY_BC2:67 };
             g.restore();
             const by = py + ih + Math.round(bottomH * 0.3);
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-            const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale));
+            const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale * (S.brandScale || 1)));
             g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
@@ -1612,7 +1612,7 @@ AV_OVERLAY_BC2:67 };
             g.restore();
             // 右侧品牌+三行参数整体在"照片右缘→画布右缘(rightW+40)"空隙中水平居中(与左留白镜像)
             const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
-            const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale));
+            const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale * (S.brandScale || 1)));
             const brandTrack = Math.round(fBrand * 0.15);
             const exifOn = S.useExif && S.cam;
             let boxW = 0, fVal = 0, valGap = 0, maxValW = 0, paramRows = [];
@@ -1928,6 +1928,7 @@ AV_OVERLAY_BC2:67 };
             avatarOffY: Number(t.avatarOffY || 0),
             avatarSelected: !!t.avatarSelected,
             logoSize: clampP(t.logoSize != null ? t.logoSize : 14, 0, 200),
+            brandScale: clampP(t.brandSize != null ? t.brandSize : 1, 0.5, 3),
         };
     }
 

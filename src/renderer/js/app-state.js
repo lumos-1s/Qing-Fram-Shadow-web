@@ -26,6 +26,7 @@ window.App = Object.assign(window.App || {}, {
                 cornerRadiusAll: (this.template.cornerConfig || {}).cornerRadiusAll || 0,
                 borderRadius: this.template.borderRadius || 0,
                 paramFontSize: this.template.paramFontSize || 33,
+                brandSize: this.template.brandSize || 1,
             };
             localStorage.setItem('qfs_last_state', JSON.stringify(s));
         } catch (_) {}
