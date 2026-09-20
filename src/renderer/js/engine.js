@@ -185,7 +185,6 @@ function renderTemplateStyle(app) {
     const { image, template } = app;
     const img = image.el;
     const margin = template.baseMargin || {};
-    const t = totals(margin);
     const cs = computeCanvasSize(img.naturalWidth, img.naturalHeight, template);
     const canvasW = cs[0], canvasH = cs[1];
     const ctx = setupCanvas(app, canvasW, canvasH);
@@ -393,7 +392,7 @@ function mapBlend(blend) {
 // 设置纹理填充画刷到当前 ctx.fillStyle(含缩放/偏移/混合/透明度),返回 true 表示成功。
 // 注意:不在这里 drawImage/fillRect,而是交由 fillLayerRect 做圆角裁剪后再 fill,
 // 这样纹理既能被圆角裁剪,也不会被随后 callLayerRect 的旧 fillStyle 覆盖。
-function setTextureFill(ctx, fill, x, y, w, h) {
+function setTextureFill(ctx, fill, x, y) {
     const name = fill.textureSrc;
     const tex = TEXTURE_CACHE[name];
     if (!tex || !tex.complete || !tex.naturalWidth) {
@@ -1017,7 +1016,7 @@ function drawLogoElements(ctx, elements, cw, ch) {
 }
 
 // 用户叠层元素:自由文字 + 贴纸 + Logo(用于相框风格??避免与样式内绘制重复)
-function drawUserElements(ctx, template, cw, ch) {
+/* exported drawUserElements */ function drawUserElements(ctx, template, cw, ch) {
     if (!template) return;
     const decor = template.decorConfig || {};
     for (const textLine of (decor.textLines || [])) {
@@ -1115,7 +1114,6 @@ function buildPuzzleSlots(layoutType, axes) {
         const vp = vs[1];
         const restW = 1 - vp;
         rects.push([0, 0, vp, 1]);
-        const hr = (0.333 * 1) / 1, hh = (0.667 * 1) / 1;
         for (let j = 0; j < rows.length; j++) rects.push([vp, rows[j][0], restW, rows[j][1] - rows[j][0]]);
     } else if (cols.length > 1 && rows.length > 1) {
         for (const c of cols) for (const r of rows) rects.push([c[0], r[0], c[1] - c[0], r[1] - r[0]]);
@@ -1265,7 +1263,6 @@ function renderPuzzle(app, compare, noSelection) {
     const gapPx = Math.max(0, (pk.gap == null ? 6 : pk.gap) * scaler * 0.5);
     const shift = gapPx;
     const shiftX = shift / Wn, shiftY = shift / Hn;
-    const EPS = 1e-6;
     slots0 = slots0.map(r => {
         let x0 = r[0], y0 = r[1], x1 = r[0] + r[2], y1 = r[1] + r[3];
         x0 += shiftX; x1 -= shiftX; y0 += shiftY; y1 -= shiftY;

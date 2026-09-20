@@ -29,14 +29,6 @@
         return scaled;
     }
 
-    function color(hex, a) {
-        try {
-            hex = String(hex || '#000000').replace('#', '');
-            if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-            const n = parseInt(hex, 16);
-            return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a };
-        } catch (e) { return { r: 0, g: 0, b: 0, a }; }
-    }
     function rgbaC(c) { return 'rgba(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ',' + (c.a == null ? 1 : c.a) + ')'; }
     function rgbJ(r, g, b) { return 'rgb(' + r + ',' + g + ',' + b + ')'; }
 
@@ -247,25 +239,6 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.arcTo(x + w, y + h, x + w - r, y + h, r); g.lineTo(x + r, y + h);
         g.arcTo(x, y + h, x, y + h - r, r); g.lineTo(x, y + r);
         g.arcTo(x, y, x + r, y, r); g.closePath();
-    }
-    function cornerClip(src, tl, tr, bl, br) {
-        const w = src.width, h = src.height;
-        const out = newCanvas(w, h);
-        const g = out.getContext('2d');
-        const p = new Path2D();
-        p.moveTo(tl, 0);
-        p.lineTo(w - tr, 0);
-        if (tr > 0) p.quadraticCurveTo(w, 0, w, tr); else p.lineTo(w, 0);
-        p.lineTo(w, h - br);
-        if (br > 0) p.quadraticCurveTo(w, h, w - br, h); else p.lineTo(w, h);
-        p.lineTo(bl, h);
-        if (bl > 0) p.quadraticCurveTo(0, h, 0, h - bl); else p.lineTo(0, h);
-        p.lineTo(0, tl);
-        if (tl > 0) p.quadraticCurveTo(0, 0, tl, 0); else p.lineTo(0, 0);
-        p.closePath();
-        g.clip(p);
-        g.drawImage(src, 0, 0);
-        return out;
     }
     function singleCornerClip(src, radius) {
         const w = src.width, h = src.height;
@@ -937,7 +910,7 @@ AV_OVERLAY_BC2:67 };
         putBlurBacking(key, out);
         return out;
     }
-    function drawBlurBackground(g, backing, img, cx, cy, blurMargin, blurIntensity) {
+    function drawBlurBackground(g, backing, img, cx, cy, blurMargin) {
         g.drawImage(backing, 0, 0);
         const edge = sampleEdgeColor(img);
         const imgCX = cx + img.naturalWidth / 2, imgCY = cy + img.naturalHeight / 2;
@@ -984,13 +957,6 @@ AV_OVERLAY_BC2:67 };
         }
         g.restore();
     }
-    // 参数/主角 居中与左右(WatermarkRender.Position)
-    function alignTextX(w, textW, pos, padX) {
-        if (pos === 'LEFT' || pos === 'SPLIT') return padX;
-        if (pos === 'RIGHT') return w - textW - padX;
-        return (w - textW) / 2;
-    }
-
     // ── WatermarkRender.drawParamMask(原版,含底部遮罩输入 = 整图)──
     function drawParamMask(g, canvasEl, cw, ch, cam, position, paramFs) {
         const lines = [cam.brand, cam.model, cam.focal, cam.aperture, cam.iso, cam.shutter].filter(v => v && String(v).trim() !== '');
@@ -1044,40 +1010,6 @@ AV_OVERLAY_BC2:67 };
         }
         g.letterSpacing = 0;
         g.restore();
-    }
-
-    // ── 卡片柔影辅助:applyCardShadow / applyBlurOuterShadow(shadowSize>0 时生效,默认 0 跳过)──
-    function applyCardShadow(g, x, y, w, h, arc, S) {
-        const sSize = S.shadowSize || 0;
-        if (sSize <= 0) return;
-        const depth = Math.max(1, Math.floor((S.shadowDepth || 30) * sSize / 100));
-        const offset = Math.max(1, Math.floor(sSize / 4));
-        const alpha = Math.max(10, Math.min(180, S.shadowAlpha != null ? S.shadowAlpha : 80));
-        for (let i = 0; i < 3; i++) {
-            const layerOff = offset + Math.floor(i * offset / 2);
-            const layerSize = sSize - Math.floor(i * sSize / 6);
-            const layerAlpha = alpha - i * 30;
-            if (layerAlpha < 5) break;
-            g.fillStyle = 'rgba(0,0,0,' + (layerAlpha / 255).toFixed(3) + ')';
-            fillRoundRectCtx(g, x + layerOff, y + layerOff, w, h, Math.max(1, arc - i * 2));
-        }
-        g.fillStyle = 'rgba(0,0,0,' + (Math.min(60, Math.floor(alpha / 2)) / 255).toFixed(3) + ')';
-        fillRoundRectCtx(g, x + Math.max(1, Math.floor(depth / 2)), y + depth, w, h, Math.max(1, arc));
-    }
-    function applyBlurOuterShadow(g, x, y, w, h, arc, S) {
-        const sSize = S.shadowSize || 0;
-        if (sSize <= 0) return;
-        const depth = Math.max(1, Math.floor((S.shadowDepth || 30) * sSize / 100));
-        const alpha = Math.max(10, Math.min(180, S.shadowAlpha != null ? S.shadowAlpha : 80));
-        for (let i = 0; i < 3; i++) {
-            const ext = sSize - Math.floor(i * sSize / 6);
-            const layerAlpha = alpha - i * 30;
-            if (layerAlpha < 5) break;
-            g.fillStyle = 'rgba(0,0,0,' + (layerAlpha / 255).toFixed(3) + ')';
-            fillRoundRectCtx(g, x - ext, y - ext, w + 2 * ext, h + 2 * ext, Math.max(1, arc - i * 2));
-        }
-        g.fillStyle = 'rgba(0,0,0,' + (Math.min(60, Math.floor(alpha / 2)) / 255).toFixed(3) + ')';
-        fillRoundRectCtx(g, x - 2, y + depth, w + 4, h, Math.max(1, arc));
     }
 
     // ── 阶段二:文本类风格(原版 addXxx 逐行移植)──
@@ -1166,7 +1098,6 @@ AV_OVERLAY_BC2:67 };
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
         const barY = ih + pad;
-        const fs = Math.max(10, Math.floor(size / 3));
         const line = S.cam.focal + '  ' + S.cam.aperture + '  ' + S.cam.iso + '  ' + S.cam.shutter;
         const f = autoExifSize(S.paramFs, iw);
         const fm = textMetrics(g, line, f, true, false, 0);
@@ -1369,7 +1300,6 @@ AV_OVERLAY_BC2:67 };
         }
     }
     function styleCardLeica(img, size, g, iw, ih, S) {
-        const ref = Math.max(1, Math.min(iw, ih));
         const pad = Math.max(24, Math.floor(size * 3 / 4));
         const brand = trim(S.cam.brand);
         const dotGap = Math.max(8, Math.floor(size / 4));
@@ -1400,7 +1330,6 @@ AV_OVERLAY_BC2:67 };
         if (pf && pl) drawTextL(g2, pl, w - pad - pm.w, baseY, 'rgb(120,120,120)', pf, true, false, 0);
     }
     function styleCardLogoParam(img, size, g, iw, ih, S) {
-        const ref = Math.max(1, Math.min(iw, ih));
         const pad = Math.max(28, Math.floor(size * 3 / 5));
         const arc = Math.max(12, Math.floor(size / 4));
         const brand = trim(S.cam.brand), model = S.cam.model || '';
@@ -1447,7 +1376,6 @@ AV_OVERLAY_BC2:67 };
         drawTrackedTextL(g, brand, Math.floor(w / 2), baseY, wf, 'rgb(34,34,34)', 0.45, false);
     }
     function styleCardSimple(img, size, g, iw, ih, S) {
-        const ref = Math.max(1, Math.min(iw, ih));
         const pad = Math.max(12, Math.floor(size / 2));
         const brand = trim(S.cam.brand);
         const line = S.useExif ? (brand + ' · ' + exifLine(S.cam)) : brand;
@@ -1462,7 +1390,6 @@ AV_OVERLAY_BC2:67 };
         drawTextL(g, line, cx2(w, fm.w), ih + pad + Math.floor((capH + fm.ascent - fm.maxDescent) / 2), 'rgb(150,150,150)', f, true, false, 0);
     }
     function styleCardImmersion(img, size, g, iw, ih, S) {
-        const ref = Math.max(1, Math.min(iw, ih));
         const pad = Math.max(20, Math.floor(size * 2 / 5));
         const arc = Math.max(10, Math.floor(size / 4));
         const brand = trim(S.cam.brand);
@@ -1494,9 +1421,7 @@ AV_OVERLAY_BC2:67 };
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             // 完全对齐印象毛玻璃布局,白底黑字
             const leftW = Math.max(180, Math.round(iw * 0.35 * gm));
-            const rightPad = Math.round(leftW / 2);
             const topBotPad = Math.max(50, Math.round(size * 1.2));
-            const w = leftW + iw + rightPad;
             const h = ih + topBotPad * 2;
             // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
             if (S.signBgBlur) {
@@ -1647,7 +1572,6 @@ AV_OVERLAY_BC2:67 };
             const rightW = Math.max(180, Math.round(iw * 0.35 * gm));
             const leftPad = Math.round(rightW / 2);
             const topBotPad = Math.max(50, Math.round(size * 1.2));
-            const w = iw + rightW + leftPad;
             const h = ih + topBotPad * 2;
             // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
             if (S.signBgBlur) {
@@ -1718,7 +1642,6 @@ AV_OVERLAY_BC2:67 };
             return;
         }
         // LEFT/BOTTOM 分支保持原样
-        const ref = Math.max(1, Math.min(iw, ih));
         const inset = Math.max(12, Math.floor(size / 2));
         const brand = trim(S.cam.brand), model = S.cam.model || '';
         const vertical = pos !== 2;
@@ -1831,7 +1754,6 @@ AV_OVERLAY_BC2:67 };
         const cols = extractMultipleDominant(img, 5);
         const swatchH = Math.floor(barH * 3 / 5), swW = Math.floor(w / cols.length);
         for (let i = 0; i < cols.length; i++) { g.fillStyle = cols[i]; g.fillRect(i * swW, barY, swW, swatchH); }
-        const fs = Math.max(9, Math.floor(size / 4));
         const f = autoExifSize(S.paramFs, iw);
         const line = S.cam.focal + '  ' + S.cam.aperture + '  ' + S.cam.iso + '  ' + S.cam.shutter;
         const fm = textMetrics(g, line, f, true, false, 0);
@@ -1986,53 +1908,6 @@ AV_OVERLAY_BC2:67 };
         };
     }
 
-    // ── 品牌 Logo(LogoResource.java 移植)──
-    // 与 Java 严格同算法:width() 返回 fs*系数,logoSz 须代入同一公式比对。
-    function logoWidth(brand, logoFs) {
-        const b = String(brand || 'CAMERA').toUpperCase();
-        const fs = logoFs;
-        switch (b) {
-            case 'LEICA': return fs * 5;
-            case 'CANON': return fs * 4;
-            case 'NIKON': return fs * 4;
-            case 'FUJIFILM': return fs * 7;
-            case 'SONY': return fs * 4;
-            case 'HASSELBLAD': return fs * 8;
-            case 'LUMIX': case 'PANASONIC': return fs * 5;
-            case 'OLYMPUS': return fs * 6;
-            case 'PENTAX': return fs * 5;
-            case 'RICOH': return fs * 4;
-            case 'ZEISS': return fs * 4;
-            case 'DJI': return fs * 3;
-            case 'APPLE': return fs * 4;
-            case 'HONOR': return fs * 4;
-            case 'HUAWEI': return fs * 5;
-            case 'OPPO': return fs * 4;
-            case 'SAMSUNG': return fs * 6;
-            case 'VIVO': return fs * 4;
-            case 'MI': case 'XIAOMI': return fs * 3;
-            case 'CAMERA': return fs * 5;
-            default: return fs * Math.min(String(brand || 'CAMERA').length, 8);
-        }
-    }
-    function logoStrWidth(g, s, fs, bold) { return textMetrics(g, s, fs, false, bold, 0).w; }
-    function logoFillRect(g, x, y, w, h) { g.fillRect(x, y, Math.max(0, w), Math.max(0, h)); }
-    function logoRoundRect(g, x, y, w, h, r) {
-        const rr = Math.max(1, r);
-        g.beginPath();
-        if (g.roundRect) { g.roundRect(x, y, w, h, rr, rr); g.fill(); return; }
-        g.moveTo(x + rr, y);
-        g.lineTo(x + w - rr, y);
-        g.arcTo(x + w, y, x + w, y + rr, rr);
-        g.lineTo(x + w, y + h - rr);
-        g.arcTo(x + w, y + h, x + w - rr, y + h, rr);
-        g.lineTo(x + rr, y + h);
-        g.arcTo(x, y + h, x, y + h - rr, r);
-        g.lineTo(x, y + rr);
-        g.arcTo(x, y, x + rr, y, r);
-        g.closePath();
-        g.fill();
-    }
     // 品牌→唯一文本(用于 LogoResource 目前"文字近似"的绘制)
     function drawLogo(g, brand, x, y, logoFs) {
         const b = String(brand || 'CAMERA').toUpperCase();
@@ -2373,7 +2248,7 @@ AV_OVERLAY_BC2:67 };
     }
 
     // ══ 赛博故障风 ══
-    function styleCyberGlitch(img, size, g, iw, ih, S) {
+    function styleCyberGlitch(img, size, g, iw, ih) {
         const pad = Math.max(40, Math.round(iw * 0.04));
         const w = iw + pad * 2, h = ih + pad * 2;
         g.fillStyle = '#0a0a0f'; g.fillRect(0, 0, w, h);
@@ -2413,7 +2288,7 @@ AV_OVERLAY_BC2:67 };
     }
 
     // ══ 拍立得手写风 ══
-    function stylePolaroidHand(img, size, g, iw, ih, S) {
+    function stylePolaroidHand(img, size, g, iw, ih) {
         const border = Math.max(24, Math.round(iw * 0.06));
         const bottomPad = Math.max(60, Math.round(iw * 0.2));
         const w = iw + border * 2, h = ih + border + bottomPad;
@@ -2436,7 +2311,7 @@ AV_OVERLAY_BC2:67 };
     }
 
     // ══ 撕纸手账风 ══
-    function styleTornJournal(img, size, g, iw, ih, S) {
+    function styleTornJournal(img, size, g, iw, ih) {
         const pad = Math.max(30, Math.round(size * 0.8));
         const w = iw + pad * 2, h = ih + pad * 2;
         // 牛皮纸底
@@ -2506,7 +2381,7 @@ AV_OVERLAY_BC2:67 };
     // 与 styleDims('COMIC_PANEL') 保持同一套尺寸(gap=round(0.015*iw),底部条=round(iw*0.08)),
     // 保证画面内容不超出画布(修复原实现在固定 gap=8 / +60 下右、下被裁切的问题);
     // 2×2 照片网格整体在画布中水平垂直居中
-    function styleComicPanel(img, size, g, iw, ih, S) {
+    function styleComicPanel(img, size, g, iw, ih) {
         const gap = Math.round(iw * 0.015);
         const barH = Math.round(iw * 0.08);
         const cols = 2, rows = 2;
@@ -2528,7 +2403,7 @@ AV_OVERLAY_BC2:67 };
     }
 
     // ══ 复古报纸 ══
-    function styleNewspaper(img, size, g, iw, ih, S) {
+    function styleNewspaper(img, size, g, iw, ih) {
         const pad = Math.max(30, Math.round(size * 0.6));
         const w = iw + pad * 2, h = ih + pad * 2 + 100;
         // 报纸米黄底
@@ -2758,7 +2633,6 @@ AV_OVERLAY_BC2:67 };
         const brandTxt2 = (S.exif.make || 'Camera').toUpperCase();
         const fBrand2 = Math.round(iw * 0.028);
         const pColor2 = S.paramColor === 'auto' ? (S.signBgBlur ? '#fff' : '#333') : S.paramColor;
-        const pColorSoft2 = S.paramColor === 'auto' ? (S.signBgBlur ? 'rgba(255,255,255,0.7)' : '#999') : (S.paramColor === '#fff' ? 'rgba(255,255,255,0.7)' : '#999');
         g.fillStyle = pColor2;
         g.font = 'bold ' + fBrand2 + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand2 * 0.15);

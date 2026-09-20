@@ -31,7 +31,7 @@ module.exports = {
                 __parseExif: 'readonly',
                 __exifSummary: 'readonly'
             },
-            rules: { 'no-undef': 'off', 'no-inner-declarations': 'warn', 'no-useless-escape': 'warn', 'no-empty': 'warn' }
+            rules: { 'no-undef': 'off', 'no-inner-declarations': 'warn', 'no-useless-escape': 'warn', 'no-empty': ['warn', { allowEmptyCatch: true }] }
         }
     ],
     rules: {

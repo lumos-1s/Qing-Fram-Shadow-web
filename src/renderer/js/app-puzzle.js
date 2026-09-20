@@ -645,7 +645,6 @@ window.App = Object.assign(window.App || {}, {
 
     // 拖拽:格内→图片精确跟随(anchor+余量换算);进入其他格→"放下即互换"预备态
     puzzleDragMove(pk, d, e) {
-        const W = this.dom.canvas.width, H = this.dom.canvas.height;
         // 拖拽分隔线
         if (d.type === 'axis') { this.puzzleDragAxis(pk, d, e); return; }
         this.ensurePuzzleSlotsCount(pk);

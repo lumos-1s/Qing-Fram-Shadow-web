@@ -310,7 +310,6 @@ window.App = {
         // 确认
         document.getElementById('cropOk').onclick = () => {
             const wrap = img.parentElement;
-            const size = wrap.clientWidth;
             const c = document.createElement('canvas');
             c.width = 200; c.height = 200;
             const ctx = c.getContext('2d');
@@ -1104,6 +1103,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if ($('slCornerDecorSize')) $('slCornerDecorSize').value = decor.cornerDecorSize || 30;
             this.updateLabel('lblCornerDecorSize', decor.cornerDecorSize || 30);
 
+            if ($('cbExifText')) $('cbExifText').checked = (decor.exifAutoText || 0) === 1;
+
             this.refreshElList();
             this.refreshTemplateFields();
             this.refreshPuzzleUI();
@@ -1802,7 +1803,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
         // 复选框 -> onSettingCommit
         const chks = ['cbCornerLock', 'cbShadow', 'cbGlow', 'cbTearEnable',
-            'cbVignette', 'cbLightLeak', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock'];
+            'cbVignette', 'cbLightLeak', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock', 'cbExifText'];
         chks.forEach(id => {
             const el = $(id);
             if (el) el.addEventListener('change', () => this.onSettingCommit());
@@ -1915,7 +1916,6 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 const key = 'slCornerTL' === id ? 'cornerRadiusTL' : 'slCornerTR' === id ? 'cornerRadiusTR' : 'slCornerBL' === id ? 'cornerRadiusBL' : 'cornerRadiusBR';
                 cc[key] = v;
                 this.updateLabel('lbl' + id.slice(2), v);
-                const main = this.$(id === 'slCornerTL' ? 'lblCornerTL' : id === 'slCornerTR' ? 'lblCornerTR' : id === 'slCornerBL' ? 'lblCornerBL' : 'lblCornerBR');
                 if ((this.template.cornerConfig.cornerLock || 0) === 1) {
                     cc.cornerRadiusTL = v; cc.cornerRadiusTR = v; cc.cornerRadiusBL = v; cc.cornerRadiusBR = v;
                     ['slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR'].forEach(c => { const el = this.$(c); if (el) el.value = v; });
@@ -1982,11 +1982,11 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         }
     },
 
-    onSelectCustom(id) {
+    onSelectCustom() {
         this.onSettingCommit();
     },
 
-    onTextCustom(id) {
+    onTextCustom() {
         this.onSettingChanged();
     },
 
@@ -2027,7 +2027,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         if (entry) this.updateLabel(entry[0], entry[1]);
     },
 
-    onSliderLive(id, v) {
+    onSliderLive(id) {
         if (['slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius', 'slParamFontSize',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius'].includes(id)) return; // 由 onSliderCustom 处理
         if (id === 'slPuzzleGap' || id === 'slPuzzleCorner' || id === 'slCapSize1' || id === 'slCapSize2' || id === 'slCapSpacing' || id === 'slSlotOffsetX' || id === 'slSlotOffsetY' || id === 'slSlotZoom') {
@@ -2084,7 +2084,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             cats.brandIconBox.push(l);
         });
         cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
-        pools.forEach((boxId, pi) => {
+        pools.forEach((boxId) => {
             const box = $(boxId);
             if (!box) return;
             box.innerHTML = '';
@@ -2336,7 +2336,6 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             this.selectedEls.forEach(s => {
                 const i = els.indexOf(s.obj);
                 if (i < 0) return;
-                const n = els.length;
                 els[i].z = (els[i].z || 0) + delta;
                 // 通过 z 排序实现层级:直接赋序
                 els[i].z = clampNum(els[i].z, -100, 100);
