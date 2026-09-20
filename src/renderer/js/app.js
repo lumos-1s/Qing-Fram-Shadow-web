@@ -1735,10 +1735,34 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     syncBorderTo(i) {
         const tgt = this.images[i];
         if (!tgt || !this.image) return;
+        const prev = this.imageTemplates.get(tgt);
+        const prevManual = (prev && prev.manualExif && typeof prev.manualExif === 'object') ? prev.manualExif : null;
         const snap = this.cloneTemplate();
         if (Array.isArray(snap.logoElements)) snap.logoElements = [];
         if (snap.decorConfig) { delete snap.decorConfig.stickers; delete snap.decorConfig.textLines; }
         delete snap.puzzle;
+        // 相机数据:能识别到 EXIF 的用自己的;识别不到的沿用当前图(第一张)的有效相机数据
+        if (!prevManual) {
+            const ownExif = (tgt.exif && typeof tgt.exif === 'object') ? tgt.exif : {};
+            const hasOwn = ['make', 'model', 'focal', 'aperture', 'iso', 'shutter'].some(k => String(ownExif[k] || '').trim() !== '');
+            if (hasOwn) {
+                delete snap.manualExif;
+            } else {
+                const srcManual = (this.template.manualExif && typeof this.template.manualExif === 'object') ? this.template.manualExif : {};
+                const srcAuto = (this.image.exif && typeof this.image.exif === 'object') ? this.image.exif : {};
+                const base = {
+                    brand: String(srcManual.brand || '').trim() || String(srcAuto.make || '').trim(),
+                    model: String(srcManual.model || '').trim() || String(srcAuto.model || '').trim(),
+                    focal: String(srcManual.focal || '').trim() || String(srcAuto.focal || '').trim(),
+                    aperture: String(srcManual.aperture || '').trim() || String(srcAuto.aperture || '').trim(),
+                    iso: String(srcManual.iso || '').trim() || String(srcAuto.iso || '').trim(),
+                    shutter: String(srcManual.shutter || '').trim() || String(srcAuto.shutter || '').trim()
+                };
+                const hasCam = ['brand', 'model', 'focal', 'aperture', 'iso', 'shutter'].some(k => base[k] !== '');
+                delete snap.manualExif;
+                if (hasCam) snap.manualExif = base;
+            }
+        }
         this.imageTemplates.set(tgt, snap);
         this.queueThumb(tgt);
         this.setStatus('已将当前边框同步到「' + tgt.name + '」');

@@ -2403,25 +2403,28 @@ AV_OVERLAY_BC2:67 };
     }
 
     // ══ 复古报纸 ══
+    // 与 styleDims('NEWSPAPER') 保持同一套尺寸(pad=max(40,iw*0.04),报头区 headH=round(iw*0.12),底部+50),
+    // 保证照片完整显示不被画布裁切
     function styleNewspaper(img, size, g, iw, ih) {
-        const pad = Math.max(30, Math.round(size * 0.6));
-        const w = iw + pad * 2, h = ih + pad * 2 + 100;
+        const pad = Math.max(40, Math.round(iw * 0.04));
+        const headH = Math.round(iw * 0.12);
+        const w = iw + pad * 2, h = ih + pad * 2 + headH + 50;
         // 报纸米黄底
         g.fillStyle = '#f0e9d6'; g.fillRect(0, 0, w, h);
         // 报头
         g.fillStyle = '#1a1a1a';
-        g.font = 'bold 36px Georgia, serif';
+        g.font = 'bold ' + Math.max(24, Math.round(headH * 0.45)) + 'px Georgia, serif';
         g.textAlign = 'center';
-        g.fillText('THE DAILY PHOTO', w / 2, pad);
-        g.font = '12px serif';
-        g.fillText(new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), w / 2, pad + 20);
+        g.fillText('THE DAILY PHOTO', w / 2, pad + Math.round(headH * 0.42));
+        g.font = Math.max(11, Math.round(headH * 0.16)) + 'px serif';
+        g.fillText(new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), w / 2, pad + Math.round(headH * 0.72));
         // 分隔线
-        g.fillRect(pad, pad + 30, w - pad * 2, 2);
+        g.fillRect(pad, pad + headH - 4, w - pad * 2, 2);
         // 照片
-        g.drawImage(img, pad, pad + 50, iw, ih);
+        g.drawImage(img, pad, pad + headH, iw, ih);
         // 照片说明
-        g.font = 'italic 14px serif';
-        g.fillText('— A captured moment in time', w / 2, pad + 50 + ih + 25);
+        g.font = 'italic ' + Math.max(12, Math.round(headH * 0.18)) + 'px serif';
+        g.fillText('— A captured moment in time', w / 2, pad + headH + ih + 25);
     }
 
 
