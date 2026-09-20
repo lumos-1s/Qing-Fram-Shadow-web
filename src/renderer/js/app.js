@@ -2027,19 +2027,19 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
     /* ══ 纹理 ══ */
-    pickBuiltinTexture() {
+    async pickBuiltinTexture() {
         const builtin = ['denim', 'frost', 'grain', 'kraft', 'leather', 'linen', 'metal', 'paper', 'watercolor', 'wood'];
         const opts = builtin.map(n => `${n} 内置`).join('\n');
-        const choice = window.prompt('选择内置纹理:\n' + opts + '\n(输入名称,留空取消)', 'denim');
+        const choice = await this.promptText('选择内置纹理:\n' + opts + '\n(输入名称,留空取消)', 'denim');
         if (!choice) return;
         const name = choice.trim().split(' ')[0];
         this.setLayerTexture(name);
     },
 
-    pickTexture() {
+    async pickTexture() {
         if (!this.textures.length) { this.setStatus('纹理库未加载'); return; }
         const opts = this.textures.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-        const choice = window.prompt('选择纹理(输入序号或名称,留空取消):\n' + opts, '1');
+        const choice = await this.promptText('选择纹理(输入序号或名称,留空取消):\n' + opts, '1');
         if (!choice) return;
         const idx = parseInt(choice, 10) - 1;
         const t = this.textures[idx];
@@ -2483,6 +2483,60 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
     canvasW() { return this.dom.canvas ? this.dom.canvas.width : 0; },
     canvasH() { return this.dom.canvas ? this.dom.canvas.height : 0; },
+
+    // 通用文本输入弹窗(Electron 不支持 window.prompt),resolve 值或 null(取消)
+    promptText(title, def) {
+        return new Promise(resolve => {
+            const ov = document.createElement('div');
+            ov.className = 'modal-overlay';
+            const card = document.createElement('div');
+            card.className = 'modal-card';
+            const head = document.createElement('div');
+            head.className = 'modal-header';
+            const t = document.createElement('div');
+            t.className = 'modal-title';
+            t.textContent = title || '输入';
+            t.style.whiteSpace = 'pre-wrap';
+            t.style.lineHeight = '1.5';
+            t.style.maxHeight = '40vh';
+            t.style.overflow = 'auto';
+            const close = document.createElement('button');
+            close.className = 'modal-close'; close.textContent = '\u00d7'; close.title = '取消';
+            head.appendChild(t); head.appendChild(close);
+            const body = document.createElement('div');
+            body.className = 'modal-body';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = def || '';
+            input.className = 'ctl-tx';
+            input.style.cssText = 'width:100%;box-sizing:border-box;font-size:13px;padding:8px 9px;';
+            const btns = document.createElement('div');
+            btns.className = 'btn-row btn-2';
+            btns.style.cssText = 'padding:14px 0 0;';
+            const btnCancel = document.createElement('button');
+            btnCancel.className = 'mini-btn'; btnCancel.textContent = '取消';
+            const btnOk = document.createElement('button');
+            btnOk.className = 'mini-btn primary'; btnOk.textContent = '确定';
+            btns.appendChild(btnCancel); btns.appendChild(btnOk);
+            body.appendChild(input); body.appendChild(btns);
+            card.appendChild(head); card.appendChild(body);
+            ov.appendChild(card);
+            document.body.appendChild(ov);
+            const done = v => { document.body.removeChild(ov); resolve(v); };
+            const ok = () => done(input.value);
+            const cancel = () => done(null);
+            btnOk.addEventListener('click', ok);
+            btnCancel.addEventListener('click', cancel);
+            close.addEventListener('click', cancel);
+            ov.addEventListener('mousedown', e => { if (e.target === ov) cancel(); });
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') ok();
+                if (e.key === 'Escape') cancel();
+            });
+            input.focus();
+            try { input.select(); } catch (_) { /* 忽略 */ }
+        });
+    },
     updateStatusBar() {
         if (!this.image) { this.setStatus(''); return; }
         const im = this.image;

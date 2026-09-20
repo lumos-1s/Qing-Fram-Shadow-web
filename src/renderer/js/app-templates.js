@@ -113,7 +113,7 @@ window.App = Object.assign(window.App || {}, {
     },
 
     async renameTemplateItem(r) {
-        const name = window.prompt('重命名模板(另存为新名称并删除旧的):', r.disp);
+        const name = await this.promptText('重命名模板(另存为新名称并删除旧的)', r.disp);
         if (!name) return;
         const safe = String(name).trim();
         if (!safe || safe === r.name) return;
