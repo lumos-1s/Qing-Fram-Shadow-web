@@ -2499,7 +2499,7 @@ AV_OVERLAY_BC2:67 };
         g.fillStyle = '#aaa';
         g.font = Math.round(iw * 0.025) + 'px cursive';
         g.textAlign = 'center';
-        g.fillText('✎ my memory', padX + iw / 2, padTop + Math.round(ih * 0.93));
+        g.fillText(S.userSignature || '✎ my memory', padX + iw / 2, padTop + Math.round(ih * 0.93));
     }
 
     // ══ 漫画分镜 ══
