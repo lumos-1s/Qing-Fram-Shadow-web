@@ -957,7 +957,7 @@ window.App = {
         const personalRows = ['rowSignText','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos'];
         personalRows.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
         if (s === 'CARD_3D') {
-            ['rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos','rowBgBlur','rowBgBlurInt'].forEach(id => {
+            ['rowParamFontSize','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos','rowBgBlur','rowBgBlurInt'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
             });
