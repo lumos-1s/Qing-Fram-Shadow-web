@@ -44,29 +44,43 @@
                 <button id="btnOpen" class="tbtn" title="打开图片 (Ctrl+O)">导入照片</button>
                 <div class="sep"></div>
                 <button id="btnSave" class="tbtn primary" title="导出当前图片">导出</button>
-                <select id="selFormat" class="inline-select" title="导出格式">
-                    <option value="png">PNG</option>
-                    <option value="jpeg" selected>JPG</option>
-                    <option value="webp">WebP</option>
-                </select>
-                <select id="slExportQuality" class="inline-select" title="JPG/WebP 输出质量(仅 JPG/WebP 生效,PNG 无损)">
-                    <option value="60">质量 60%</option>
-                    <option value="70">质量 70%</option>
-                    <option value="80">质量 80%</option>
-                    <option value="85">质量 85%</option>
-                    <option value="90">质量 90%</option>
-                    <option value="92" selected>质量 92%</option>
-                    <option value="95">质量 95%</option>
-                    <option value="98">质量 98%</option>
-                    <option value="100">质量 100%</option>
-                </select>
-                <select id="selExportSize" class="inline-select" title="导出尺寸(长边像素)">
-                    <option value="0" selected>原图尺寸</option>
-                    <option value="8192">打印超大 · 8192px</option>
-                    <option value="4096">高清大图 · 4096px</option>
-                    <option value="2048">常用清晰 · 2048px</option>
-                    <option value="1080">手机分享 · 1080px</option>
-                </select>
+                <div class="export-settings-wrap" id="exportSettingsWrap">
+                    <button id="btnExportSettings" class="tbtn" title="导出格式 / 质量 / 尺寸">设置</button>
+                    <div class="export-pop" id="exportPop" style="display:none">
+                        <div class="ep-row">
+                            <label>格式</label>
+                            <select id="selFormat" class="inline-select" title="导出格式">
+                                <option value="png">PNG</option>
+                                <option value="jpeg" selected>JPG</option>
+                                <option value="webp">WebP</option>
+                            </select>
+                        </div>
+                        <div class="ep-row">
+                            <label>质量</label>
+                            <select id="slExportQuality" class="inline-select" title="JPG/WebP 输出质量(仅 JPG/WebP 生效,PNG 无损)">
+                                <option value="60">质量 60%</option>
+                                <option value="70">质量 70%</option>
+                                <option value="80">质量 80%</option>
+                                <option value="85">质量 85%</option>
+                                <option value="90">质量 90%</option>
+                                <option value="92" selected>质量 92%</option>
+                                <option value="95">质量 95%</option>
+                                <option value="98">质量 98%</option>
+                                <option value="100">质量 100%</option>
+                            </select>
+                        </div>
+                        <div class="ep-row">
+                            <label>尺寸</label>
+                            <select id="selExportSize" class="inline-select" title="导出尺寸(长边像素)">
+                                <option value="0" selected>原图尺寸</option>
+                                <option value="8192">打印超大 · 8192px</option>
+                                <option value="4096">高清大图 · 4096px</option>
+                                <option value="2048">常用清晰 · 2048px</option>
+                                <option value="1080">手机分享 · 1080px</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <button id="btnSyncSel" class="tbtn" title="将当前边框效果应用到选中的照片">同步到选中</button>
             </div>
 

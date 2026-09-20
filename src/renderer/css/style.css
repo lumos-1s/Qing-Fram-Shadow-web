@@ -155,6 +155,22 @@ html.dark .tbtn.primary { color: #0c1914; }
 .inline-select:hover { border-color: var(--primary); }
 .inline-select option { color: var(--text); }
 
+/* 导出设置弹出面板(格式/质量/尺寸折叠进次级菜单) */
+.export-settings-wrap { position: relative; }
+.export-pop {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+    min-width: 228px; padding: 8px;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 12px; box-shadow: var(--shadow);
+}
+.export-pop .ep-row {
+    display: flex; align-items: center; gap: 8px; padding: 4px 2px;
+}
+.export-pop .ep-row label {
+    flex: 0 0 34px; color: var(--text-2); font-size: 12px; text-align: right;
+}
+.export-pop .ep-row .inline-select { flex: 1; width: 100%; padding: 5px 8px; font-size: 12px; background: var(--surface-alt); }
+
 .tzoom {
     width: 56px; text-align: center;
     border: 1px solid var(--border-strong); border-radius: 8px;

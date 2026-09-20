@@ -118,6 +118,7 @@ window.App = {
         this.dom = {
             btnOpen: $('btnOpen'), btnSave: $('btnSave'), selFormat: $('selFormat'), selExportSize: $('selExportSize'),
             slExportQuality: $('slExportQuality'),
+            btnExportSettings: $('btnExportSettings'), exportPop: $('exportPop'),
             btnSyncSel: $('btnSyncSel'), btnUndo: $('btnUndo'), btnRedo: $('btnRedo'),
             btnReset: $('btnReset'), btnRandom: $('btnRandom'), btnFit: $('btnFit'),
             zoomInput: $('zoomInput'), zoomRange: $('zoomRange'), btnTheme: $('btnTheme'),
@@ -150,6 +151,17 @@ window.App = {
         const d = this.dom;
         d.btnOpen.addEventListener('click', () => this.openImages());
         d.btnSave.addEventListener('click', () => this.exportImage());
+        if (d.btnExportSettings && d.exportPop) {
+            d.btnExportSettings.addEventListener('click', (e) => {
+                e.stopPropagation();
+                d.exportPop.style.display = d.exportPop.style.display === 'block' ? 'none' : 'block';
+            });
+            document.addEventListener('click', (ev) => {
+                if (d.exportPop.style.display === 'block' && d.exportPop && ev.target !== d.btnExportSettings && !d.exportPop.contains(ev.target)) {
+                    d.exportPop.style.display = 'none';
+                }
+            });
+        }
         if (d.slExportQuality) {
             d.slExportQuality.addEventListener('change', () => {
                 // 异步调用,静默忽略失败(旧主进程无该 handler 时不报未处理错误)
