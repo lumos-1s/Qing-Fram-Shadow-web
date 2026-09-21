@@ -384,15 +384,18 @@ window.App = {
     /* ══ 画布元素 / 缩放平移交互 ══ */
     bindInteractive() {
         const pane = this.dom.canvasPane, stage = this.dom.stage, canvas = this.dom.canvas;
-        const strip = this.dom.thumbStrip;
-        if (strip) {
-            strip.addEventListener('wheel', e => {
-                if (strip.scrollWidth <= strip.clientWidth) return;
+        const hscrollWheel = (el) => {
+            if (!el) return;
+            el.addEventListener('wheel', e => {
+                if (el.scrollWidth <= el.clientWidth) return;
                 e.preventDefault();
                 e.stopPropagation();
-                strip.scrollLeft += (e.deltaY || e.deltaX);
+                el.scrollLeft += (e.deltaY || e.deltaX);
             }, { passive: false });
-        }
+        };
+        hscrollWheel(this.dom.thumbStrip);
+        hscrollWheel(this.$('brandIconBox'));
+        hscrollWheel(this.$('customIconBox'));
         pane.addEventListener('wheel', e => {
             const pk = this.tplPuzzle();
             if (pk) {
