@@ -2841,12 +2841,31 @@ AV_OVERLAY_BC2:67 };
         g.textAlign = 'center';
     }
 
+    // 头像系列通用边框:开启「背景模糊」用模糊照片铺满+压暗,否则纯白底;照片主体带悬浮阴影
+    function drawAvBg(g, img, pad, w, h, S) {
+        if (!S.signBgBlur) {
+            g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+            g.drawImage(img, pad, pad, img.naturalWidth, img.naturalHeight);
+            return;
+        }
+        g.save();
+        g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+        g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
+        const bs = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+        g.drawImage(img, (w - img.naturalWidth * bs) / 2, (h - img.naturalHeight * bs) / 2, img.naturalWidth * bs, img.naturalHeight * bs);
+        g.filter = 'none';
+        g.restore();
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
+        g.drawImage(img, pad, pad, img.naturalWidth, img.naturalHeight);
+        g.restore();
+    }
+
     // ══ 头像·左下:头像+签名直接放在照片上 ══
     function styleAvOverlay(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.round(iw * 0.03));
         const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-        g.drawImage(img, pad, pad, iw, ih);
+        drawAvBg(g, img, pad, w, h, S);
         // 头像在左下角
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + avatarR + Math.round(iw * 0.03);
@@ -2883,8 +2902,7 @@ AV_OVERLAY_BC2:67 };
     function styleAvOverlayTR(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.round(iw * 0.03));
         const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-        g.drawImage(img, pad, pad, iw, ih);
+        drawAvBg(g, img, pad, w, h, S);
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + iw - avatarR - Math.round(iw * 0.03);
         const ay = pad + avatarR + Math.round(iw * 0.03);
@@ -2919,8 +2937,7 @@ AV_OVERLAY_BC2:67 };
     function styleAvOverlayBR(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.round(iw * 0.03));
         const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-        g.drawImage(img, pad, pad, iw, ih);
+        drawAvBg(g, img, pad, w, h, S);
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + iw - avatarR - Math.round(iw * 0.03);
         const ay = pad + ih - avatarR - Math.round(iw * 0.03);
@@ -2954,8 +2971,7 @@ AV_OVERLAY_BC2:67 };
     function styleAvOverlayBC(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.round(iw * 0.03));
         const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-        g.drawImage(img, pad, pad, iw, ih);
+        drawAvBg(g, img, pad, w, h, S);
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + Math.round(iw / 2);
         const ay = pad + ih - avatarR - Math.round(iw * 0.04);
@@ -2990,8 +3006,7 @@ AV_OVERLAY_BC2:67 };
     function styleAvOverlayBC2(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.round(iw * 0.03));
         const w = iw + pad * 2, h = ih + pad * 2;
-        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-        g.drawImage(img, pad, pad, iw, ih);
+        drawAvBg(g, img, pad, w, h, S);
         const avatarR = Math.round(Math.min(iw, ih) * 0.05 * (S.avatarScale || 0.85));
         const globalAv = window.__qfsAvatarImg;
         // 先量签名宽度
