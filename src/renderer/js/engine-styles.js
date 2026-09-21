@@ -1349,11 +1349,30 @@ AV_OVERLAY_BC2:67 };
         const pad = Math.max(28, Math.floor(size * 3 / 5));
         const arc = Math.max(12, Math.floor(size / 4));
         const brand = trim(S.cam.brand), model = S.cam.model || '';
-        const l1 = (brand + ' ' + model).trim() || 'CAMERA';
+        const brandTxt = (brand || 'CAMERA').toUpperCase();
+        const modelTxt = model.toUpperCase();
+        const hasModel = !!modelTxt;
         const l2 = S.useExif ? exifLine(S.cam) : '';
         const innerW = Math.max(80, iw - Math.floor(pad * 2 / 3));
-        const f1 = fitFont(g, l1, false, true, Math.max(14, autoExifSize(S.paramFs, iw)), innerW, 0);
-        const m1 = textMetrics(g, l1, f1, false, true, 0);
+        // 品牌行总宽(含字距):品牌 Georgia 衬线 + 型号无衬线,与「签名+参数」同字体
+        const brandTotal = (fs) => {
+            const ls = Math.round(fs * 0.15), gap = Math.round(fs * 0.3);
+            g.font = 'bold ' + fs + "px Georgia, 'Times New Roman', serif";
+            g.letterSpacing = 0;
+            const bw = g.measureText(brandTxt).width + ls * Math.max(0, brandTxt.length - 1);
+            let tw = bw;
+            if (hasModel) {
+                g.font = 'bold ' + fs + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+                g.letterSpacing = 0;
+                tw += gap + g.measureText(modelTxt).width + ls * Math.max(0, modelTxt.length - 1);
+            }
+            g.letterSpacing = 0;
+            return tw;
+        };
+        let fBrand = Math.max(14, autoExifSize(S.paramFs, iw));
+        while (fBrand > 9 && brandTotal(fBrand) > innerW) fBrand--;
+        const f1 = fBrand;
+        const m1 = { height: Math.round(f1 * 0.78) + Math.round(f1 * 0.22), ascent: Math.round(f1 * 0.78), maxDescent: Math.round(f1 * 0.22) };
         let f2 = null;
         let m2 = textMetrics(g, ' ', 10, true, false, 0);
         if (l2) {
@@ -1369,8 +1388,23 @@ AV_OVERLAY_BC2:67 };
         g.drawImage(roundedPhoto(img, arc), pad, pad);
         const bandTop = ih + pad;
         const y1 = bandTop + Math.floor((bandH - blockH) / 2) + m1.ascent;
-        const l1m = textMetrics(g, l1, f1, false, true, 0);
-        drawTextL(g, l1, cx2(w, l1m.w), y1, 'rgb(25,25,25)', f1, false, true, 0);
+        // 品牌行:品牌 Georgia + 字距,型号无衬线,整体居中
+        const tw1 = brandTotal(f1);
+        const ls = Math.round(f1 * 0.15), gapT = Math.round(f1 * 0.3);
+        g.font = 'bold ' + f1 + "px Georgia, 'Times New Roman', serif";
+        g.letterSpacing = 0;
+        const bw = g.measureText(brandTxt).width + ls * Math.max(0, brandTxt.length - 1);
+        const sx = cx2(w, tw1);
+        g.textAlign = 'left';
+        g.fillStyle = 'rgb(25,25,25)';
+        g.fillText(brandTxt, sx, y1);
+        g.letterSpacing = 0;
+        if (hasModel) {
+            g.font = 'bold ' + f1 + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+            g.letterSpacing = ls;
+            g.fillText(modelTxt, sx + bw + gapT, y1);
+            g.letterSpacing = 0;
+        }
         if (l2 && f2) {
             setFont(g, f2, true, false);
             const l2w = g.measureText(l2).width;
