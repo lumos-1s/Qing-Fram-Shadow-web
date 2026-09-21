@@ -960,22 +960,28 @@ AV_OVERLAY_BC2:67 };
         g.restore();
     }
     // ── WatermarkRender.drawParamMask(原版,含底部遮罩输入 = 整图)──
-    function drawParamMask(g, canvasEl, cw, ch, cam, position, paramFs) {
-        const lines = [cam.brand, cam.model, cam.focal, cam.aperture, cam.iso, cam.shutter].filter(v => v && String(v).trim() !== '');
+    function drawParamMask(g, canvasEl, cw, ch, cam, position, paramFs, S) {
+        const lines = [brandHidden(S) ? null : cam.brand, cam.model, cam.focal, cam.aperture, cam.iso, cam.shutter].filter(v => v && String(v).trim() !== '');
         if (!lines.length) return;
         if (position === 'SPLIT') {
             const mid = Math.floor(lines.length / 2);
-            drawSingleMask(g, canvasEl, cw, ch, lines.slice(0, mid), 'LEFT', paramFs);
-            drawSingleMask(g, canvasEl, cw, ch, lines.slice(mid), 'RIGHT', paramFs);
+            drawSingleMask(g, canvasEl, cw, ch, lines.slice(0, mid), 'LEFT', paramFs, S, true);
+            drawSingleMask(g, canvasEl, cw, ch, lines.slice(mid), 'RIGHT', paramFs, S, false);
             return;
         }
-        drawSingleMask(g, canvasEl, cw, ch, lines, position, paramFs);
+        drawSingleMask(g, canvasEl, cw, ch, lines, position, paramFs, S, true);
     }
-    function drawSingleMask(g, canvasEl, cw, ch, lines, pos, paramFs) {
+    function drawSingleMask(g, canvasEl, cw, ch, lines, pos, paramFs, S, brandFirst) {
         const fs = Math.max(11, autoExifSize(paramFs, cw));
         const fm = textMetrics(g, lines[0], fs, true, false, 0);
+        const markW0 = brandMarkW(S, fs);
+        const logoOnly0 = !!(brandFirst && S.brandLogo === 2 && markW0 > 0);
+        const brandTxt0 = lines[0], brandW0 = textMetrics(g, brandTxt0, fs, true, false, 0).w;
         let maxW = 0;
-        for (const l of lines) maxW = Math.max(maxW, textMetrics(g, l, fs, true, false, 0).w);
+        for (let li = 0; li < lines.length; li++) {
+            const w = textMetrics(g, lines[li], fs, true, false, 0).w + ((li === 0 && brandFirst) ? (logoOnly0 ? 0 : markW0) : 0);
+            if (w > maxW) maxW = w;
+        }
         const lineH = fm.height;
         const maskW = maxW + 24, maskH = lines.length * lineH + (lines.length - 1) * 16 + 16;
         let x = (pos === 'RIGHT') ? cw - maskW - 12 : 12;
@@ -999,7 +1005,7 @@ AV_OVERLAY_BC2:67 };
         let textY = my + 8 + fm.ascent;
         for (let li = 0; li < lines.length; li++) {
             const l = lines[li];
-            if (li === 0) {
+            if (li === 0 && brandFirst) {
                 // 品牌名用Georgia衬线字体
                 g.font = 'bold ' + fs + "px Georgia, 'Times New Roman', serif";
                 g.letterSpacing = Math.round(fs * 0.15);
@@ -1007,7 +1013,17 @@ AV_OVERLAY_BC2:67 };
                 g.font = 'bold ' + fs + 'px sans-serif';
                 g.letterSpacing = 0;
             }
-            g.fillText(l, mx + 12, textY);
+            if (li === 0 && brandFirst) {
+                if (logoOnly0) {
+                    const used = drawBrandMark(g, S, logoCenterX(S, fs, mx + 12, brandW0), textY, fs);
+                    if (!used) g.fillText(l, mx + 12, textY);
+                } else {
+                    const used = drawBrandMark(g, S, mx + 12, textY, fs);
+                    g.fillText(l, mx + 12 + used, textY);
+                }
+            } else {
+                g.fillText(l, mx + 12, textY);
+            }
             textY += lineH + 16;
         }
         g.letterSpacing = 0;
@@ -1067,19 +1083,32 @@ AV_OVERLAY_BC2:67 };
         const padX = Math.max(scaledPx(20), scaledPx(10) + exifSz);
         const modelTrack = Math.max(1, Math.round(modelSz * 0.08));
         const paramTrack = Math.max(1, Math.round(paramSz * 0.10));
-        const model = S.cam.brand + ' ' + S.cam.model;
+        const model = brandHidden(S) ? '' : (S.cam.brand + ' ' + S.cam.model);
         const text = dateLayout ? dateYMD() : buildParamString(S.cam, S.paramType);
         if (showModel) {
+            const logoW = brandMarkW(S, modelSz);
+            const modelOnly = (S.brandLogo === 2 && logoW) ? S.cam.model.trim() : model;
             const gap = Math.min(scaledPx(6), Math.max(0, maskH - modelSz - paramSz));
             const blockH = modelSz + gap + paramSz;
             const modelY = Math.max(topY + modelSz, centerY - Math.floor(blockH / 2) + modelSz);
             const paramsY = modelY + paramSz + gap;
-            const mw = textMetrics(g, model, modelSz, false, true, modelTrack);
+            const mw = textMetrics(g, modelOnly, modelSz, false, true, modelTrack);
+            const onlyLogo = (S.brandLogo === 2 && logoW > 0);
             let mX;
             if (pos === 'LEFT' || pos === 'SPLIT') mX = padX;
-            else if (pos === 'RIGHT') mX = cw - mw.w - padX;
-            else mX = cx2(cw, mw.w);
-            drawTextL(g, model, mX, modelY, 'rgba(255,255,255,0.922)', modelSz, false, true, modelTrack);
+            else if (pos === 'RIGHT') mX = cw - (onlyLogo ? mw.w : mw.w + logoW) - padX;
+            else mX = cx2(cw, onlyLogo ? mw.w : mw.w + logoW);
+            if (onlyLogo) {
+                // 品牌词被 logo 替换:logo 画在 brand 词块位置(居中),model 保留原排布
+                const bw0 = textMetrics(g, S.cam.brand, modelSz, false, true, modelTrack).w;
+                g.font = 'bold ' + modelSz + "px Georgia, 'Times New Roman', serif";
+                g.letterSpacing = modelTrack;
+                drawBrandMark(g, S, logoCenterX(S, modelSz, mX, bw0), modelY, modelSz);
+                drawTextL(g, modelOnly, mX + bw0 + Math.round(modelSz * 0.4), modelY, 'rgba(255,255,255,0.922)', modelSz, false, true, modelTrack);
+            } else {
+                const lwUsed = drawBrandMark(g, S, mX, modelY, modelSz);
+                drawTextL(g, modelOnly, mX + lwUsed, modelY, 'rgba(255,255,255,0.922)', modelSz, false, true, modelTrack);
+            }
             const pw = textMetrics(g, text, paramSz, true, false, paramTrack);
             let pX;
             if (pos === 'RIGHT' || pos === 'SPLIT') pX = cw - pw.w - padX;
@@ -1103,9 +1132,9 @@ AV_OVERLAY_BC2:67 };
         const barY = ih + pad;
         const fs = Math.max(11, Math.floor(size / 3));
         g.fillStyle = 'rgb(30,30,30)'; g.fillRect(pad, barY, iw, barH);
-        drawLogo(g, trim(S.cam.brand), pad + 10, barY + Math.floor(barH / 2) + Math.floor(fs / 3), fs);
+        const brandWid = drawLogo(g, trim(S.cam.brand), pad + 10, barY + Math.floor(barH / 2) + Math.floor(fs / 3), fs, S);
         const line2 = S.cam.model + '  |  ' + S.cam.focal + '  ' + S.cam.aperture;
-        drawTextL(g, line2, pad + 10 + fs * 4, barY + Math.floor(barH / 2) + Math.floor(fs / 3), 'rgb(180,180,180)', autoExifSize(S.paramFs, iw), true, false, 0);
+        drawTextL(g, line2, pad + 10 + Math.round(brandWid) + Math.round(fs * 0.8), barY + Math.floor(barH / 2) + Math.floor(fs / 3), 'rgb(180,180,180)', autoExifSize(S.paramFs, iw), true, false, 0);
     }
     function styleWmSingle(img, size, g, iw, ih, S) {
         const barH = Math.max(32, size), pad = Math.max(8, Math.floor(size / 2));
@@ -1189,7 +1218,7 @@ AV_OVERLAY_BC2:67 };
         if (S.useExif) {
             const barY = ih + pad, textCenterY = barY + Math.floor(barH / 2);
             const logoFs = Math.max(14, autoExifSize(S.paramFs, iw) + 4);
-            drawLogo(g, trim(S.cam.brand), pad + 16, textCenterY + Math.floor(logoFs / 3), logoFs);
+            drawLogo(g, trim(S.cam.brand), pad + 16, textCenterY + Math.floor(logoFs / 3), logoFs, S);
             const ps = buildParamString(S.cam, S.paramType);
             if (ps) {
                 const f = autoExifSize(S.paramFs, iw);
@@ -1240,7 +1269,7 @@ AV_OVERLAY_BC2:67 };
         g.restore();
         // 3. 左侧品牌名
         const ml = Math.round(leftW * 0.25) + 40;
-        const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+        const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
         // 默认自适应:按照片宽度比例算,用户调参数字号时按比例缩放
         const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
         const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale * (S.brandScale || 1)));
@@ -1249,7 +1278,8 @@ AV_OVERLAY_BC2:67 };
         g.letterSpacing = Math.round(fBrand * 0.15);
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
-        g.fillText(brand, ml, Math.round(h * 0.28));
+        const bmLw = drawBrandMark(g, S, S.brandLogo === 2 ? logoCenterX(S, fBrand, ml, textMetrics(g, brand, fBrand, false, true, Math.round(fBrand * 0.15)).w) : ml, Math.round(h * 0.28), fBrand);
+        if (S.brandLogo !== 2 || !bmLw) g.fillText(brand, ml + (S.brandLogo === 2 ? 0 : bmLw), Math.round(h * 0.28));
         // 4. 三行圆角方框参数
         if (true && S.useExif && S.cam) {
             const ps = S.paramScale || 1;
@@ -1287,7 +1317,7 @@ AV_OVERLAY_BC2:67 };
         const w = iw + pad * 2, h = ih + pad * 2;
         g.fillStyle = 'rgb(40,40,45)'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad);
-        if (S.useExif) drawParamMask(g, g.canvas, w, h, S.cam, S.position, Math.max(11, S.paramFs));
+        if (S.useExif) drawParamMask(g, g.canvas, w, h, S.cam, S.position, Math.max(11, S.paramFs), S);
     }
     function styleXiaomiImp(img, size, g, iw, ih, S) {
         const topPad = Math.max(20, Math.floor(size / 2));
@@ -1317,7 +1347,7 @@ AV_OVERLAY_BC2:67 };
     }
     function styleCardLeica(img, size, g, iw, ih, S) {
         const pad = Math.max(24, Math.floor(size * 3 / 4));
-        const brand = trim(S.cam.brand);
+        const brand = brandHidden(S) ? '' : trim(S.cam.brand);
         const dotGap = Math.max(8, Math.floor(size / 4));
         const w = iw + pad * 2;
         const bf = fitFont(g, brand, false, true, Math.max(14, autoExifSize(S.paramFs, iw)), iw, 0);
@@ -1326,7 +1356,7 @@ AV_OVERLAY_BC2:67 };
         const pl = S.useExif ? exifLine(S.cam) : '';
         let pf = 0, pm = { w: 0, ascent: 0 };
         if (pl) {
-            const reserved = pad * 2 + dotD + dotGap + bm.w + Math.floor(autoExifSize(S.paramFs, iw) * 0.5);
+            const reserved = pad * 2 + dotD + dotGap + bm.w + brandMarkW(S, bf) + Math.floor(autoExifSize(S.paramFs, iw) * 0.5);
             pf = fitFont(g, pl, true, false, Math.max(12, Math.floor(autoExifSize(S.paramFs, iw) * 2 / 3)), Math.max(60, w - reserved), 0);
             pm = textMetrics(g, pl, pf, true, false, 0);
         }
@@ -1342,15 +1372,16 @@ AV_OVERLAY_BC2:67 };
         g2.beginPath();
         g2.arc(pad + dotD / 2, capCenter, dotD / 2, 0, Math.PI * 2);
         g2.fill();
-        drawTextL(g2, brand, pad + dotD + dotGap, baseY, 'rgb(30,30,30)', bf, false, true, 0);
+        const brandLw = drawBrandMark(g2, S, S.brandLogo === 2 ? logoCenterX(S, bf, pad + dotD + dotGap, bm.w) : pad + dotD + dotGap, baseY, bf);
+        if (!(S.brandLogo === 2 && brandLw)) drawTextL(g2, brand, pad + dotD + dotGap + (S.brandLogo === 2 ? 0 : brandLw), baseY, 'rgb(30,30,30)', bf, false, true, 0);
         if (pf && pl) drawTextL(g2, pl, w - pad - pm.w, baseY, 'rgb(120,120,120)', pf, true, false, 0);
     }
     function styleCardLogoParam(img, size, g, iw, ih, S) {
         const pad = Math.max(28, Math.floor(size * 3 / 5));
         const arc = Math.max(12, Math.floor(size / 4));
         const brand = trim(S.cam.brand), model = S.cam.model || '';
-        const brandTxt = (brand || 'CAMERA').toUpperCase();
-        const modelTxt = model.toUpperCase();
+        const brandTxt = brandHidden(S) ? '' : (brand || 'CAMERA').toUpperCase();
+        const modelTxt = brandHidden(S) ? '' : model.toUpperCase();
         const hasModel = !!modelTxt;
         const l2 = S.useExif ? exifLine(S.cam) : '';
         const innerW = Math.max(80, iw - Math.floor(pad * 2 / 3));
@@ -1365,7 +1396,7 @@ AV_OVERLAY_BC2:67 };
             const bw = g.measureText(brandTxt).width + ls * Math.max(0, brandTxt.length - 1);
             let tw = bw;
             if (hasModel) {
-                g.font = 'bold ' + fs + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+                g.font = 'bold ' + fs + "px 'Consolas', 'Courier New', monospace";
                 g.letterSpacing = 0;
                 tw += gap + g.measureText(modelTxt).width + ls * Math.max(0, modelTxt.length - 1);
             }
@@ -1409,24 +1440,28 @@ AV_OVERLAY_BC2:67 };
         const paramColor = S.signBgBlur ? 'rgba(255,255,255,0.75)' : 'rgb(130,130,130)';
         const bandTop = ih + pad;
         const y1 = bandTop + Math.floor((bandH - blockH) / 2) + m1.ascent;
-        // 品牌行:品牌 Georgia + 字距,型号无衬线,整体居中
+        // 品牌行:品牌 Georgia + 字距,型号无衬线,整体居中(开启品牌 logo 时 logo 在左并排)
         const tw1 = brandTotal(f1);
+        const lw1 = brandMarkW(S, f1);
         const ls = Math.round(f1 * 0.15), gapT = Math.round(f1 * 0.3);
         g.font = 'bold ' + f1 + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = 0;
         if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 4; }
         const bw = g.measureText(brandTxt).width + ls * Math.max(0, brandTxt.length - 1);
-        const sx = cx2(w, tw1);
+        // mode2(仅Logo):品牌文字被 logo 替换,型号保留 → 块宽仍按品牌+型号原文计算,logo 居中于品牌词区域
+        const onlyLogo = (S.brandLogo === 2 && lw1 > 0);
+        const sx = cx2(w, tw1 + (onlyLogo ? 0 : lw1));
         g.textAlign = 'left';
         g.fillStyle = brandColor;
-        g.fillText(brandTxt, sx, y1);
+        const lw2 = onlyLogo ? drawBrandMark(g, S, logoCenterX(S, f1, sx, bw), y1, f1) : drawBrandMark(g, S, sx, y1, f1);
+        if (!onlyLogo || !lw2) g.fillText(brandTxt, sx + lw2, y1);
         g.shadowBlur = 0;
         g.letterSpacing = 0;
         if (hasModel) {
-            g.font = 'bold ' + f1 + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+            g.font = 'bold ' + f1 + "px 'Consolas', 'Courier New', monospace";
             g.letterSpacing = ls;
             g.fillStyle = brandColor;
-            g.fillText(modelTxt, sx + bw + gapT, y1);
+            g.fillText(modelTxt, sx + (onlyLogo ? (bw + gapT) : (lw2 + bw + gapT)), y1);
             g.letterSpacing = 0;
         }
         if (l2 && f2) {
@@ -1438,7 +1473,7 @@ AV_OVERLAY_BC2:67 };
     function styleCardPureLogo(img, size, g, iw, ih, S) {
         const pad = Math.max(32, size);
         const arc = Math.max(14, Math.floor(size / 3));
-        const brand = trim(S.cam.brand) || 'PHOTO';
+        const brand = brandHidden(S) ? '' : (trim(S.cam.brand) || 'PHOTO');
         const wf = fitFont(g, brand, false, true, Math.max(20, Math.min(96, Math.round(autoExifSize(S.paramFs, iw)))), Math.max(80, iw - pad), 0);
         const wm = textMetrics(g, brand, wf, false, true, Math.max(1, Math.round(wf * 0.45)));
         const extra = Math.max(wm.height * 3, size);
@@ -1447,12 +1482,17 @@ AV_OVERLAY_BC2:67 };
         drawCardSoftShadow(g, w, h, pad, pad, iw, ih, arc);
         g.drawImage(roundedPhoto(img, arc), pad, pad);
         const baseY = ih + pad + Math.floor((extra - wm.height) / 2) + wm.ascent;
-        drawTrackedTextL(g, brand, Math.floor(w / 2), baseY, wf, 'rgb(34,34,34)', 0.45, false);
+        const lw = brandMarkW(S, wf);
+        const onlyLogo = (S.brandLogo === 2 && lw > 0);
+        const blockW = onlyLogo ? lw : wm.w + lw;
+        const x0 = Math.round(w / 2 - blockW / 2);
+        const lwUsed = drawBrandMark(g, S, x0, baseY, wf);
+        if (!onlyLogo) drawTrackedTextL(g, brand, w / 2, baseY, wf, 'rgb(34,34,34)', 0.45, false, x0 + lwUsed);
     }
     function styleCardSimple(img, size, g, iw, ih, S) {
         const pad = Math.max(12, Math.floor(size / 2));
-        const brand = trim(S.cam.brand);
-        const line = S.useExif ? (brand + ' · ' + exifLine(S.cam)) : brand;
+        const brand = brandHidden(S) ? '' : trim(S.cam.brand);
+        const line = S.useExif ? (brand ? (brand + ' · ' + exifLine(S.cam)) : exifLine(S.cam)) : brand;
         const f = fitFont(g, line, true, false, Math.max(12, autoExifSize(S.paramFs, iw)), Math.max(60, iw - pad * 3), 0);
         const fm = textMetrics(g, line, f, true, false, 0);
         const capH = Math.floor(fm.height * 5 / 3) + Math.max(6, Math.floor(pad / 4));
@@ -1461,20 +1501,36 @@ AV_OVERLAY_BC2:67 };
         g.drawImage(img, pad, pad);
         g.strokeStyle = 'rgb(230,230,230)'; g.lineWidth = 1;
         g.strokeRect(pad - 1, pad - 1, iw + 1, ih + 1);
-        drawTextL(g, line, cx2(w, fm.w), ih + pad + Math.floor((capH + fm.ascent - fm.maxDescent) / 2), 'rgb(150,150,150)', f, true, false, 0);
+        const baseY = ih + pad + Math.floor((capH + fm.ascent - fm.maxDescent) / 2);
+        const lw = brandMarkW(S, f);
+        const onlyLogo = (S.brandLogo === 2 && lw > 0);
+        const lineRest = onlyLogo ? (S.useExif ? (' · ' + exifLine(S.cam)) : '') : line;
+        const brandWm = textMetrics(g, brand, f, true, false, 0).w;
+        const xStart = cx2(w, onlyLogo ? fm.w : fm.w + lw);
+        const lwUsed = drawBrandMark(g, S, onlyLogo ? logoCenterX(S, f, xStart, brandWm) : xStart, baseY, f);
+        if (onlyLogo) { if (lwUsed) drawTextL(g, lineRest, xStart + brandWm, baseY, 'rgb(150,150,150)', f, true, false, 0); }
+        else drawTextL(g, line, xStart + lwUsed, baseY, 'rgb(150,150,150)', f, true, false, 0);
     }
     function styleCardImmersion(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.floor(size * 2 / 5));
         const arc = Math.max(10, Math.floor(size / 4));
-        const brand = trim(S.cam.brand);
-        const line = S.useExif ? (brand + '   ' + exifLine(S.cam)) : brand;
+        const brand = brandHidden(S) ? '' : trim(S.cam.brand);
+        const line = S.useExif ? (brand ? (brand + '   ' + exifLine(S.cam)) : exifLine(S.cam)) : brand;
         const f = fitFont(g, line, true, false, Math.max(12, autoExifSize(S.paramFs, iw)), Math.max(60, iw - pad), 0);
         const fm = textMetrics(g, line, f, true, false, 0);
         const bandH = fm.height * 2 + Math.max(10, Math.floor(pad / 2));
         const w = iw + pad * 2, h = ih + pad + bandH;
         g.fillStyle = 'rgb(17,17,17)'; g.fillRect(0, 0, w, h);
         g.drawImage(roundedPhoto(img, arc), pad, pad);
-        drawTextL(g, line, cx2(w, fm.w), ih + pad + Math.floor((bandH + fm.ascent - fm.maxDescent) / 2), 'rgb(185,185,185)', f, true, false, 0);
+        const baseY = ih + pad + Math.floor((bandH + fm.ascent - fm.maxDescent) / 2);
+        const lw = brandMarkW(S, f);
+        const onlyLogo = (S.brandLogo === 2 && lw > 0);
+        const lineRest = onlyLogo ? (S.useExif ? ('   ' + exifLine(S.cam)) : '') : line;
+        const brandWm = textMetrics(g, brand, f, true, false, 0).w;
+        const xStart = cx2(w, onlyLogo ? fm.w : fm.w + lw);
+        const lwUsed = drawBrandMark(g, S, onlyLogo ? logoCenterX(S, f, xStart, brandWm) : xStart, baseY, f);
+        if (onlyLogo) { if (lwUsed) drawTextL(g, lineRest, xStart + brandWm, baseY, 'rgb(185,185,185)', f, true, false, 0); }
+        else drawTextL(g, line, xStart + lwUsed, baseY, 'rgb(185,185,185)', f, true, false, 0);
     }
     function paintScrim(g, w, h, pos, band) {
         let grad;
@@ -1522,7 +1578,7 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, dpxL, dpyL, pdwL, pdhL);
             g.restore();
             // 左侧品牌+三行参数整体在"画布左缘→照片左缘(leftW+40)"空隙中水平居中
-            const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+            const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
             const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale * (S.brandScale || 1)));
             const brandTrack = Math.round(fBrand * 0.15);
             const exifOn = S.useExif && S.cam;
@@ -1544,11 +1600,19 @@ AV_OVERLAY_BC2:67 };
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.letterSpacing = brandTrack;
             const brandW = g.measureText(brand).width;
-            const contentW = Math.max(brandW, exifOn ? boxW + valGap + maxValW : 0);
+            const markL = brandMarkW(S, fBrand);
+            const onlyLogo = (S.brandLogo === 2 && markL > 0);
+            const contentW = Math.max(onlyLogo ? brandMarkNetW(S, fBrand) : (brandW + markL), exifOn ? boxW + valGap + maxValW : 0);
             const tx = Math.max(0, Math.round((leftW + 40 - contentW) / 2));
             g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-            g.fillText(brand, tx, Math.round(h * 0.28));
+            if (onlyLogo) {
+                const used = drawBrandMark(g, S, logoCenterX(S, fBrand, tx, textMetrics(g, brand, fBrand, false, true, brandTrack).w), Math.round(h * 0.28), fBrand);
+                if (!used) g.fillText(brand, tx, Math.round(h * 0.28));
+            } else {
+                const markLUsed = drawBrandMark(g, S, tx, Math.round(h * 0.28), fBrand);
+                g.fillText(brand, tx + markLUsed, Math.round(h * 0.28));
+            }
             // 三行参数(和毛玻璃一致)
             if (exifOn) {
                 const boxH = Math.round(boxW * 0.55);
@@ -1606,12 +1670,23 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, dpxB, dpyB, pdwB, pdhB);
             g.restore();
             const by = py + ih + Math.round(bottomH * 0.3);
-            const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+            const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
             const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale * (S.brandScale || 1)));
             g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            const markB = brandMarkW(S, fBrand);
             g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-            g.fillText(brand, w / 2, by);
+            const onlyLogoB = (S.brandLogo === 2);
+            if (!S.brandLogo) {
+                g.fillText(brand, w / 2, by);
+            } else {
+                const bw = onlyLogoB ? 0 : g.measureText(brand).width;
+                const bx0 = Math.round(w / 2 - (bw + (onlyLogoB ? brandMarkNetW(S, fBrand) : markB)) / 2);
+                g.textAlign = 'left';
+                const markLUsed = drawBrandMark(g, S, bx0, by, fBrand);
+                if (!onlyLogoB || !markLUsed) g.fillText(brand, bx0 + markLUsed, by);
+                g.textAlign = 'left';
+            }
             if (S.useExif && S.cam) {
                 const boxW = Math.round(Math.max(280, Math.min(w * 0.35, 440)) * pfScale * (S.paramScale || 1));
                 const boxH = Math.round(boxW * 0.55);
@@ -1685,7 +1760,7 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, dpxR, dpyR, pdwR, pdhR);
             g.restore();
             // 右侧品牌+三行参数整体在"照片右缘→画布右缘(rightW+40)"空隙中水平居中(与左留白镜像)
-            const brand = (S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY';
+            const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale * (S.brandScale || 1)));
             const brandTrack = Math.round(fBrand * 0.15);
             const exifOn = S.useExif && S.cam;
@@ -1707,13 +1782,16 @@ AV_OVERLAY_BC2:67 };
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.letterSpacing = brandTrack;
             const brandW = g.measureText(brand).width;
-            const contentW = Math.max(brandW, exifOn ? boxW + valGap + maxValW : 0);
+            const markR = brandMarkW(S, fBrand);
+            const onlyLogo = (S.brandLogo === 2);
+            const contentW = Math.max(onlyLogo ? brandMarkNetW(S, fBrand) : (brandW + markR), exifOn ? boxW + valGap + maxValW : 0);
             const gapW = rightW;
             const startX = px + iw + Math.round((gapW - contentW) / 2);
             g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.textAlign = 'left';
             g.textBaseline = 'alphabetic';
-            g.fillText(brand, startX, Math.round(h * 0.28));
+            const markRUsed = drawBrandMark(g, S, startX, Math.round(h * 0.28), fBrand);
+            if (!onlyLogo || !markRUsed) g.fillText(brand, startX + markRUsed, Math.round(h * 0.28));
             // 三行参数(和左留白镜像)
             if (exifOn) {
                 const boxH = Math.round(boxW * 0.55);
@@ -1741,10 +1819,10 @@ AV_OVERLAY_BC2:67 };
         }
         // LEFT/BOTTOM 分支保持原样
         const inset = Math.max(12, Math.floor(size / 2));
-        const brand = trim(S.cam.brand), model = S.cam.model || '';
+        const brand = brandHidden(S) ? '' : trim(S.cam.brand), model = brandHidden(S) ? '' : (S.cam.model || '');
         const vertical = pos !== 2;
         let line = vertical ? (brand + ' ' + model).trim() : ((brand + ' ' + model).trim() + '   ' + exifLine(S.cam)).trim();
-        if (!line) line = 'PHOTO';
+        if (!line && !brandHidden(S)) line = 'PHOTO';
         const along = vertical ? ih : iw;
         const f = fitFont(g, line, true, false, Math.max(12, Math.min(autoExifSize(S.paramFs, iw), Math.floor(along / 10))), Math.max(60, along - inset * 2), 0);
         const fm = textMetrics(g, line, f, true, false, 0);
@@ -1767,6 +1845,7 @@ AV_OVERLAY_BC2:67 };
         const inset = Math.max(14, Math.floor(size * 2 / 5));
         let brand = trim(S.cam.brand);
         if (!brand) brand = 'PHOTO';
+        if (brandHidden(S)) brand = '';
         let fs = Math.max(16, Math.min(96, Math.round(autoExifSize(S.paramFs, iw))));
         let track = 1, tw = 0;
         for (; fs > 10; fs--) {
@@ -1780,20 +1859,25 @@ AV_OVERLAY_BC2:67 };
         g.drawImage(img, 0, 0);
         paintScrim(g, iw, ih, 2, wm.height * 3 + inset);
         const baseY = ih - inset - wm.maxDescent;
-        const x = cx2(iw, tw);
+        const lw = brandMarkW(S, fs);
+        const onlyLogo = (S.brandLogo === 2 && lw > 0);
+        const x = cx2(iw, onlyLogo ? brandMarkNetW(S, fs) : (tw + lw));
+        const lwUsed = drawBrandMark(g, S, x, baseY, fs);
         const toff = Math.max(1, Math.floor(fs / 24));
-        setFont(g, fs, false, true);
-        g.fillStyle = 'rgba(0,0,0,0.588)';
-        let sx = x;
-        for (let i = 0; i < brand.length; i++) {
-            g.fillText(brand[i], sx + toff, baseY + toff);
-            sx += charW(g, brand[i], fs, false, true) + track;
-        }
-        g.fillStyle = 'rgba(255,255,255,0.941)';
-        sx = x;
-        for (let i = 0; i < brand.length; i++) {
-            g.fillText(brand[i], sx, baseY);
-            sx += charW(g, brand[i], fs, false, true) + track;
+        if (!onlyLogo) {
+            setFont(g, fs, false, true);
+            g.fillStyle = 'rgba(0,0,0,0.588)';
+            let sx = x + lwUsed;
+            for (let i = 0; i < brand.length; i++) {
+                g.fillText(brand[i], sx + toff, baseY + toff);
+                sx += charW(g, brand[i], fs, false, true) + track;
+            }
+            g.fillStyle = 'rgba(255,255,255,0.941)';
+            sx = x + lwUsed;
+            for (let i = 0; i < brand.length; i++) {
+                g.fillText(brand[i], sx, baseY);
+                sx += charW(g, brand[i], fs, false, true) + track;
+            }
         }
     }
     function extractMultipleDominant(img, n) {
@@ -1838,10 +1922,20 @@ AV_OVERLAY_BC2:67 };
         const cols = extractMultipleDominant(img, 5);
         const swatchH = barH, swW = Math.floor(w / cols.length);
         for (let i = 0; i < cols.length; i++) { g.fillStyle = cols[i]; g.fillRect(i * swW, barY, swW, swatchH); }
-        const label = S.cam.brand + ' ' + S.cam.model;
+        const label = brandHidden(S) ? '' : (S.cam.brand + ' ' + S.cam.model);
+        const onlyLogoClr = (S.brandLogo === 2 && brandMarkW(S, fs) > 0);
         g.fillStyle = '#ffffff';
         g.font = 'bold ' + fs + 'px sans-serif';
-        g.fillText(label, 12, barY + Math.floor(barH / 2) + Math.floor(fs / 3));
+        const lblY = barY + Math.floor(barH / 2) + Math.floor(fs / 3);
+        const clrBrandW = textMetrics(g, S.cam.brand, fs, true, true, 0).w;
+        if (onlyLogoClr) {
+            const used = drawBrandMark(g, S, logoCenterX(S, fs, 12, clrBrandW), lblY, fs);
+            if (!used) g.fillText(label, 12, lblY);
+            else g.fillText(S.cam.model, 12 + clrBrandW + Math.round(fs * 0.45), lblY);
+        } else {
+            const lwClr = drawBrandMark(g, S, 12, lblY, fs);
+            g.fillText(label, 12 + lwClr, lblY);
+        }
     }
     function styleColorRefined(img, size, g, iw, ih, S) {
         const barH = Math.max(50, Math.floor(size * 4 / 3)), pad = Math.max(8, Math.floor(size / 2));
@@ -1866,9 +1960,24 @@ AV_OVERLAY_BC2:67 };
         const barY = ih + pad;
         const swatchH = Math.floor(barH * 2 / 3), swW = Math.floor(w / COLOR_SWATCHES.length);
         for (let i = 0; i < COLOR_SWATCHES.length; i++) { g.fillStyle = COLOR_SWATCHES[i]; g.fillRect(i * swW, barY, swW, swatchH); }
-        const model = 'GFX ' + S.cam.model;
-        const mfw = textMetrics(g, model, fs, false, true, 0);
-        drawTextL(g, model, w - pad - mfw.w, barY + swatchH + Math.floor((barH - swatchH + fs) / 2), 'rgb(60,60,60)', fs, false, true, 0);
+        const artBandY = barY + swatchH;
+        if (!brandHidden(S)) {
+            const model = 'GFX ' + S.cam.model;
+            const gfxW = textMetrics(g, 'GFX ', fs, false, true, 0).w;
+            const mfw = textMetrics(g, model, fs, false, true, 0);
+            const artBaseY = artBandY + Math.floor((barH - swatchH + fs) / 2);
+            const lwArt = brandMarkW(S, fs);
+            const onlyLogoArt = (S.brandLogo === 2 && lwArt > 0);
+            if (onlyLogoArt) {
+                const modelW = textMetrics(g, S.cam.model, fs, false, true, 0).w;
+                const xModel = w - pad - modelW;
+                drawBrandMark(g, S, logoCenterX(S, fs, xModel - gfxW, gfxW), artBaseY, fs);
+                drawTextL(g, S.cam.model, xModel, artBaseY, 'rgb(60,60,60)', fs, false, true, 0);
+            } else {
+                const lwArtUsed = drawBrandMark(g, S, S.brandLogo ? w - pad - mfw.w - brandMarkW(S, fs) : w - pad - mfw.w, artBaseY, fs);
+                drawTextL(g, model, w - pad - mfw.w + (S.brandLogo ? 0 : lwArtUsed), artBaseY, 'rgb(60,60,60)', fs, false, true, 0);
+            }
+        }
     }
     function styleFujiWhite(img, size, g, iw, ih, S) {
         const pad = Math.max(12, Math.round(iw * 0.02));
@@ -1885,9 +1994,20 @@ AV_OVERLAY_BC2:67 };
         // 文字在barH内垂直居中
         const barY = ih + pad;
         const startY = barY + padBottom;
-        const line1 = 'FUJIFILM ' + S.cam.model;
+        const line1 = brandHidden(S) ? '' : ('FUJIFILM ' + S.cam.model);
         const m1 = textMetrics(g, line1, fs, false, true, 0);
-        drawTextL(g, line1, cx2(w, m1.w), startY + fs, 'rgb(40,40,40)', fs, false, true, 0);
+        const lwFw = brandMarkW(S, fs);
+        const onlyLogoFw = (S.brandLogo === 2 && lwFw > 0);
+        const fwBrandW = textMetrics(g, 'FUJIFILM ', fs, false, true, 0).w;
+        if (onlyLogoFw) {
+            const x1 = cx2(w, m1.w);
+            const used = drawBrandMark(g, S, logoCenterX(S, fs, x1, fwBrandW), startY + fs, fs);
+            if (!used) drawTextL(g, line1, x1, startY + fs, 'rgb(40,40,40)', fs, false, true, 0);
+            else drawTextL(g, S.cam.model, x1 + fwBrandW, startY + fs, 'rgb(40,40,40)', fs, false, true, 0);
+        } else {
+            const lwFwUsed = drawBrandMark(g, S, cx2(w, m1.w + lwFw), startY + fs, fs);
+            drawTextL(g, line1, cx2(w, m1.w + lwFw) + lwFwUsed, startY + fs, 'rgb(40,40,40)', fs, false, true, 0);
+        }
         const line2 = S.cam.focal + '  ' + S.cam.aperture + '  ' + S.cam.iso + '  ' + S.cam.shutter;
         const m2 = textMetrics(g, line2, f2, true, false, 0);
         drawTextL(g, line2, cx2(w, m2.w), startY + fs + lineGap + f2, 'rgb(120,120,120)', f2, true, false, 0);
@@ -1952,6 +2072,23 @@ AV_OVERLAY_BC2:67 };
     }
 
     // 阶段二渲染状态(模板参数 → 原版静态参数)
+    // 判定某样式 logo 出现的背景明暗,返回品牌 logo 变体偏好('white'|'black')。
+    // 深背景(深色条/暗卡/模糊照片压暗)用 White,浅背景(米白/白卡底)用 Black。
+    // 有「背景模糊」开关的样式随 signBgBlur 切换。
+    function brandLogoPref(styleName, signBgBlur) {
+        const dark = [
+            'WM_CLASSIC', 'WM_BRAND_LOGO', 'WM_AI',
+            'BLUR_CLASSIC', 'BLUR_DATE', 'IMP_FROSTED', 'IMP_CLASSIC',
+            'CARD_IMMERSION', 'OVERLAY_LOGO_BOTTOM',
+            'FUJI_WM', 'FUJI_WM_BRAND', 'DARK_BRAND_ONLY',
+            'SIGN_BLUR', 'SIG_BLUR', 'AV_BLUR'
+        ].indexOf(styleName) !== -1;
+        if (dark) return 'white';
+        if (signBgBlur && ['OVERLAY_PARAM_LEFT', 'OVERLAY_PARAM_RIGHT', 'OVERLAY_PARAM_BOTTOM',
+                           'CARD_LOGO_PARAM', 'SIGN_PARAM', 'SIGNATURE'].indexOf(styleName) !== -1) return 'white';
+        return 'black';
+    }
+
     function buildState(app, styleName, iw, ih, size) {
         const t = app.template;
         const cc = t.cornerConfig || {};
@@ -1970,10 +2107,32 @@ AV_OVERLAY_BC2:67 };
         // 0(未指定) = 自适应:按照片短边/45,clamp 20~64(原版 autoParamFontSize 同规则)
         const rawPf = t.paramFontSize != null ? t.paramFontSize : 35;
         const autoPf = Math.max(20, Math.min(64, Math.round(Math.min(iw, ih) / 45)));
+        const cam = cameraFor(styleName, iw, ih, exif);
+        // 相机品牌->logo 图(勾选 brandLogo 且按品牌名匹配到品牌池时预载)
+        // 变体按背景明暗选:同一品牌有黑白两版时,深背景用 White、浅背景用 Black/Color。
+        let brandLogoImg = null, brandLogoData = '';
+        const brandLogoVal = Number(t.brandLogo || 0);
+        if ((brandLogoVal === 1 || brandLogoVal === 2) && cam.brand) {
+            const hit = brandLogoEntry(app, cam.brand, brandLogoPref(styleName, Number(t.signBgBlur || 0)));
+            if (hit && hit.dataUrl) {
+                brandLogoData = hit.dataUrl;
+                let im = (app.logoImgCache && app.logoImgCache[brandLogoData]) || null;
+                if (!im) {
+                    im = new Image();
+                    im.onload = () => { try { if (app.scheduleRender) app.scheduleRender(true); } catch (e) {} };
+                    im.src = brandLogoData;
+                    if (app.logoImgCache) app.logoImgCache[brandLogoData] = im;
+                }
+                brandLogoImg = im;
+            }
+        }
         return {
             size,
             exif,
-            cam: cameraFor(styleName, iw, ih, exif),
+            cam,
+            brandLogo: Number(t.brandLogo || 0),
+            brandLogoImg,
+            brandLogoData,
             paramFs: rawPf > 0 ? clampP(rawPf, 2, 160) : autoPf,
             blurIntensity: clampP(t.blurIntensity != null ? t.blurIntensity : 50, 0, 100),
             paramType: clampP(t.paramType != null ? t.paramType : 0, 0, 2),
@@ -2009,16 +2168,112 @@ AV_OVERLAY_BC2:67 };
         };
     }
 
-    // 品牌→唯一文本(用于 LogoResource 目前"文字近似"的绘制)
-    function drawLogo(g, brand, x, y, logoFs) {
+    // 品牌→唯一文本(用于 LogoResource 目前"文字近似"的绘制)。S.brandLogo:1=文字+Logo 并排,2=仅 Logo(品牌文字被替换)。
+    // 仅Logo 时 logo 顶替品牌词:占位按原词宽返回(后续元素位置不变),logo 水平居中于原词块。
+    function drawLogo(g, brand, x, y, logoFs, S) {
+        if (brandHidden(S)) return 0;
         const b = String(brand || 'CAMERA').toUpperCase();
         const fs = logoFs;
         // 统一用印象毛玻璃同款衬线字体:Georgia + 字间距(颜色保留调用方设定的 fillStyle)
         g.font = 'bold ' + fs + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fs * 0.15);
+        const only = S && S.brandLogo === 2;
+        const tw = textMetrics(g, b, fs, false, true, 0).w;
+        if (S && S.brandLogo) {
+            const lw = drawBrandMark(g, S, only ? logoCenterX(S, fs, x, tw) : x, y, fs);
+            if (!only || !lw) g.fillText(b, only ? x : x + lw, y);
+            g.letterSpacing = 0;
+            return only && lw ? tw : lw + tw;
+        }
         g.fillText(b, x, y);
         g.letterSpacing = 0;
-        return textMetrics(g, b, fs, false, true, 0).w;
+        return tw;
+    }
+
+    // 品牌池匹配:把品牌名与池内文件去后缀(去掉 _White/_Black/_Color/-White/-Black/.png)后不区分大小写比对,
+    // 无匹配或自定义 logo 返回 null。pref:'white'|'black'|''(默认)——按 logo 出现的背景明暗选变体:
+    // 深背景优先 White、浅背景优先 Black(彩色变体居中兼容,纯净图兜底)。
+    function brandLogoEntry(app, brand, pref) {
+        if (!app || !app.logos || !app.logos.length || !brand) return null;
+        const b = String(brand).trim().toUpperCase();
+        if (!b) return null;
+        const strip = n => n.replace(/\.(png|jpg|jpeg|svg|gif|webp)$/i, '')
+            .replace(/[_-](white|black|color)$/i, '').trim();
+        const cands = app.logos.filter(l => l && !l.custom && strip(l.name).toUpperCase() === b);
+        if (!cands.length) return null;
+        const variantOf = l => {
+            const m = (l.name || '').toLowerCase().match(/[_-](white|black|color)$/);
+            return m ? m[1] : '';
+        };
+        const rank = l => {
+            const v = variantOf(l);
+            if (pref === 'white') {
+                if (v === 'white') return 0;
+                if (v === 'color') return 1;
+                if (!v) return 2;
+                return 3;
+            }
+            if (pref === 'black') {
+                if (v === 'black') return 0;
+                if (v === 'color') return 1;
+                if (!v) return 2;
+                return 3;
+            }
+            if (v === 'white') return 3;
+            if (v === 'black') return 2;
+            if (v === 'color') return 1;
+            return 0;
+        };
+        cands.sort((a, c) => rank(a) - rank(c));
+        return cands[0];
+    }
+
+    // 品牌行是否隐藏(不显示品牌名与 Logo,参数行保留)。S.brandLogo:3=隐藏。
+    function brandHidden(S) { return !!(S && S.brandLogo === 3); }
+
+    // 根据品牌字号算出 logo 绘制尺寸与水平占宽。S.brandLogo:1=文字+Logo(logo 高≈品牌字号,在左),2=仅Logo(品牌文字被 logo 替换,logo 放大到 1.6 倍字号)。
+    // 返回 {img, w, h, gap} 或 null。img 未加载完返回 null → 纯文字退路;品牌行隐藏时也返回 null。
+    function brandMarkSpec(S, fs) {
+        if (brandHidden(S)) return null;
+        const im = S.brandLogoImg;
+        if (!S.brandLogo || !im || !(im.complete && im.naturalWidth)) return null;
+        const h = Math.round(fs * (S.brandLogo === 2 ? 0.8 : 0.5));
+        const w = Math.max(1, Math.round(h * im.naturalWidth / im.naturalHeight));
+        return { img: im, w, h, gap: Math.round(fs * 0.35) };
+    }
+
+    // logo 在左、品牌文字在右:正常进入后把 logo 画到文字起始 x 左侧,返回总占宽(logo+gap+文字没算进去)。
+    // 用于居中时先算总宽:return brandMarkSpec 的宽;真正绘制走 drawBrandMark。
+    function brandMarkW(S, fs) {
+        const sp = brandMarkSpec(S, fs);
+        return sp ? sp.w + sp.gap : 0;
+    }
+
+    // 仅Logo 模式居中徽标时只用 logo 净宽(不带文字预留 gap),保证 logo 几何中心真正居中。
+    function brandMarkNetW(S, fs) {
+        const sp = brandMarkSpec(S, fs);
+        return sp ? sp.w : 0;
+    }
+
+    // 仅Logo 模式:logo 应顶替品牌文字原来的位置。给出品牌文字左起点 x0 与文字宽 tw,
+    // 返回让 logo 水平居中于原文字区域的绘制 x(无可用 logo 时原样返回 x0 → 走文字退路)。
+    function logoCenterX(S, fs, x0, tw) {
+        const sp = brandMarkSpec(S, fs);
+        return sp ? Math.round(x0 + (tw - sp.w) / 2) : x0;
+    }
+
+    // 绘制 logo(左)此时 g 的文字字形与字号已经设为品牌文案用,基线在 y;返回 logo 占的横向宽度(不含文字)。
+    // align: 'top'(textBaseline=top 用,logo 顶贴 y);默认 bottom 贴基线。
+    // logo 替换文字(仅Logo 模式)时 logo 以文字行高垂直居中——行中心轴=基线 y - ascent(0.78fs)/2 即 y - 0.28fs。
+    function drawBrandMark(g, S, x, y, fs, align) {
+        const sp = brandMarkSpec(S, fs);
+        if (!sp) return 0;
+        const yy = align === 'top' ? Math.round(y)
+            : (S.brandLogo === 2 ? Math.round(y - fs * 0.28 - sp.h / 2) : Math.round(y - sp.h));
+        g.save();
+        g.drawImage(sp.img, Math.round(x), yy, sp.w, sp.h);
+        g.restore();
+        return sp.w + sp.gap;
     }
 
     // 成品尺寸(与原版几何一致)
@@ -2365,14 +2620,22 @@ AV_OVERLAY_BC2:67 };
         g.textBaseline = 'alphabetic';
         const bottomPad = Math.max(20, Math.round(ih * 0.06));
         let ty = cy + ih - bottomPad;
-        if (withBrand && S.cam) {
+        if (withBrand && S.cam && !brandHidden(S)) {
             g.font = 'bold ' + fBrand + 'px sans-serif';
             g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 6;
             g.fillStyle = '#ffffff';
             const brand = (S.cam.brand || 'FUJIFILM').toUpperCase();
             // 无参数时品牌直接画在底部
-            g.fillText(brand, w / 2, showParams ? ty - fParam * 1.5 : ty);
+            g.textAlign = 'left';
+            const by = showParams ? ty - fParam * 1.5 : ty;
+            const bw = g.measureText(brand).width;
+            const lw = brandMarkW(S, fBrand);
+            const onlyLogo = (S.brandLogo === 2 && lw > 0);
+            const x0 = Math.round(w / 2 - (onlyLogo ? brandMarkNetW(S, fBrand) : bw + lw) / 2);
+            const lwUsed = drawBrandMark(g, S, x0, by, fBrand);
+            if (!onlyLogo) g.fillText(brand, x0 + lwUsed, by);
             g.shadowBlur = 0;
+            g.textAlign = 'center';
         }
         if (showParams && S.useExif && S.cam) {
             const fLen = String(S.cam.focal || '450').replace(/mm$/i, '');
@@ -2658,10 +2921,10 @@ AV_OVERLAY_BC2:67 };
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2; // 参数行中心x
         // 品牌居中在参数行上方(印象毛玻璃同款衬线字体);可选加入型号——型号用无衬线,数字 0/O 易区分
-        const hasModel = !!(S.signIncludeModel && (S.exif.model || '').trim());
-        const brandTxt = (S.exif.make || 'Camera').trim().toUpperCase();
-        const modelTxt = (S.exif.model || '').trim().toUpperCase();
-        let fBrand = Math.round(iw * 0.028);
+        const hasModel = !brandHidden(S) && !!(S.signIncludeModel && (S.exif.model || '').trim());
+        const brandTxt = brandHidden(S) ? '' : (S.exif.make || 'Camera').trim().toUpperCase();
+        const modelTxt = brandHidden(S) ? '' : (S.exif.model || '').trim().toUpperCase();
+        let fBrand = Math.round(iw * 0.028 * (S.brandScale || 1));
         const pColor = S.paramColor === 'auto' ? (S.signBgBlur ? '#fff' : '#333') : S.paramColor;
         const pColorSoft = S.paramColor === 'auto' ? (S.signBgBlur ? 'rgba(255,255,255,0.7)' : '#999') : (S.paramColor === '#fff' ? 'rgba(255,255,255,0.7)' : '#999');
         // 品牌(含型号)太长时收缩居中不溢出右侧区域
@@ -2671,12 +2934,13 @@ AV_OVERLAY_BC2:67 };
         const rawWTmp = g.measureText(hasModel ? brandTxt + ' ' + modelTxt : brandTxt).width;
         const bwTmp = Math.round(rawWTmp + lsTmp * Math.max(0, (hasModel ? brandTxt + ' ' + modelTxt : brandTxt).length - 1));
         const maxBrandW = Math.max(60, (rx - cxRight) * 2 * 0.92);
-        if (bwTmp > maxBrandW && fBrand > 8) fBrand = Math.max(8, Math.round(fBrand * maxBrandW / bwTmp));
+        const markWTmp = brandMarkW(S, fBrand);
+        if (bwTmp + markWTmp > maxBrandW && fBrand > 8) fBrand = Math.max(8, Math.round(fBrand * (maxBrandW - markWTmp) / bwTmp));
         // 品牌:衬线 + 字距;型号:无衬线(同高度/同色),拼接与品牌保持在同一条基线上
         // 测量须显式计入字距(letterSpacing 在 measureText 中是否计入因渲染器而异),否则型号起点与整体居中会偏移
         const gap = Math.round(fBrand * 0.3);
         const ls = Math.round(fBrand * 0.15);
-        const sansFont = 'bold ' + fBrand + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+        const sansFont = 'bold ' + fBrand + "px 'Consolas', 'Courier New', monospace";
         const brandW = (function () {
             g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
             g.letterSpacing = 0;
@@ -2693,15 +2957,20 @@ AV_OVERLAY_BC2:67 };
         g.textAlign = 'left';
         g.textBaseline = 'top';
         const topY2 = barY + Math.round(bottomH * 0.15);
+        const markW = brandMarkW(S, fBrand);
+        const onlyLogoSum = (S.brandLogo === 2 && markW > 0);
+        const sumW = onlyLogoSum ? totalW : (totalW + markW);
+        const groupX = cxRight - sumW / 2;
         // 型号无衬线,避免衬线数字 0 与字母 o 混淆
         g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
-        g.fillText(brandTxt, cxRight - totalW / 2, topY2);
+        const markUsed = onlyLogoSum ? drawBrandMark(g, S, logoCenterX(S, fBrand, groupX, brandW), topY2, fBrand, 'top') : drawBrandMark(g, S, groupX, topY2, fBrand, 'top');
+        if (!onlyLogoSum) g.fillText(brandTxt, groupX + markUsed, topY2);
         g.letterSpacing = 0;
         if (hasModel) {
             g.font = sansFont;
             g.letterSpacing = ls;
             g.fillStyle = pColor;
-            g.fillText(modelTxt, cxRight - totalW / 2 + brandW + gap, topY2);
+            g.fillText(modelTxt, groupX + (onlyLogoSum ? brandW : markUsed + brandW) + gap, topY2);
             g.letterSpacing = 0;
         }
         // 参数行
@@ -2810,15 +3079,27 @@ AV_OVERLAY_BC2:67 };
         g.font = fs + 'px sans-serif';
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2;
-        const brandTxt2 = (S.exif.make || 'Camera').toUpperCase();
-        const fBrand2 = Math.round(iw * 0.028);
+        const brandTxt2 = brandHidden(S) ? '' : (S.exif.make || 'Camera').toUpperCase();
+        const fBrand2 = Math.round(iw * 0.028 * (S.brandScale || 1));
         const pColor2 = S.paramColor === 'auto' ? (S.signBgBlur ? '#fff' : '#333') : S.paramColor;
         g.fillStyle = pColor2;
         g.font = 'bold ' + fBrand2 + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand2 * 0.15);
         g.textAlign = 'center';
         g.textBaseline = 'top';
-        g.fillText(brandTxt2, cxRight, barY + Math.round(bottomH * 0.15));
+        const topY2b = barY + Math.round(bottomH * 0.15);
+        if (!S.brandLogo) {
+            g.fillText(brandTxt2, cxRight, topY2b);
+        } else {
+            const onlyLogoBlur = (S.brandLogo === 2);
+            const bw2 = onlyLogoBlur ? 0 : g.measureText(brandTxt2).width;
+            const mark2 = brandMarkW(S, fBrand2);
+            const bx2 = Math.round(cxRight - (bw2 + mark2) / 2);
+            g.textAlign = 'left';
+            const mark2Used = drawBrandMark(g, S, bx2, topY2b, fBrand2, 'top');
+            if (!onlyLogoBlur || !mark2Used) g.fillText(brandTxt2, bx2 + mark2Used, topY2b);
+            g.textAlign = 'left';
+        }
         g.letterSpacing = 0;
         g.fillStyle = 'rgba(255,255,255,0.7)';
         g.font = fs + 'px sans-serif';

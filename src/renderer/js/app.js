@@ -62,6 +62,7 @@ window.App = {
                 if (s.paramColor) this.template.paramColor = s.paramColor;
                 if (s.paramFontSize) this.template.paramFontSize = s.paramFontSize;
                 if (s.brandSize) this.template.brandSize = s.brandSize;
+                if (s.brandLogo != null) this.template.brandLogo = s.brandLogo;
                 if (s.paramScale) this.template.paramScale = s.paramScale;
                 this.refreshUI();
                 this.scheduleRender();
@@ -210,6 +211,8 @@ window.App = {
         if (cbC) cbC.addEventListener('change', () => { this.template.signColor = cbC.value; this.onSettingChanged(); });
         const chkSM = document.getElementById('chkSignModel');
         if (chkSM) chkSM.addEventListener('change', () => { this.template.signIncludeModel = chkSM.checked ? 1 : 0; this.onSettingChanged(); });
+        const chkBL = document.getElementById('chkBrandLogo');
+        if (chkBL) chkBL.addEventListener('change', () => { this.template.brandLogo = Number(chkBL.value) || 0; this.onSettingChanged(); });
         const rgAS = document.getElementById('rgAvatarScale');
         if (rgAS) rgAS.addEventListener('input', () => {
             this.template.avatarScale = Number(rgAS.value) / 100;
@@ -458,6 +461,7 @@ window.App = {
                 e.preventDefault();
                 this.selectedEls = this.hasEl(this.selectedEls, el) ? this.selectedEls : [el];
                 this._dragEl = { kind: el.kind, ref: el.obj, sx: e.screenX, sy: e.screenY, x: el.x0, y: el.y0, moved: false };
+                this._logoSnapV = null; this._logoSnapH = null;
                 this.refreshElList();
                 canvas.style.cursor = 'pointer';
                 this.requestRender();
@@ -541,6 +545,7 @@ window.App = {
             if (this._dragEl) {
                 const moved = this._dragEl.moved;
                 this._dragEl = null;
+                this._logoSnapV = null; this._logoSnapH = null;
                 if (moved) this.commitNoPush();
             }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
@@ -553,7 +558,7 @@ window.App = {
                 this._dragPz = null;
                 canvas.style.cursor = '';
             }
-            if (this._dragEl) { this._dragEl = null; }
+            if (this._dragEl) { this._dragEl = null; this._logoSnapV = null; this._logoSnapH = null; }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
         };
         window.addEventListener('blur', cancelDrags);
@@ -710,10 +715,36 @@ window.App = {
         const e = drag.ref;
         const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
         const clampV = (v, max, half) => half > 0 ? Math.max(half, Math.min(v, max - half)) : Math.max(0, Math.min(v, max));
-        if (drag.kind === 'logo') { e.x = x; e.y = y; e.offsetX = 0; e.offsetY = 0; }
+        if (drag.kind === 'logo') {
+            const snap = this.snapLogoToGuides(x, y, cw, ch);
+            e.x = snap.x; e.y = snap.y; e.offsetX = 0; e.offsetY = 0;
+            this._logoSnapV = snap.v; this._logoSnapH = snap.h;
+        }
         else if (drag.kind === 'sticker') { e.x = clampV(x, cw, 20); e.y = clampV(y, ch, 20); }
         else if (drag.kind === 'text') { e.x = clampV(x, cw, 30); e.y = clampV(y, ch, 20); }
         this.onSettingChanged();
+    },
+
+    // 二分线 + 三分线:吸附 logo 中心并记录命中的线(供高亮)
+    snapLogoToGuides(x, y, cw, ch) {
+        const vLines = [cw / 3, cw / 2, cw * 2 / 3];
+        const hLines = [ch / 3, ch / 2, ch * 2 / 3];
+        const tol = 8;
+        let sv = -1, sh = -1, dv = tol, dh = tol;
+        for (let i = 0; i < vLines.length; i++) {
+            const d = Math.abs(x - vLines[i]);
+            if (d < dv) { dv = d; sv = i; }
+        }
+        for (let i = 0; i < hLines.length; i++) {
+            const d = Math.abs(y - hLines[i]);
+            if (d < dh) { dh = d; sh = i; }
+        }
+        return {
+            x: sv >= 0 ? vLines[sv] : x,
+            y: sh >= 0 ? hLines[sh] : y,
+            v: sv >= 0 ? sv : null,
+            h: sh >= 0 ? sh : null,
+        };
     },
 
     textureEl(src) {
@@ -768,6 +799,62 @@ window.App = {
                 ctx.restore();
             }
         } catch(err) { console.warn('drawSelectionBox', err); }
+    },
+
+    // 拖 logo 时叠加 二分/三分参考线,命中线高亮(角色固定 #00e5a0)
+    drawLogoGuides() {
+        try {
+            if (!this._dragEl || this._dragEl.kind !== 'logo') return;
+            const canvas = this.dom.canvas;
+            if (!canvas || !canvas.width) return;
+            const ctx = canvas.getContext('2d');
+            const cw = canvas.width, ch = canvas.height;
+            const vLines = [cw / 3, cw / 2, cw * 2 / 3];
+            const hLines = [ch / 3, ch / 2, ch * 2 / 3];
+            ctx.save();
+            const drawLine = (x1, y1, x2, y2, active) => {
+                // 深色衬底 + 亮线两层,保证深/浅背景都清晰
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+                ctx.lineWidth = active ? 5 : 3;
+                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.strokeStyle = active ? '#00e5a0' : 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = active ? 2.5 : 1.5;
+                if (active) {
+                    ctx.shadowColor = '#00e5a0';
+                    ctx.shadowBlur = 8;
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            };
+            vLines.forEach((x, i) => drawLine(x, 0, x, ch, i === this._logoSnapV));
+            hLines.forEach((y, i) => drawLine(0, y, cw, y, i === this._logoSnapH));
+            // 命中反馈:在 logo 中心画瞄准环
+            if (this._logoSnapV != null || this._logoSnapH != null) {
+                const el = this._dragEl.ref;
+                const size = el.size || 60;
+                const cx0 = this.logoPos(el, cw, ch, size).cx, cy0 = this.logoPos(el, cw, ch, size).cy;
+                ctx.beginPath();
+                ctx.arc(cx0, cy0, size * 0.42, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(cx0, cy0, size * 0.42, 0, Math.PI * 2);
+                ctx.strokeStyle = '#00e5a0';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#00e5a0';
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(cx0, cy0, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#00e5a0';
+                ctx.fill();
+            }
+            ctx.restore();
+        } catch(err) { console.warn('drawLogoGuides', err); }
     },
 
     /* ══ 默认模板 ══ */
@@ -1017,6 +1104,15 @@ window.App = {
         if (rowBrand) rowBrand.style.display = isImpression ? '' : 'none';
         const rowParamScale = document.getElementById('rowParamScale');
         if (rowParamScale) rowParamScale.style.display = (isImpression || isBlurStyle) ? '' : 'none';
+        // 相机品牌 Logo:凡品牌名会渲染成行的样式都显示该勾选(匹配 by 品牌池)
+        const brandShown = ['WM_CLASSIC','WM_BRAND_LOGO','IMP_FROSTED','IMP_CLASSIC',
+            'OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM',
+            'CARD_LEICA','CARD_LOGO_PARAM','CARD_PURE_LOGO','CARD_SIMPLE','CARD_IMMERSION',
+            'FUJI_WM_BRAND','DARK_BRAND_ONLY','OVERLAY_LOGO_BOTTOM',
+            'SIGN_PARAM','SIGN_BLUR','BLUR_CLASSIC','BLUR_DATE',
+            'FUJI_WHITE','COLOR_CLASSIC','ART_CARD'].includes(s);
+        const rowBrandLogo = document.getElementById('rowBrandLogo');
+        if (rowBrandLogo) rowBrandLogo.style.display = brandShown ? '' : 'none';
     },
 
     // 回显:模板 -> 控件
@@ -1070,6 +1166,7 @@ window.App = {
             if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
             if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
             if ($('chkSignModel')) $('chkSignModel').checked = !!(this.template.signIncludeModel);
+            if ($('chkBrandLogo')) $('chkBrandLogo').value = String(this.template.brandLogo || 0);
             if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
             if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;
@@ -1307,6 +1404,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
                 this.template = prevTpl;
             }
             this.drawSelectionBox();
+            this.drawLogoGuides();
             if (this.autoFit) {
                 this.autoFit = false;
                 requestAnimationFrame(() => this.fitZoom());
@@ -2249,7 +2347,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         if (!this.template.logoElements) this.template.logoElements = [];
         const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
         // 默认 logo 尺寸固定为 900(宽),按原图比例
-        const size = 900;
+        const size = 500;
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
             x: px != null ? px : Math.round(cw / 2), y: py != null ? py : Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
