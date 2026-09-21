@@ -1,12 +1,17 @@
 {
   "name": "qingframe-web",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "本地照片加框工具：艺术边框、光影、文字 Logo、模板与多图拼贴（Electron + Canvas 2D）",
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "lint": "eslint src --ext .js",
     "validate:presets": "node tools/validate-presets.js",
+    "test:brand": "electron tools/test-brand-logo.js",
+    "test:elements": "electron tools/test-element-ops.js",
+    "test:hint": "electron tools/test-logo-hint.js",
+    "test:position": "electron tools/test-element-position.js",
+    "test": "electron tools/test-brand-logo.js && electron tools/test-element-ops.js && electron tools/test-logo-hint.js && electron tools/test-element-position.js",
     "check": "npm run lint && npm run validate:presets",
     "app:dir": "electron-builder --win --dir",
     "verify:dist": "node tools/verify-dist.js",

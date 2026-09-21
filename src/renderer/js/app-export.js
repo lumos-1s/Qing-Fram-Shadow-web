@@ -55,12 +55,15 @@ window.App = Object.assign(window.App || {}, {
             if (k === 1) return false;
             let any = false;
             (tpl.logoElements || []).forEach(el => {
-                if (typeof el.x === 'number') {
-                    el.x *= k; el.y *= k; if (el.size) el.size *= k;
+                // 只缩放「尺寸」。位置不再按 k 放大:
+                //  - rel 元素的位置是相对比例(rx/ry),与画布大小无关,放大比例会把它推出画布;
+                //  - 锚点元素兼容旧模板的 offsetX/offsetY,按 k 放大以保持视觉边距。
+                if (el.size) el.size *= k;
+                if (typeof el.x !== 'number' && (el.offsetX || el.offsetY)) {
                     if (el.offsetX) el.offsetX *= k;
                     if (el.offsetY) el.offsetY *= k;
-                    any = true;
                 }
+                any = true;
             });
             (tpl.decorConfig && tpl.decorConfig.stickers || []).forEach(s => {
                 s.x = (s.x || 0) * k; s.y = (s.y || 0) * k; s.scale = (s.scale || 1) * k;

@@ -1,0 +1,35 @@
+// 测量专用 preload:提供 App 启动所需的 IPC 桥 + 测试图注入
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('qingframe', {
+    openImage: () => ipcRenderer.invoke('open-image'),
+    openImages: () => ipcRenderer.invoke('open-images'),
+    listPresets: () => ipcRenderer.invoke('list-presets'),
+    loadPreset: (name) => ipcRenderer.invoke('load-preset', name),
+    saveImage: () => ipcRenderer.invoke('save-image-base64'),
+    saveImagesBatch: () => ipcRenderer.invoke('save-images-batch'),
+    pickExportLocation: () => ipcRenderer.invoke('pick-export-location'),
+    writeExportFiles: () => ipcRenderer.invoke('write-export-files'),
+    listLogos: () => ipcRenderer.invoke('list-logos'),
+    listTextures: () => ipcRenderer.invoke('list-textures'),
+    saveTemplate: () => ipcRenderer.invoke('save-template'),
+    listTemplates: () => ipcRenderer.invoke('list-templates'),
+    loadTemplate: () => ipcRenderer.invoke('load-template'),
+    deleteTemplate: () => ipcRenderer.invoke('delete-template'),
+    renameTemplate: () => ipcRenderer.invoke('rename-template'),
+    exportTemplate: () => ipcRenderer.invoke('export-template'),
+    importTemplate: () => ipcRenderer.invoke('import-template'),
+    exportQfs: () => ipcRenderer.invoke('export-qfs'),
+    openQfs: () => ipcRenderer.invoke('open-qfs'),
+    getUser: () => ipcRenderer.invoke('get-user'),
+    saveUser: () => ipcRenderer.invoke('save-user'),
+    logoutUser: () => ipcRenderer.invoke('logout-user'),
+    getPrefs: () => ipcRenderer.invoke('get-prefs'),
+    savePrefs: (p) => ipcRenderer.invoke('save-prefs', p),
+    readExif: () => ipcRenderer.invoke('read-exif'),
+    openStickerImage: () => ipcRenderer.invoke('open-sticker-image')
+});
+
+contextBridge.exposeInMainWorld('__measure', {
+    testImage: () => ipcRenderer.invoke('measure:test-image')
+});

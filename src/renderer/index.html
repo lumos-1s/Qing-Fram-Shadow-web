@@ -523,6 +523,11 @@
                             <div class="icon-pool" id="brandIconBox"></div>
                             <div class="pool-title">自定义图标 <span class="cnt" id="customIconCnt"></span></div>
                             <div class="icon-pool" id="customIconBox"></div>
+                            <div class="hint-box" id="logoPoolHint" style="display:none;">
+                                图标库为空。点下方按钮导入你自己的 PNG 图标即可使用；<br />
+                                若把文件命名为 <b>Canon.png</b>、<b>SONY.png</b>、<b>FUJIFILM.png</b> 等相机品牌名，
+                                软件会按照片 EXIF 识别出的品牌自动选用对应图标（文件名带机型如 <b>Canon EOS R5.png</b> 也可以）。
+                            </div>
                             <div class="btn-row">
                                 <button class="mini-btn" id="btnAddCustomIcon">+ 添加自定义图标</button>
                             </div>
@@ -533,7 +538,7 @@
                             <div class="el-status" id="elStatus">未选中元素</div>
                             <div class="el-list" id="elList"></div>
                             <div class="param-row"><label>透明度</label><input type="range" id="slActiveIconOpacity" class="ctl-rng" min="0" max="100" value="100" /><span class="pval" id="lblActiveIconOpacity"></span></div>
-                            <div class="param-row"><label>缩放</label><input type="range" id="slElementSize" class="ctl-rng" min="16" max="2000" value="900" /><span class="pval" id="lblElementSize"></span></div>
+                            <div class="param-row"><label>缩放</label><input type="range" id="slElementSize" class="ctl-rng" min="16" max="10000" value="500" /><span class="pval" id="lblElementSize"></span></div>
                             <div class="param-row"><label>旋转</label><input type="range" id="slElementRotation" class="ctl-rng" min="0" max="360" value="0" /><span class="pval" id="lblElementRotation"></span></div>
                             <div class="btn-row btn-4">
                                 <button class="mini-btn" id="btnZOrderTop" title="置于顶层">↑顶</button>
@@ -545,6 +550,21 @@
                                 <button class="mini-btn" id="btnCopySelectedElement">复制 (Ctrl+C)</button>
                                 <button class="mini-btn" id="btnPasteClipboardElement">粘贴 (Ctrl+V)</button>
                                 <button class="mini-btn danger" id="btnDeleteActiveIcon">删除 (Del)</button>
+                            </div>
+                            <div class="btn-row btn-3">
+                                <button class="mini-btn" id="btnAlignLeft" title="左对齐(按住 Ctrl/Shift 可多选元素)">左对齐</button>
+                                <button class="mini-btn" id="btnAlignHCenter" title="水平居中">水平居中</button>
+                                <button class="mini-btn" id="btnAlignRight" title="右对齐">右对齐</button>
+                            </div>
+                            <div class="btn-row btn-3">
+                                <button class="mini-btn" id="btnAlignTop" title="顶对齐">顶对齐</button>
+                                <button class="mini-btn" id="btnAlignVCenter" title="垂直居中">垂直居中</button>
+                                <button class="mini-btn" id="btnAlignBottom" title="底对齐">底对齐</button>
+                            </div>
+                            <div class="btn-row btn-3">
+                                <button class="mini-btn" id="btnDistributeH" title="在最小/最大之间均匀分布(至少 3 个元素)">水平均分</button>
+                                <button class="mini-btn" id="btnDistributeV" title="在最小/最大之间均匀分布(至少 3 个元素)">垂直均分</button>
+                                <button class="mini-btn" id="btnSameSize" title="把选中元素缩放到平均尺寸">统一尺寸</button>
                             </div>
                             <button class="mini-btn danger block" id="btnClearAllIcons">清空全部元素</button>
                         </div>

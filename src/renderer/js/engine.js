@@ -368,7 +368,7 @@ function getTexture(name) {
 }
 
 // 元素位图:纹理名或 dataUrl 均可(贴纸 dataUrl / Logo 图标 / 内置纹理走同一缓存)
-function getElementBitmap(src) {
+/* exported getElementBitmap */ function getElementBitmap(src) {
     if (!src) return null;
     if (TEXTURE_CACHE[src] && TEXTURE_CACHE[src].complete && TEXTURE_CACHE[src].naturalWidth > 0) return TEXTURE_CACHE[src];
     if (TEXTURE_CACHE[src]) return null; // 加载中
@@ -740,7 +740,7 @@ function textLineAnchor(textLine, cw, ch, card, cardY, cardH) {
 }
 
 // 文字行绘??原版 drawTextLine)
-function drawTextLine(ctx, line, cw, ch, card, cardY, cardH) {
+/* exported drawTextLine */ function drawTextLine(ctx, line, cw, ch, card, cardY, cardH) {
     ctx.save();
     const fs = autoExifTextSize(line, cw);
     ctx.font = `${line.fontWeight || 400} ${fs}px "${line.fontFamily || 'Microsoft YaHei'}"`;
@@ -983,8 +983,17 @@ function drawBlurredBackground(ctx, img, cw, ch, margin) {
     ctx.restore();
 }
 
-// Logo 元素绘制(透明 PNG 叠在最上层;坐标为基准画布像??拖拽/命中检测一??
+// Logo 元素绘制(透明 PNG 叠在最上层;坐标为基准画布像素,拖拽/命中检测一致)
+// 拖动优化:app._skipUserEl 指向正在拖的元素时把它排除,使其余内容可作为静态背景缓存,
+// 拖动期间只需 blit 背景 + 重绘该元素(见 app.js 的 renderPreview)
+function _filterUserEls(elements) {
+    const skip = (typeof window !== 'undefined' && window.App) ? window.App._skipUserEl : null;
+    if (!skip || !elements || !elements.length) return elements;
+    return elements.filter(el => el !== skip);
+}
+
 function drawLogoElements(ctx, elements, cw, ch) {
+    elements = _filterUserEls(elements);
     if (!elements || !elements.length) return;
     const sorted = elements.slice().sort((a, b) => (a.z || 0) - (b.z || 0));
     for (const el of sorted) {
@@ -996,13 +1005,27 @@ function drawLogoElements(ctx, elements, cw, ch) {
         const ratio = img.naturalHeight / img.naturalWidth || 1;
         const dw = size, dh = size * ratio;
         let cx, cy;
-        if (typeof el.x === 'number' && typeof el.y === 'number') {
-            cx = el.x; cy = el.y;
-        } else {
-            const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
-            const ox = el.offsetX || 20, oy = el.offsetY || 20;
-            cx = hAlign === 'left' ? ox + dw / 2 : hAlign === 'center' ? cw / 2 : cw - ox - dw / 2;
-            cy = vAlign === 'top' ? oy + dh / 2 : vAlign === 'center' ? ch / 2 : ch - oy - dh / 2;
+        if (el.rel && typeof el.rx === 'number' && typeof el.ry === 'number') {
+            // 相对比例存储:按「基准画布」比例还原,同一模板套到不同尺寸照片上位置一致。
+            // 基准画布尺寸记在 canvas._logW/_logH 上(由 setupCanvas/renderPhotoFrame 写入);
+            // app 侧另有 logoPos 做同样解析,两处必须一致。
+            const cvEl = (typeof window !== 'undefined' && window.App && window.App.dom && window.App.dom.canvas) || null;
+            const logW = cvEl && cvEl._logW, logH = cvEl && cvEl._logH;
+            if (logW > 1 && logH > 1) {
+                cx = el.rx * logW;
+                cy = el.ry * logH;
+            }
+        }
+        if (cx === undefined) {
+            if (typeof el.x === 'number' && typeof el.y === 'number') {
+                cx = el.x; cy = el.y;
+            } else {
+                const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
+                const ox = el.offsetX || 20, oy = el.offsetY || 20;
+                // 与 app.js 的 logoPos 口径一致:此处 dw/dh 已是实际绘制尺寸,直接用
+                cx = hAlign === 'left' ? ox + dw / 2 : hAlign === 'center' ? cw / 2 : cw - ox - dw / 2;
+                cy = vAlign === 'top' ? oy + dh / 2 : vAlign === 'center' ? ch / 2 : ch - oy - dh / 2;
+            }
         }
         ctx.save();
         ctx.globalAlpha = clamp((el.opacity == null ? 100 : el.opacity) / 100, 0, 1);
@@ -1017,10 +1040,13 @@ function drawLogoElements(ctx, elements, cw, ch) {
 /* exported drawUserElements */ function drawUserElements(ctx, template, cw, ch) {
     if (!template) return;
     const decor = template.decorConfig || {};
+    const skip = (typeof window !== 'undefined' && window.App) ? window.App._skipUserEl : null;
     for (const textLine of (decor.textLines || [])) {
+        if (textLine === skip) continue;
         if (textLine.text && textLine.align === 'free') drawTextLine(ctx, textLine, cw, ch, false, 0, 0);
     }
     for (const sticker of (decor.stickers || [])) {
+        if (sticker === skip) continue;
         if (!sticker.src) continue;
         const tex = getElementBitmap(sticker.src);
         if (!tex || !tex.complete || !tex.naturalWidth) continue;
@@ -1467,6 +1493,10 @@ function drawDetailBlurBackground(ctx, used, rawSlots, Wn, Hn) {
 
 window.__renderPuzzle = renderPuzzle;
 window.__render = renderToCanvas;
+// 供 app.js 的「拖动叠加层」复用,保证拖拽中的画法与整帧渲染像素一致
+window.getElementBitmap = getElementBitmap;
+window.drawTextLine = drawTextLine;
+window.drawLogoElements = drawLogoElements;
 window.PUZZLE_LAYOUT_TYPES = PUZZLE_LAYOUT_TYPES;
 window.PUZZLE_LAYOUT_AXES = PUZZLE_LAYOUT_AXES;
 window.__buildPuzzleSlots = buildPuzzleSlots;

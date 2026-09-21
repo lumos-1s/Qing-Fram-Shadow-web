@@ -475,7 +475,11 @@ window.App = {
                 e.preventDefault();
                 this.selectedEls = this.hasEl(this.selectedEls, el) ? this.selectedEls : [el];
                 this._dragEl = { kind: el.kind, ref: el.obj, sx: e.screenX, sy: e.screenY, x: el.x0, y: el.y0, moved: false };
+                // 整帧渲染时排除被拖元素,使其余内容可作为静态背景缓存(见 renderPreview)
+                this._skipUserEl = el.obj;
+                this._dropDragBase();
                 this._logoSnapV = null; this._logoSnapH = null;
+                this._logoSnapEdgeV = null; this._logoSnapEdgeH = null;
                 this.refreshElList();
                 canvas.style.cursor = 'pointer';
                 this.requestRender();
@@ -559,7 +563,10 @@ window.App = {
             if (this._dragEl) {
                 const moved = this._dragEl.moved;
                 this._dragEl = null;
+                this._skipUserEl = null;
+                this._dropDragBase();
                 this._logoSnapV = null; this._logoSnapH = null;
+                this._logoSnapEdgeV = null; this._logoSnapEdgeH = null;
                 if (moved) this.commitNoPush();
             }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
@@ -572,7 +579,7 @@ window.App = {
                 this._dragPz = null;
                 canvas.style.cursor = '';
             }
-            if (this._dragEl) { this._dragEl = null; this._logoSnapV = null; this._logoSnapH = null; }
+            if (this._dragEl) { this._dragEl = null; this._skipUserEl = null; this._dropDragBase(); this._logoSnapV = null; this._logoSnapH = null; this._logoSnapEdgeV = null; this._logoSnapEdgeH = null; }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
         };
         window.addEventListener('blur', cancelDrags);
@@ -694,23 +701,85 @@ window.App = {
         return null;
     },
 
+    // 元素在画布上的中心点(像素)。三种坐标形式并存,按优先级解析:
+    //   ① el.rel + 相对比例 rx/ry —— 以「基准画布」的比例存储,换照片时按新画布还原,不会错位
+    //   ② el.x 为数字            —— 绝对像素坐标(旧模板的格式;新写入时与 ① 同时保存以兼容旧版)
+    //   ③ el.x 为字符串          —— 锚点定位('right'/'bottom' + offsetX/offsetY),天然随画布自适应
+    // baseW/baseH 取「基准画布」而非显示画布:拖动时 displayMax 会临时降到 900,
+    // 若按显示画布换算,比例会失真。
     logoPos(el, cw, ch, size) {
+        if (!el) return { cx: cw / 2, cy: ch / 2 };
+        if (el.rel && typeof el.rx === 'number' && typeof el.ry === 'number') {
+            const base = this.logoBaseSize();
+            // 基准画布未知时(例如尚未渲染)退回像素值,避免用错误的基准算出偏移
+            if (base && base.w > 1 && base.h > 1) {
+                return { cx: el.rx * cw, cy: el.ry * ch };
+            }
+        }
         if (typeof el.x === 'number' && typeof el.y === 'number') {
             return { cx: el.x, cy: el.y };
         }
         const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
         const ox = el.offsetX || 20, oy = el.offsetY || 20;
-        const tx = hAlign === 'left' ? ox + size / 2 : hAlign === 'center' ? cw / 2 : cw - ox - size / 2;
-        const ty = vAlign === 'top' ? oy + size / 2 : vAlign === 'center' ? ch / 2 : ch - oy - size / 2;
+        // 半高按元素真实纵横比算(Logo 的 size 是宽度,高度 = size * ratio);
+        // 原先上下都用 size/2,等于把非正方形 Logo 当正方形,导致上下留白与左右不一致。
+        const ratio = (typeof el.ratio === 'number' && el.ratio > 0) ? el.ratio : 1;
+        const hw = size / 2, hh = (size * ratio) / 2;
+        const tx = hAlign === 'left' ? ox + hw : hAlign === 'center' ? cw / 2 : cw - ox - hw;
+        const ty = vAlign === 'top' ? oy + hh : vAlign === 'center' ? ch / 2 : ch - oy - hh;
         return { cx: tx, cy: ty };
+    },
+
+    // 当前照片的「基准画布」尺寸(不含显示缩放与 DPR),rel 比例的换算基准。
+    // 注意 _logW/_logH 由引擎渲染时写入,切换照片后到下一次渲染完成前仍是「上一张图」的值。
+    // 因此校验 canvas.width ≈ _logW × devicePixelRatio:两者对不上说明 _log 是上一张图的残留,
+    // 此时返回 null,调用方退回像素坐标(绝不拿错误基准去算比例)。
+    logoBaseSize() {
+        const cv = this.dom && this.dom.canvas;
+        const im = this.image;
+        if (cv && cv._logW > 1 && cv._logH > 1 && im) {
+            const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+            const expect = cv._logW * dpr;
+            if (Math.abs(cv.width - expect) <= Math.max(2, expect * 0.02)) {
+                return { w: cv._logW, h: cv._logH };
+            }
+        }
+        return null;
+    },
+
+    // 把像素中心写回元素:优先用相对比例存储(可跨照片尺寸),锚点模式则保留锚点只反算 offset。
+    setLogoPixelPos(el, cx, cy) {
+        if (!el) return;
+        const base = this.logoBaseSize();
+        if (typeof el.x === 'string' || typeof el.y === 'string') {
+            // 锚点模式:保持锚点不变 → 它本来就能随画布自适应,无需转成比例
+            if (!base) return;
+            const dim = this._logoDrawSize(el);
+            const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
+            const halfW = dim.w / 2, halfH = dim.h / 2;
+            if (hAlign === 'left') el.offsetX = Math.max(0, Math.round(cx - halfW));
+            else if (hAlign === 'center') el.offsetX = 0;
+            else el.offsetX = Math.max(0, Math.round(base.w - cx - halfW));
+            if (vAlign === 'top') el.offsetY = Math.max(0, Math.round(cy - halfH));
+            else if (vAlign === 'center') el.offsetY = 0;
+            else el.offsetY = Math.max(0, Math.round(base.h - cy - halfH));
+            return;
+        }
+        // 像素值照旧写入(旧版程序打开同一模板时仍能定位),额外记录相对比例供新版跨尺寸还原
+        el.x = Math.round(cx);
+        el.y = Math.round(cy);
+        if (!base) return;
+        el.rel = 1;
+        el.rx = Math.max(0, Math.min(1, cx / base.w));
+        el.ry = Math.max(0, Math.min(1, cy / base.h));
     },
 
     nudgeElement(el, mode, dir) {
         const e = el.obj;
         if (el.kind === 'logo') {
-            if (typeof e.x !== 'number') { e.x = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cx; e.y = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cy; }
+            if (typeof e.x !== 'number') { const p = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60); this.setLogoPixelPos(e, p.cx, p.cy); }
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
-            else e.size = clampNum((e.size || 60) + dir * 25, 8, 2000);
+            else e.size = clampNum((e.size || 60) + dir * 25, 8, 10000);
         } else if (el.kind === 'sticker') {
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
             else e.scale = clampNum((e.scale || 1) * (dir > 0 ? 1.1 : 0.9), 0.02, 3);
@@ -730,17 +799,35 @@ window.App = {
         const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
         const clampV = (v, max, half) => half > 0 ? Math.max(half, Math.min(v, max - half)) : Math.max(0, Math.min(v, max));
         if (drag.kind === 'logo') {
-            const snap = this.snapLogoToGuides(x, y, cw, ch);
-            e.x = snap.x; e.y = snap.y; e.offsetX = 0; e.offsetY = 0;
+            const snap = this.snapLogoToGuides(x, y, cw, ch, e);
+            // 用相对比例写回,换照片尺寸时不会跑到画布外
+            this.setLogoPixelPos(e, snap.x, snap.y);
             this._logoSnapV = snap.v; this._logoSnapH = snap.h;
+            this._logoSnapEdgeV = snap.vEdge; this._logoSnapEdgeH = snap.hEdge;
         }
         else if (drag.kind === 'sticker') { e.x = clampV(x, cw, 20); e.y = clampV(y, ch, 20); }
         else if (drag.kind === 'text') { e.x = clampV(x, cw, 30); e.y = clampV(y, ch, 20); }
         this.onSettingChanged();
     },
 
-    // 二分线 + 三分线:吸附 logo 中心并记录命中的线(供高亮)
-    snapLogoToGuides(x, y, cw, ch) {
+    // 参考线 + 四边吸附:吸附 logo 中心并记录命中的位置(供高亮)
+    //  - 参考线:1/3、1/2、2/3 六条,吸附中心
+    //  - 边缘  :贴左/右/上/下,吸附到「元素完整可见 + 最小边距」的位置
+    //    水印最常见用法就是贴四角(右下角品牌、左下角日期),原实现只有三分线,贴角全靠手感,
+    //    而且容易贴得太靠外——大 logo 会有一半落在画布外。
+    // 位移量按元素实际绘制尺寸推导(而非固定比例),因此大 logo 会自动留出更大的贴边距离。
+    _logoDrawSize(el) {
+        const size = Math.max(2, (el && el.size) || 60);
+        let ratio = (el && el.ratio) || 0;
+        if (!ratio && el && el.dataUrl) {
+            const im = window.getElementBitmap ? window.getElementBitmap(el.dataUrl) : null;
+            if (im && im.naturalWidth) ratio = im.naturalHeight / im.naturalWidth;
+        }
+        if (!ratio) ratio = 0.4;   // 图片尚未就绪时的兜底纵横比
+        return { w: size, h: size * ratio };
+    },
+
+    snapLogoToGuides(x, y, cw, ch, el) {
         const vLines = [cw / 3, cw / 2, cw * 2 / 3];
         const hLines = [ch / 3, ch / 2, ch * 2 / 3];
         const tol = 8;
@@ -753,11 +840,36 @@ window.App = {
             const d = Math.abs(y - hLines[i]);
             if (d < dh) { dh = d; sh = i; }
         }
+        let nx = sv >= 0 ? vLines[sv] : x;
+        let ny = sh >= 0 ? hLines[sh] : y;
+
+        const dim = this._logoDrawSize(el);
+        const dx = dim.w / 2, dy = dim.h / 2;
+        const kx = Math.max(10, Math.min(cw * 0.05, dx));
+        const ky = Math.max(10, Math.min(ch * 0.05, dy));
+        const glx = Math.min(dx + kx, cw / 2);
+        const gly = Math.min(dy + ky, ch / 2);
+
+        // 分别记录「该方向是否真的发生了边缘约束」,不用"哪个更近"判断——
+        // 例如元素在右上角时,左右两个候选的 x 距离可能相同。
+        let vEdge = null, hEdge = null;
+        let bestX = tol, bestY = tol;
+        for (const [d, tag] of [[x - glx, 'left'], [cw - glx - x, 'right'], [Math.abs(x - cw / 2), 'hcenter']]) {
+            if (d < bestX) { bestX = d; vEdge = tag; }
+        }
+        for (const [d, tag] of [[y - gly, 'top'], [ch - gly - y, 'bottom'], [Math.abs(y - ch / 2), 'vcenter']]) {
+            if (d < bestY) { bestY = d; hEdge = tag; }
+        }
+        if (vEdge === 'left') nx = glx; else if (vEdge === 'right') nx = cw - glx;
+        else if (vEdge === 'hcenter') nx = cw / 2;
+        if (hEdge === 'top') ny = gly; else if (hEdge === 'bottom') ny = ch - gly;
+        else if (hEdge === 'vcenter') ny = ch / 2;
+
         return {
-            x: sv >= 0 ? vLines[sv] : x,
-            y: sh >= 0 ? hLines[sh] : y,
+            x: nx, y: ny,
             v: sv >= 0 ? sv : null,
             h: sh >= 0 ? sh : null,
+            vEdge, hEdge,
         };
     },
 
@@ -779,7 +891,8 @@ window.App = {
         if (rot) rot.value = ((e.rotation || 0) % 360 + 360) % 360;
         if (op) op.value = Math.round(e.opacity != null ? e.opacity : 100);
         const sizeVal = el.kind === 'logo' ? Math.round(e.size || 60) : el.kind === 'sticker' ? Math.round((e.scale || 1) * 60) : 60;
-        if (sz) sz.value = sizeVal;
+        // 缩放滑块用平方映射覆盖 16~10000:低值端(常用的小 Logo)分度仍然细,高值端也能拖到
+        if (sz) sz.value = Math.round(1000 * Math.sqrt(clampNum((sizeVal - 16) / (10000 - 16), 0, 1)));
         this.updateLabel('lblElementRotation', ((e.rotation || 0) % 360 + 360) % 360 + '°');
         this.updateLabel('lblActiveIconOpacity', Math.round(e.opacity != null ? e.opacity : 100) + '%');
         this.updateLabel('lblElementSize', sizeVal);
@@ -815,7 +928,7 @@ window.App = {
         } catch(err) { console.warn('drawSelectionBox', err); }
     },
 
-    // 拖 logo 时叠加 二分/三分参考线,命中线高亮(角色固定 #00e5a0)
+    // 拖 logo 时叠加参考线:三分/中心线、四边吸附高亮、安全区提示
     drawLogoGuides() {
         try {
             if (!this._dragEl || this._dragEl.kind !== 'logo') return;
@@ -844,8 +957,26 @@ window.App = {
             };
             vLines.forEach((x, i) => drawLine(x, 0, x, ch, i === this._logoSnapV));
             hLines.forEach((y, i) => drawLine(0, y, cw, y, i === this._logoSnapH));
+
+            // 边缘吸附:高亮贴住的那条画布边,让"已贴边"有明确反馈
+            const ev = this._logoSnapEdgeV, eh = this._logoSnapEdgeH;
+            if (ev === 'left') drawLine(1, 0, 1, ch, true);
+            else if (ev === 'right') drawLine(cw - 1, 0, cw - 1, ch, true);
+            if (eh === 'top') drawLine(0, 1, cw, 1, true);
+            else if (eh === 'bottom') drawLine(0, ch - 1, cw, ch - 1, true);
+
+            // 安全区:提示"贴到这里以内不会被裁"。(居中吸附时不画,避免与中心线视觉混淆)
+            const dim = this._logoDrawSize(this._dragEl.ref);
+            const kx = Math.max(10, Math.min(cw * 0.05, dim.w / 2));
+            const ky = Math.max(10, Math.min(ch * 0.05, dim.h / 2));
+            ctx.setLineDash([7, 6]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(kx, ky, Math.max(1, cw - kx * 2), Math.max(1, ch - ky * 2));
+            ctx.setLineDash([]);
+
             // 命中反馈:在 logo 中心画瞄准环
-            if (this._logoSnapV != null || this._logoSnapH != null) {
+            if (this._logoSnapV != null || this._logoSnapH != null || ev || eh) {
                 const el = this._dragEl.ref;
                 const size = el.size || 60;
                 const cx0 = this.logoPos(el, cw, ch, size).cx, cy0 = this.logoPos(el, cw, ch, size).cy;
@@ -1416,6 +1547,94 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         return false;
     },
 
+    /* ══ 拖动叠加层:拖拽期间避免每帧全量重合成 ══
+       问题:移动 logo/贴纸/文字时每帧都会走完整引擎(实测 52~143ms/帧,见 tools/measure-drag.js),
+       而 logo 是最后绘制的一层,前面所有内容(照片+边框+光影)在拖动期间完全不变。
+       做法:拖动首帧把"不含被拖元素"的整帧结果缓存成背景位图,之后每帧只 blit 背景 +
+       重绘被拖元素 + 选择框/参考线,把每帧成本从「全量合成」降到「一次位图拷贝」。
+       正确性:缓存键包含画布尺寸/模板引用/图源,任一变化即重建;拖动结束后清缓存并整帧重渲染。 */
+    _dragBaseValid() {
+        const c = this._dragBase;
+        const cv = this.dom.canvas;
+        return !!(c
+            && c.bmp
+            && c.w === cv.width && c.h === cv.height
+            && c.tpl === this.template
+            && c.img === (this.image && this.image.el));
+    },
+
+    _dragBaseBuild() {
+        const canvas = this.dom.canvas;
+        const bmp = document.createElement('canvas');
+        bmp.width = canvas.width;
+        bmp.height = canvas.height;
+        // 此时被拖元素已从整帧绘制中排除,拷出来即是干净背景
+        bmp.getContext('2d').drawImage(canvas, 0, 0);
+        this._dragBase = { bmp, w: canvas.width, h: canvas.height, tpl: this.template, img: this.image && this.image.el };
+    },
+
+    _blitDragBase() {
+        const canvas = this.dom.canvas;
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // 背景位图是在「拖动态当时」的画布尺寸下建的,而拖动期间 displayMax 会变(降级到 900 再复原),
+        // 因此要按当前画布尺寸缩放贴回,否则会把小图直接摊在画布一角
+        const b = this._dragBase.bmp;
+        if (b.width === canvas.width && b.height === canvas.height) ctx.drawImage(b, 0, 0);
+        else ctx.drawImage(b, 0, 0, b.width, b.height, 0, 0, canvas.width, canvas.height);
+    },
+
+    _drawDraggedEl(ctx, el, kind, cw, ch) {
+        if (!el) return;
+        const base = this._dragBase;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // 元素坐标以「基准画布」像素存储。基准 ≈ 拖动态当时的画布;displayMax 变化时会不一致,
+        // 用 _dragBase 存的尺寸还原系数,与引擎保持一致
+        const s = (base && base.w > 0) ? cw / base.w : 1;
+        if (s !== 1) ctx.scale(s, s);
+        if (kind === 'logo' || kind === 'sticker') {
+            const src = kind === 'logo' ? el.dataUrl : el.src;
+            if (!src) return;
+            // 复用引擎的同一份位图缓存,避免拖动中重复解码
+            const img = window.getElementBitmap ? window.getElementBitmap(src) : null;
+            if (!img || !img.complete || !img.naturalWidth) return;
+            const size = kind === 'logo' ? Math.max(2, el.size || 60) : 0;
+            let dw, dh, cx, cy;
+            if (kind === 'logo') {
+                const ratio = img.naturalHeight / img.naturalWidth || 1;
+                dw = size; dh = size * ratio;
+                if (typeof el.x === 'number' && typeof el.y === 'number') {
+                    cx = el.x; cy = el.y;
+                } else {
+                    const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
+                    const ox = el.offsetX || 20, oy = el.offsetY || 20;
+                    cx = hAlign === 'left' ? ox + dw / 2 : hAlign === 'center' ? cw / 2 : cw - ox - dw / 2;
+                    cy = vAlign === 'top' ? oy + dh / 2 : vAlign === 'center' ? ch / 2 : ch - oy - dh / 2;
+                }
+            } else {
+                dw = img.naturalWidth * (el.scale || 1);
+                dh = img.naturalHeight * (el.scale || 1);
+                cx = el.x || 0; cy = el.y || 0;
+            }
+            const op = el.opacity == null ? 100 : el.opacity;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, op / 100));
+            ctx.translate(cx, cy);
+            if (el.rotation) ctx.rotate(el.rotation * Math.PI / 180);
+            ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+            ctx.restore();
+        } else if (kind === 'text') {
+            // 自由文字直接复用引擎的绘制,保证与整帧渲染像素一致
+            if (el.text && el.align === 'free' && window.drawTextLine) {
+                window.drawTextLine(ctx, el, cw, ch, false, 0, 0);
+            }
+        }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    },
+
+    _dropDragBase() { this._dragBase = null; },
+
     renderPreview() {
         if (!this.image) return;
         const token = ++this.renderToken;
@@ -1427,6 +1646,18 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             // 不再用 customSettings 替换 this.template,保持编辑对象引用稳定
             this.normalizeTemplate();
             this.dom.stage.classList.toggle('has-img', !!this.image);
+            // 拖动中且背景缓存有效 → 只拷贝背景 + 重绘被拖元素,跳过整帧合成
+            // (缓存键在校验尺寸/模板/图源,任一变即回落到正常整帧渲染)
+            const dragRef = this._dragEl && this._dragEl.ref;
+            if (dragRef && this._dragBaseValid()) {
+                this._blitDragBase();
+                this._drawDraggedEl(this.dom.canvas.getContext('2d'), dragRef, this._dragEl.kind,
+                    this.dom.canvas.width, this.dom.canvas.height);
+                this.drawSelectionBox();
+                this.drawLogoGuides();
+                this.updateStatusBar();
+                return;
+            }
             // 未使用预设的图:画布直接展示原图;当前图只要有边框设置,就把最新模板写回该图记录
             // (既标记“已用预设”,也保证切走再切回时保留最新编辑)
             const im = this.image;
@@ -1438,13 +1669,23 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             const previewTpl = assigned ? this.template : this.defaultTemplate();
             const prevTpl = this.template;
             this.template = previewTpl;
+            // 拖动首帧:合成完整帧(此时被拖元素已被 _skipUserEl 排除)后缓存为背景,供后续帧复用
+            const needDragBase = !!(dragRef && this._dragEl
+                && (!this._dragBase || !this._dragBaseValid()));
             try {
                 const puzzle = previewTpl && previewTpl.puzzle && previewTpl.puzzle.enabled;
-                if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
-                else window.__render(this, false);
+                const fire = () => {
+                    if (puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false);
+                    else window.__render(this, false);
+                };
+                fire();
+                // 引擎在分辨率刚变化时首帧不稳定(实测同一路径连渲两次,首帧与次帧最大通道差可达 86),
+                // 而缓存一旦建在这种帧上,整个拖动过程都会沿用错误背景。再渲一次取其稳定结果。
+                if (needDragBase) fire();
             } finally {
                 this.template = prevTpl;
             }
+            if (needDragBase && this._dragEl) this._dragBaseBuild();
             this.drawSelectionBox();
             this.drawLogoGuides();
             if (this.autoFit) {
@@ -1936,7 +2177,10 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         const prev = this.imageTemplates.get(tgt);
         const prevManual = (prev && prev.manualExif && typeof prev.manualExif === 'object') ? prev.manualExif : null;
         const snap = this.cloneTemplate();
-        if (Array.isArray(snap.logoElements)) snap.logoElements = [];
+        // Logo/贴纸/自由文字的位置已改为「相对比例」存储,可跨照片尺寸还原,
+        // 因此同步边框时一并带上(原先会清空 logoElements,等于放弃多图统一元素布局)。
+        // 旧模板里的绝对像素坐标也会随模板复制过去 —— 目标图尺寸不同时位置会偏,
+        // 但引擎/app 在首次拖动该元素时就会补写成相对比例。
         if (snap.decorConfig) { delete snap.decorConfig.stickers; delete snap.decorConfig.textLines; }
         delete snap.puzzle;
         // 相机数据:同步只动边框。目标图自己能识别 EXIF → 用自己的(清除历史同步/兜底写入的手动参数);
@@ -2077,6 +2321,16 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnZOrderBottom', () => this.moveZOrder(-2));
         bindBtn('btnZOrderUp', () => this.moveZOrder(1));
         bindBtn('btnZOrderDown', () => this.moveZOrder(-1));
+        // 元素对齐 / 均分 / 统一尺寸(需多选;列表中 Ctrl/Shift 点击即可多选)
+        bindBtn('btnAlignLeft', () => this.alignSelectedEls('left'));
+        bindBtn('btnAlignHCenter', () => this.alignSelectedEls('hcenter'));
+        bindBtn('btnAlignRight', () => this.alignSelectedEls('right'));
+        bindBtn('btnAlignTop', () => this.alignSelectedEls('top'));
+        bindBtn('btnAlignVCenter', () => this.alignSelectedEls('vcenter'));
+        bindBtn('btnAlignBottom', () => this.alignSelectedEls('bottom'));
+        bindBtn('btnDistributeH', () => this.alignSelectedEls('distH'));
+        bindBtn('btnDistributeV', () => this.alignSelectedEls('distV'));
+        bindBtn('btnSameSize', () => this.alignSelectedEls('sameSize'));
         bindBtn('btnSaveTemplate', () => this.saveTemplate());
         bindBtn('btnExportTemplate', () => this.exportTemplate());
         bindBtn('btnImportTemplate', () => this.importTemplate());
@@ -2106,7 +2360,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             this.batchElOps();
         });
         if ($('slElementSize')) $('slElementSize').addEventListener('input', () => {
-            const v = parseInt($('slElementSize').value, 10);
+            // 平方映射:滑块 0~1000 → 尺寸 16~10000(L 为滑块长度,平方项在低端更精细)
+            const pos = parseInt($('slElementSize').value, 10);
+            const k = pos / 1000;
+            const v = Math.round(16 + (10000 - 16) * k * k);
             this.updateLabel('lblElementSize', v);
             this.applyToSelectedEls((el, kind) => {
                 if (kind === 'logo') el.size = v;
@@ -2323,6 +2580,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             cats.brandIconBox.push(l);
         });
         cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
+        // 发行版不再内置品牌 Logo 包,新用户进这个页签会看到"整组被隐藏、只剩一个按钮"。
+        // 空池时给出引导,说明可以自己导入、以及文件名按品牌命名可自动匹配。
+        const hint = $('logoPoolHint');
+        if (hint) hint.style.display = this.logos.length ? 'none' : '';
         pools.forEach((boxId) => {
             const box = $(boxId);
             if (!box) return;
@@ -2388,13 +2649,16 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         }
         if (!this.template.logoElements) this.template.logoElements = [];
         const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
-        // 默认 logo 尺寸固定为 900(宽),按原图比例
-        const size = 500;
+        // 默认按画布宽度取比例(原为写死的 500px):固定值在 800px 画布上占 62%,在 3600px 上只占 14%,
+        // 用户每次都得手动调。改为约 12% 画布宽并夹在 80~2000,大小观感在不同分辨率下保持一致。
+        const size = clampNum(Math.round(cw * 0.12), 80, 2000);
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
             x: px != null ? px : Math.round(cw / 2), y: py != null ? py : Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
             ratio: bmp.naturalHeight / bmp.naturalWidth || 1,
         };
+        // 补记相对比例:新加的 Logo 默认在画布中央,换照片尺寸时应仍在中央,而不是按像素算偏
+        this.setLogoPixelPos(el, el.x, el.y);
         this.template.logoElements.push(el);
         this.selectedEls = [{ kind: 'logo', obj: el }];
         this.refreshUI();
@@ -2421,7 +2685,11 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     async addCustomIcon() {
         const res = await window.qingframe.openStickerImage();
         if (!res || !res.data) return;
-        const dataUrl = 'data:image/jpeg;base64,' + res.data;
+        // 按扩展名判断 MIME:主进程只回传文件名与 base64。此前一律标成 image/jpeg,
+        // 会把带透明通道的 PNG 图标当作 JPEG 解码,导致透明底变黑、边缘出现杂色块。
+        const ext = String(res.name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+        const mime = { png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', gif: 'image/gif' }[ext ? ext[1] : ''] || 'image/jpeg';
+        const dataUrl = 'data:' + mime + ';base64,' + res.data;
         const im = new Image();
         await new Promise(r => { im.onload = r; im.onerror = r; im.src = dataUrl; });
         if (!im.naturalWidth) { this.setStatus('图片加载失败'); return; }
@@ -2470,16 +2738,41 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             r.appendChild(tag);
             const sel = this.selectedEls.some(x => x.kind === it.kind && x.obj === it.obj);
             if (sel) r.classList.add('active');
-            r.addEventListener('click', () => {
+            // 列表多选:普通点击=单选;Ctrl/Cmd 点击=加选/取消;Shift 点击=范围选取。
+            // 底层 selectedEls / applyToSelectedEls / 批量滑块早就支持多选,此前列表点击会
+            // 直接覆盖选中集,导致"给多个 Logo 统一调透明度"只能在画布上逐个 Shift 点选。
+            r.addEventListener('click', (ev) => {
                 const cur = this.selectedEls.some(x => x.kind === it.kind && x.obj === it.obj);
-                if (cur) this.selectedEls = this.selectedEls.filter(x => !(x.kind === it.kind && x.obj === it.obj));
-                else this.selectedEls = [{ kind: it.kind, obj: it.obj }];
+                if (ev.shiftKey && this._elListAnchor) {
+                    const i0 = items.findIndex(x => x.obj === this._elListAnchor.obj && x.kind === this._elListAnchor.kind);
+                    const i1 = items.indexOf(it);
+                    if (i0 >= 0 && i1 >= 0) {
+                        const [a, b] = i0 <= i1 ? [i0, i1] : [i1, i0];
+                        const range = items.slice(a, b + 1).map(x => ({ kind: x.kind, obj: x.obj }));
+                        // 叠加去重,保留已有选中项
+                        const merged = this.selectedEls.slice();
+                        range.forEach(r2 => {
+                            if (!merged.some(m => m.kind === r2.kind && m.obj === r2.obj)) merged.push(r2);
+                        });
+                        this.selectedEls = merged;
+                    }
+                } else if (ev.ctrlKey || ev.metaKey) {
+                    if (cur) this.selectedEls = this.selectedEls.filter(x => !(x.kind === it.kind && x.obj === it.obj));
+                    else this.selectedEls.push({ kind: it.kind, obj: it.obj });
+                    this._elListAnchor = { kind: it.kind, obj: it.obj };
+                } else {
+                    this.selectedEls = [{ kind: it.kind, obj: it.obj }];
+                    this._elListAnchor = { kind: it.kind, obj: it.obj };
+                }
                 this.refreshElList();
+                this.scheduleRender(true);
             });
             list.appendChild(r);
         });
         const first = this.selectedEls.length ? this.selectedEls[0] : null;
-        status.textContent = first ? `${tagMap[first.kind]}「${this.elLabel(first.obj)}」已选中` : `共 ${items.length} 个元素,点击选择`;
+        const n = this.selectedEls.length;
+        status.textContent = !first ? `共 ${items.length} 个元素,点击选择(可 Ctrl/Shift 多选)`
+            : (n > 1 ? `已选中 ${n} 个元素` : `${tagMap[first.kind]}「${this.elLabel(first.obj)}」已选中`);
         if (first) this.syncSliderFromEl({ kind: first.kind, obj: first.obj });
     },
 
@@ -2588,6 +2881,105 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     },
 
 
+
+    // 元素对齐 / 均分 / 统一尺寸。基准取「所有选中元素的包围盒」(贴近常见编辑器行为)。
+    // 兼容两种坐标:绝对像素(el.x 为数字)与锚点+偏移(el.x 为 'right'/'bottom' 等)。
+    // 后者在写回时按目标点反算 offset,避免被强行转成像素坐标而失去"随画布自适应"的特性。
+    alignSelectedEls(mode) {
+        const sel = (this.selectedEls || []).filter(s => s && s.obj);
+        if (sel.length < 2) { this.setStatus('请至少选中两个元素再对齐'); return; }
+        const cv = this.dom.canvas;
+        const cwM = Math.max(1, cv.width), chM = Math.max(1, cv.height);
+        const lw = cv._logW || cwM, lh = cv._logH || chM;
+
+        this.onSettingCommit();
+        const boxes = sel.map(s => {
+            const o = s.obj;
+            const dim = this._elBoxSize(s);
+            const cur = (typeof o.x === 'number' && typeof o.y === 'number')
+                ? { cx: o.x, cy: o.y }
+                : this.logoPos(o, lw, lh, dim.w);
+            return { s, dim, cur, box: { x0: cur.cx - dim.w / 2, y0: cur.cy - dim.h / 2, x1: cur.cx + dim.w / 2, y1: cur.cy + dim.h / 2 } };
+        });
+
+        const L = Math.min(...boxes.map(b => b.box.x0));
+        const R = Math.max(...boxes.map(b => b.box.x1));
+        const T = Math.min(...boxes.map(b => b.box.y0));
+        const B = Math.max(...boxes.map(b => b.box.y1));
+        const HC = (L + R) / 2, VC = (T + B) / 2;
+
+        if (mode === 'sameSize') {
+            const avg = Math.round(boxes.reduce((sum, b) => sum + b.dim.w, 0) / boxes.length);
+            boxes.forEach(b => { this._applyElSize(b.s.kind, b.s.obj, Math.max(2, avg)); });
+        } else if (mode === 'distH' || mode === 'distV') {
+            const horiz = mode === 'distH';
+            const sorted = boxes.slice().sort((a, b) => (horiz ? a.cur.cx - b.cur.cx : a.cur.cy - b.cur.cy));
+            const first = sorted[0], last = sorted[sorted.length - 1];
+            const span = horiz ? (last.cur.cx - first.cur.cx) : (last.cur.cy - first.cur.cy);
+            const step = span / (sorted.length - 1);
+            sorted.forEach((b, i) => {
+                const cx = horiz ? first.cur.cx + step * i : b.cur.cx;
+                const cy = horiz ? b.cur.cy : first.cur.cy + step * i;
+                this._applyElPos(b.s.obj, cx, cy, cwM, chM, lw, lh, b.dim);
+            });
+        } else {
+            boxes.forEach(b => {
+                let cx = b.cur.cx, cy = b.cur.cy;
+                if (mode === 'left') cx = L + b.dim.w / 2;
+                else if (mode === 'right') cx = R - b.dim.w / 2;
+                else if (mode === 'hcenter') cx = HC;
+                else if (mode === 'top') cy = T + b.dim.h / 2;
+                else if (mode === 'bottom') cy = B - b.dim.h / 2;
+                else if (mode === 'vcenter') cy = VC;
+                this._applyElPos(b.s.obj, cx, cy, cwM, chM, lw, lh, b.dim);
+            });
+        }
+        this.refreshUI();
+        this.saveCurrentTemplate();
+        this.scheduleRender(true);
+        const names = { left: '左对齐', hcenter: '水平居中', right: '右对齐', top: '顶对齐', vcenter: '垂直居中', bottom: '底对齐', distH: '水平均分', distV: '垂直均分', sameSize: '统一尺寸' };
+        this.setStatus('已' + (names[mode] || mode));
+    },
+
+    // 元素在画布上的近似外接尺寸(对齐用)。Logo 为宽×宽×纵横比;贴纸按原图×scale;文字按字号方块。
+    _elBoxSize(s) {
+        const o = s.obj || {};
+        if (s.kind === 'logo') return this._logoDrawSize(o);
+        if (s.kind === 'sticker') {
+            const im = window.getElementBitmap ? window.getElementBitmap(o.src) : null;
+            const sc = o.scale || 1;
+            const w = (im && im.naturalWidth ? im.naturalWidth : 100) * sc;
+            const h = (im && im.naturalHeight ? im.naturalHeight : 100) * sc;
+            return { w, h };
+        }
+        const f = (o.fontSize || 18) * 1.2;
+        return { w: f * Math.max(1, String(o.text || '').length) * 0.6, h: f };
+    },
+
+    _applyElSize(kind, o, size) {
+        if (kind === 'logo') o.size = clampNum(size, 8, 10000);
+        else if (kind === 'sticker') o.scale = clampNum(size / 100, 0.02, 3);
+        else if (kind === 'text') o.fontSize = clampNum(size, 6, 300);
+    },
+
+    _applyElPos(o, cx, cy, cwM, chM, lw, lh, dim) {
+        if (typeof o.x === 'string' || typeof o.y === 'string') {
+            // 锚点定位:保持锚点不变,按目标点反算偏移量,这样它仍能随画布尺寸自适应
+            const hAlign = o.x || 'right', vAlign = o.y || 'bottom';
+            const half = dim.w / 2, halfY = dim.h / 2;
+            if (hAlign === 'left') o.offsetX = Math.round(cx - half);
+            else if (hAlign === 'center') o.offsetX = 0;
+            else o.offsetX = Math.round(lw - cx - half);
+            if (vAlign === 'top') o.offsetY = Math.round(cy - halfY);
+            else if (vAlign === 'center') o.offsetY = 0;
+            else o.offsetY = Math.round(lh - cy - halfY);
+            if (o.offsetX < 0) o.offsetX = 0;
+            if (o.offsetY < 0) o.offsetY = 0;
+            return;
+        }
+        // 绝对坐标:按测量画布→显示画布的缩放换算(与拖拽一致),并同步相对比例
+        this.setLogoPixelPos(o, cx * (cwM / lw), cy * (chM / lh));
+    },
 
     /* ══ 缩放 / 平移 / 状态栏 / 主题 ══ */
     zoomAt(e, stage, factor) {

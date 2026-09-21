@@ -2123,7 +2123,7 @@ AV_OVERLAY_BC2:67 };
         const brandLogoVal = Number(t.brandLogo || 0);
         if ((brandLogoVal === 1 || brandLogoVal === 2) && cam.brand) {
             const hit = brandLogoEntry(app, cam.brand, brandLogoPref(styleName, Number(t.signBgBlur || 0)));
-            if (hit && hit.dataUrl) {
+        if (hit && hit.dataUrl) {
                 brandLogoData = hit.dataUrl;
                 let im = (app.logoImgCache && app.logoImgCache[brandLogoData]) || null;
                 if (!im) {
@@ -2199,8 +2199,10 @@ AV_OVERLAY_BC2:67 };
         return tw;
     }
 
-    // 品牌池匹配:把品牌名与池内文件去后缀(去掉 _White/_Black/_Color/-White/-Black/.png)后不区分大小写比对,
-    // 无匹配或自定义 logo 返回 null。pref:'white'|'black'|''(默认)——按 logo 出现的背景明暗选变体:
+    // 品牌池匹配:把品牌名与池内文件去后缀(去掉 _White/_Black/_Color/-White/-Black/.png)后不区分大小写比对。
+    // 自定义图标同样参与匹配,并按「文件名首个词」兜底 —— 用户导入 Canon.png / Canon EOS R5.png
+    // 都能命中 EXIF 识别出的 CANON,使发行版(不带内置 Logo 包)也有可用的品牌 Logo 路径。
+    // pref:'white'|'black'|''(默认)——按 logo 出现的背景明暗选变体:
     // 深背景优先 White、浅背景优先 Black(彩色变体居中兼容,纯净图兜底)。
     function brandLogoEntry(app, brand, pref) {
         if (!app || !app.logos || !app.logos.length || !brand) return null;
@@ -2208,11 +2210,30 @@ AV_OVERLAY_BC2:67 };
         if (!b) return null;
         const strip = n => n.replace(/\.(png|jpg|jpeg|svg|gif|webp)$/i, '')
             .replace(/[_-](white|black|color)$/i, '').trim();
-        const cands = app.logos.filter(l => l && !l.custom && strip(l.name).toUpperCase() === b);
-        if (!cands.length) return null;
+        const m = app.logos.filter(l => {
+            if (!l) return false;
+            const full = strip(l.name).toUpperCase();
+            if (full === b) return true;
+            if (!l.custom) return false;
+            // 自定义图标放宽比对,让「按文件名配品牌」覆盖到识别表之外的机型:
+            //  a) 首个词相等          —— "Canon EOS R5.png" ← CANON
+            //  b) 品牌以首个词+边界开头 —— "Hasselblad.png"  ← "Hasselblad AB"(make 原文)
+            // 都要求词边界,避免 "Canonical.png" 误配 CANON
+            const head = full.split(/[\s_\-·]+/)[0];
+            if (head === b) return true;
+            if (b.length > head.length && b.startsWith(head)) {
+                const next = b.charAt(head.length);
+                return /[\s_\-·.]/.test(next);
+            }
+            return false;
+        });
+        // 同品牌重名时优先内置素材(质量与黑白变体更可控),再按背景明暗排序
+        const cands = m.filter(l => !l.custom);
+        const pool = cands.length ? cands : m;
+        if (!pool.length) return null;
         const variantOf = l => {
-            const m = (l.name || '').toLowerCase().match(/[_-](white|black|color)$/);
-            return m ? m[1] : '';
+            const match = (l.name || '').toLowerCase().match(/[_-](white|black|color)$/);
+            return match ? match[1] : '';
         };
         const rank = l => {
             const v = variantOf(l);
@@ -2233,8 +2254,11 @@ AV_OVERLAY_BC2:67 };
             if (v === 'color') return 1;
             return 0;
         };
-        cands.sort((a, c) => rank(a) - rank(c));
-        return cands[0];
+        // 排「将要返回的那一组」:pool 在无内置候选时会回退成 m(纯自定义)。
+        // 排序与取值都基于 pool —— 之前排 cands 却取 cands[0],当兜底走到 pool=m 时
+        // cands 为空数组,会永远返回 undefined(内置包因总带颜色后缀而恰好没暴露这个 bug)。
+        pool.sort((a, c) => rank(a) - rank(c));
+        return pool[0];
     }
 
     // 品牌行是否隐藏(不显示品牌名与 Logo,参数行保留)。S.brandLogo:3=隐藏。
