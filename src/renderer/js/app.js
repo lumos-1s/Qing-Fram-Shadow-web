@@ -691,7 +691,7 @@ window.App = {
         if (el.kind === 'logo') {
             if (typeof e.x !== 'number') { e.x = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cx; e.y = this.logoPos(e, this.dom.canvas.width, this.dom.canvas.height, e.size || 60).cy; }
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
-            else e.size = clampNum((e.size || 60) + dir * 25, 8, 1200);
+            else e.size = clampNum((e.size || 60) + dir * 25, 8, 2000);
         } else if (el.kind === 'sticker') {
             if (mode === 'rot') e.rotation = (e.rotation || 0) + dir * 5;
             else e.scale = clampNum((e.scale || 1) * (dir > 0 ? 1.1 : 0.9), 0.02, 3);
@@ -2245,8 +2245,8 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         }
         if (!this.template.logoElements) this.template.logoElements = [];
         const cw = this.dom.canvas.width, ch = this.dom.canvas.height;
-        // 以宽度为基准,按原图比例
-        const size = Math.max(48, Math.round(Math.min(cw, ch) * 0.07));
+        // 默认 logo 尺寸固定为 900(宽),按原图比例
+        const size = 900;
         const el = {
             name: logo.name, dataUrl: logo.dataUrl, img: null,
             x: px != null ? px : Math.round(cw / 2), y: py != null ? py : Math.round(ch / 2), size, opacity: 100, rotation: 0, z: 10, free: 1,
