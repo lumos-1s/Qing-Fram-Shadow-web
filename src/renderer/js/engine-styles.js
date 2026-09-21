@@ -886,13 +886,14 @@ AV_OVERLAY_BC2:67 };
         return Math.max(blurRadius, rim);
     }
     // 参数文字字号:由照片宽度驱动(跟随 paramFs 滑块),不受模糊带高度压缩,保证清晰可读
-    function blurExifSz(iw, ih, paramFs) {
-        return Math.max(28, Math.min(Math.round(autoExifSize(paramFs, iw) * 1.5), Math.round(Math.min(iw, ih) * 0.09)));
+    function blurExifSz(iw, ih, paramFs, paramScale) {
+        const k = paramScale || 1;
+        return Math.max(28, Math.min(Math.round(autoExifSize(paramFs, iw) * 1.5 * k), Math.round(Math.min(iw, ih) * 0.09)));
     }
     // 底部参数带:至少能放下 型号行+参数行,其余三边仍用紧凑的模糊带
     function blurBottom(size, iw, ih, S) {
         const side = blurBand(size, iw, ih, S.blurIntensity);
-        const exifSz = blurExifSz(iw, ih, S.paramFs);
+        const exifSz = blurExifSz(iw, ih, S.paramFs, S.paramScale);
         const blockH = (S.paramType === 0 ? (exifSz + scaledPx(4)) + scaledPx(6) + exifSz : exifSz);
         return Math.max(side, Math.round(blockH + scaledPx(24)));
     }
@@ -1043,14 +1044,17 @@ AV_OVERLAY_BC2:67 };
         drawMainPhoto(g, img, cx, cy, photoCr, S.imgScale, S.imgOffsetX, S.imgOffsetY);
 
         if (!S.useExif) return;
-        const topY = cy + ih;
+        // 字号:跟随 paramFs,并对经典/日期应用「参数缩放」滑块(与印象系列同映射)
+        const exifSz = blurExifSz(iw, ih, S.paramFs, S.paramScale);
+        const modelSz = exifSz + scaledPx(4);
+        const paramSz = exifSz;
+        // 参数带:位于照片(缩放后+偏移)下边缘与画布底边之间,拖动图片缩放时自动贴合
+        const phBottom = cy + Math.round(ih * (1 + (S.imgScale || 1)) / 2) + (S.imgOffsetY || 0);
+        const minH = exifSz + (S.paramType === 0 ? (exifSz + scaledPx(4) + scaledPx(6)) : 0) + scaledPx(24);
+        const topY = Math.max(cy, Math.min(phBottom, ch - minH));
         const maskH = ch - topY;
         const centerY = topY + Math.floor(maskH / 2);
         const showModel = S.paramType === 0;
-        // 原版:字号由照片宽度驱动(blurExifSz),底部参数带高度为其留出空间,两行完整露出且清晰
-        const exifSz = blurExifSz(iw, ih, S.paramFs);
-        const modelSz = exifSz + scaledPx(4);
-        const paramSz = exifSz;
 
         const bc = sampleBottomDarkColor(img);
         const grad = g.createLinearGradient(0, topY, 0, ch);

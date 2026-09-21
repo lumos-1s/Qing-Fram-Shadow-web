@@ -1003,7 +1003,7 @@ window.App = {
         const rowBrand = document.getElementById('rowBrandSize');
         if (rowBrand) rowBrand.style.display = isImpression ? '' : 'none';
         const rowParamScale = document.getElementById('rowParamScale');
-        if (rowParamScale) rowParamScale.style.display = isImpression ? '' : 'none';
+        if (rowParamScale) rowParamScale.style.display = (isImpression || isBlurStyle) ? '' : 'none';
     },
 
     // 回显:模板 -> 控件
