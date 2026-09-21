@@ -2800,7 +2800,7 @@ AV_OVERLAY_BC2:67 };
         g.textAlign = 'center';
     }
 
-    // ══ 头像·叠加:头像+签名直接放在照片上 ══
+    // ══ 头像·左下:头像+签名直接放在照片上 ══
     function styleAvOverlay(img, size, g, iw, ih, S) {
         const pad = Math.max(20, Math.round(iw * 0.03));
         const w = iw + pad * 2, h = ih + pad * 2;
