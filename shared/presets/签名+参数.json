@@ -15,5 +15,6 @@
   "photoFrameStyle": "SIGN_PARAM",
   "photoFrameBorderSize": 100,
   "blurIntensity": 50,
-  "userSignature": "— my memory —"
+  "userSignature": "— my memory —",
+  "signIncludeModel": 0
 }

@@ -19,6 +19,7 @@ window.App = Object.assign(window.App || {}, {
                 userSignature: this.template.userSignature || '',
                 signFont: this.template.signFont || '',
                 signColor: this.template.signColor || '',
+                signIncludeModel: this.template.signIncludeModel || 0,
                 avatarScale: this.template.avatarScale || 0.85,
                 signSize: this.template.signSize || 1,
                 signBgBlur: this.template.signBgBlur || 0,

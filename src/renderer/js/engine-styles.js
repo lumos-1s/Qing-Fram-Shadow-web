@@ -1933,6 +1933,7 @@ AV_OVERLAY_BC2:67 };
             userSignature: String(t.userSignature || '').trim(),
             signFont: String(t.signFont || 'cursive'),
             signColor: String(t.signColor || '#555'),
+            signIncludeModel: Number(t.signIncludeModel || 0),
             avatarScale: Number(t.avatarScale || 0.85),
             signSize: Number(t.signSize || 1),
             signBgBlur: Number(t.signBgBlur || 0),
@@ -2594,12 +2595,17 @@ AV_OVERLAY_BC2:67 };
         g.font = fs + 'px sans-serif';
         const pw = g.measureText(paramStr).width;
         const cxRight = rx - pw / 2; // 参数行中心x
-        // 品牌居中在参数行上方(印象毛玻璃同款衬线字体)
-        const brandTxt = (S.exif.make || 'Camera').toUpperCase();
-        const fBrand = Math.round(iw * 0.028);
+        // 品牌居中在参数行上方(印象毛玻璃同款衬线字体);可选加入型号
+        const brandTxt = (S.signIncludeModel ? ((S.exif.make || 'Camera') + ' ' + (S.exif.model || '')) : (S.exif.make || 'Camera')).trim().toUpperCase();
+        let fBrand = Math.round(iw * 0.028);
         const pColor = S.paramColor === 'auto' ? (S.signBgBlur ? '#fff' : '#333') : S.paramColor;
         const pColorSoft = S.paramColor === 'auto' ? (S.signBgBlur ? 'rgba(255,255,255,0.7)' : '#999') : (S.paramColor === '#fff' ? 'rgba(255,255,255,0.7)' : '#999');
         g.fillStyle = pColor;
+        g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+        // 品牌(含型号)太长时收缩居中不溢出右侧区域
+        const bwTmp = g.measureText(brandTxt).width + Math.round(fBrand * 0.15 * brandTxt.length);
+        const maxBrandW = Math.max(60, (rx - cxRight) * 2 * 0.92);
+        if (bwTmp > maxBrandW && fBrand > 8) fBrand = Math.max(8, Math.round(fBrand * maxBrandW / bwTmp));
         g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = Math.round(fBrand * 0.15);
         g.textAlign = 'center';

@@ -55,6 +55,7 @@ window.App = {
                 if (s.userSignature) this.template.userSignature = s.userSignature;
                 if (s.signFont) this.template.signFont = s.signFont;
                 if (s.signColor) this.template.signColor = s.signColor;
+                if (s.signIncludeModel != null) this.template.signIncludeModel = s.signIncludeModel;
                 if (s.avatarScale) this.template.avatarScale = s.avatarScale;
                 if (s.signSize) this.template.signSize = s.signSize;
                 if (s.signBgBlur != null) this.template.signBgBlur = s.signBgBlur;
@@ -207,6 +208,8 @@ window.App = {
         if (cbF) cbF.addEventListener('change', () => { this.template.signFont = cbF.value; this.onSettingChanged(); });
         const cbC = document.getElementById('cbSignColor');
         if (cbC) cbC.addEventListener('change', () => { this.template.signColor = cbC.value; this.onSettingChanged(); });
+        const chkSM = document.getElementById('chkSignModel');
+        if (chkSM) chkSM.addEventListener('change', () => { this.template.signIncludeModel = chkSM.checked ? 1 : 0; this.onSettingChanged(); });
         const rgAS = document.getElementById('rgAvatarScale');
         if (rgAS) rgAS.addEventListener('input', () => {
             this.template.avatarScale = Number(rgAS.value) / 100;
@@ -969,6 +972,9 @@ window.App = {
         // 传统个人样式:全部签名/头像/参数行显示; CARD_3D 只用签名文字,隐藏其余
         const personalRows = ['rowSignText','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos'];
         personalRows.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+        // 品牌行含型号:仅签名+参数(SIGN_PARAM,底部右区域品牌/参数行)有此选项
+        const rowSM = document.getElementById('rowSignModel');
+        if (rowSM) rowSM.style.display = (s === 'SIGN_PARAM') ? '' : 'none';
         if (s === 'CARD_3D') {
             ['rowParamFontSize','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos','rowBgBlur','rowBgBlurInt'].forEach(id => {
                 const el = document.getElementById(id);
@@ -1050,6 +1056,7 @@ window.App = {
             if ($('inpSignature')) $('inpSignature').value = this.template.userSignature || '';
             if ($('cbSignFont')) $('cbSignFont').value = this.template.signFont || 'cursive';
             if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
+            if ($('chkSignModel')) $('chkSignModel').checked = !!(this.template.signIncludeModel);
             if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
             if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;
