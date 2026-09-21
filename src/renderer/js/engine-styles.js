@@ -2609,21 +2609,28 @@ AV_OVERLAY_BC2:67 };
         // 品牌(含型号)太长时收缩居中不溢出右侧区域
         const lsTmp = Math.round(fBrand * 0.15);
         g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
-        g.letterSpacing = lsTmp;
-        const bwTmp = g.measureText(hasModel ? brandTxt + ' ' + modelTxt : brandTxt).width;
         g.letterSpacing = 0;
+        const rawWTmp = g.measureText(hasModel ? brandTxt + ' ' + modelTxt : brandTxt).width;
+        const bwTmp = Math.round(rawWTmp + lsTmp * Math.max(0, (hasModel ? brandTxt + ' ' + modelTxt : brandTxt).length - 1));
         const maxBrandW = Math.max(60, (rx - cxRight) * 2 * 0.92);
         if (bwTmp > maxBrandW && fBrand > 8) fBrand = Math.max(8, Math.round(fBrand * maxBrandW / bwTmp));
         // 品牌:衬线 + 字距;型号:无衬线(同高度/同色),拼接与品牌保持在同一条基线上
+        // 测量须显式计入字距(letterSpacing 在 measureText 中是否计入因渲染器而异),否则型号起点与整体居中会偏移
         const gap = Math.round(fBrand * 0.3);
         const ls = Math.round(fBrand * 0.15);
         const sansFont = 'bold ' + fBrand + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-        g.fillStyle = pColor;
-        g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
-        g.letterSpacing = ls;
-        const brandW = g.measureText(brandTxt).width;
-        g.font = sansFont;
-        const modelW = hasModel ? g.measureText(modelTxt).width : 0;
+        const brandW = (function () {
+            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.letterSpacing = 0;
+            const base = g.measureText(brandTxt).width;
+            return Math.round(base + ls * Math.max(0, brandTxt.length - 1));
+        })();
+        const modelW = hasModel ? (function () {
+            g.font = sansFont;
+            g.letterSpacing = 0;
+            const base = g.measureText(modelTxt).width;
+            return Math.round(base + ls * Math.max(0, modelTxt.length - 1));
+        })() : 0;
         const totalW = brandW + (hasModel ? gap + modelW : 0);
         g.textAlign = 'left';
         g.textBaseline = 'top';
