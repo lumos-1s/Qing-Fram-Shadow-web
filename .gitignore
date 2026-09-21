@@ -7,3 +7,7 @@ s_err.log
 Thumbs.db
 icon_new_2048.png
 resume_input.png
+
+# 第三方品牌 Logo:仅保留在本地用于开发,不纳入版本库、不随包分发
+# 说明见 THIRD-PARTY-ASSETS.md。从版本库移除:git rm -r --cached shared/brandlogos
+shared/brandlogos/

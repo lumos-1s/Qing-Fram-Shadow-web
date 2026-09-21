@@ -1,4 +1,4 @@
-﻿// 相框样式引擎(原版 BorderProcessor.java 移植,阶段一)
+// 相框样式引擎(原版 BorderProcessor.java 移植,阶段一)
 // 严格对齐原版:BorderProcessor.apply() 的 size 折算(size*2 → min边/1000 缩放)、cornerRadius 后处理
 // (ROUNDED 用四角、其余统一圆角且 BLUR_CLASSIC/BLUR_DATE 不裁角)、try/catch 失败回退原图、
 // addGradient 用 extractDominantColors(直方图 16bin + 平均亮度 35~225 + bin 距离≥30)。
@@ -2060,7 +2060,11 @@ AV_OVERLAY_BC2:67 };
         }
     }
 
-    // 未实现风格:中性底 + 风格名(占位)
+    // 未实现/未知风格:中性底 + 风格名(占位)
+    // 注意这里有三条路径会走到:①导入的模板 photoFrameStyle 写错或来自更新版本
+    // ②导出模板在旧版本打开 ③引擎新增风格但忘了注册进 draw 映射表。
+    // 因此除了画占位图,还要在控制台留一条可诊断的线索——否则用户只看到灰底,
+    // 无法区分「风格不支持」和「照片/程序坏了」。
     function stylePlaceholder(img, name, g, iw, ih) {
         g.fillStyle = '#f0f0f0';
         g.fillRect(0, 0, iw + 60, ih + 60);
@@ -2069,6 +2073,11 @@ AV_OVERLAY_BC2:67 };
         g.lineWidth = 1;
         g.strokeRect(29.5, 29.5, iw + 1, ih + 1);
         drawText(g, name, 34, ih + 50, 16, '#999999', false, true);
+        try {
+            console.warn('[engine-styles] 未注册的相框风格:', name,
+                '— 已渲染为占位图。请在 engine-styles.js 的 draw 映射表与 styleDims() 中登记该风格,'
+                + '或检查模板里的 photoFrameStyle 是否为笔误。');
+        } catch (e) { /* 忽略 */ }
     }
 
     // 阶段二渲染状态(模板参数 → 原版静态参数)

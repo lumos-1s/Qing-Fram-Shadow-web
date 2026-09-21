@@ -77,6 +77,35 @@ npm run dist:portable
 > 提示：Windows 上可双击根目录 `start.bat` 直接启动开发环境。
 > Tip: on Windows you can double-click `start.bat` in the project root to launch the dev environment.
 
+### 发布前自检 · Pre-release checks
+
+```bash
+npm run check         # ESLint + 预设与引擎风格表一致性校验
+npm run release       # 先产出未压缩目录 → 校验无品牌 Logo → 再打安装包
+```
+
+`npm run release` 等价于 `app:dir` + `verify:dist` + `dist`：一旦 `app.asar` 里出现
+`shared/brandlogos/`，`verify:dist` 会以退出码 1 中止，**不会**继续产出安装包。
+
+```bash
+npm run app:dir       # 只产出未压缩目录(供校验用)
+npm run verify:dist   # 检查 dist/ 下所有 app.asar:无品牌 Logo、预设 70、纹理 10
+```
+
+`verify:dist` 的退出码：`0` 通过 / `1` 发现 Logo 泄漏 / `2` 无法判定（没有产物，或产物早于源码改动）。
+
+> **它同时检查产物新鲜度**：若 `app.asar` 比 `src/`、`shared/presets/`、`package.json`
+> 还旧，说明那是上一次构建的残留，会以退出码 2 拒绝通过——避免"改了配置但校验的是旧包"。
+
+> `brandlogos/` 是本机素材：它**不在版本库中**（见 `.gitignore`），也不随安装包分发。
+> 全新克隆的仓库不含该目录时，软件照常运行，只是「品牌 Logo」选择组为空、
+> 「按品牌自动配 Logo」不生效——相关素材需自行准备，见
+> [`THIRD-PARTY-ASSETS.md`](./THIRD-PARTY-ASSETS.md)。
+>
+> `shared/brandlogos/` is a local-only asset directory: it is **not** tracked by git and is
+> excluded from installers. A fresh clone runs fine without it — the brand-logo picker is
+> simply empty. See `THIRD-PARTY-ASSETS.md`.
+
 ---
 
 ## 目录结构 · Project Structure
@@ -90,14 +119,30 @@ npm run dist:portable
 ├─ shared/
 │  ├─ presets/       # 70 个内置模板（JSON 描述）
 │  │                 #   70 built-in preset templates (JSON)
-│  ├─ brandlogos/    # 品牌 Logo 素材 / brand logo assets (65)
+│  ├─ brandlogos/    # 品牌 Logo 素材（106 个文件 / 69 个品牌）
+│  │                 #   brand logo assets — 不随发行版分发,见 THIRD-PARTY-ASSETS.md
 │  └─ textures/      # 纹理素材 / texture assets (10)
 ├─ start.bat         # Windows 快速启动脚本 / quick-launch script
+├─ THIRD-PARTY-ASSETS.md  # 第三方素材归属说明 / asset attribution notice
 └─ package.json
 ```
+
+> ⚠️ `shared/brandlogos/` 中的品牌图形**不在 MIT 许可范围内**，也未随打包发行版分发
+> （已在 `package.json` 的 `build.files` 中排除）。品牌名称与图形仅用于标识照片的拍摄设备，
+> 本软件与任何品牌无授权或合作关系。详见 [`THIRD-PARTY-ASSETS.md`](./THIRD-PARTY-ASSETS.md)。
+>
+> The brand artwork in `shared/brandlogos/` is **not** covered by the MIT License and is
+> excluded from distributed builds. Marks are used only to indicate the camera that took a
+> photo; this project is not affiliated with any brand. See `THIRD-PARTY-ASSETS.md`.
 
 ---
 
 ## License
 
-[MIT](./LICENSE)
+代码采用 [MIT](./LICENSE) 许可。**该许可仅覆盖 `src/` 下的源代码与 `shared/presets/`
+中的原创模板**；`shared/brandlogos/` 与 `shared/textures/` 中的素材不适用，其权利归各自
+权利人所有 —— 详见 [`THIRD-PARTY-ASSETS.md`](./THIRD-PARTY-ASSETS.md)。
+
+The source code is [MIT](./LICENSE) licensed. This license covers the code under `src/` and
+the original templates in `shared/presets/` only. Assets in `shared/brandlogos/` and
+`shared/textures/` are excluded — see `THIRD-PARTY-ASSETS.md`.
