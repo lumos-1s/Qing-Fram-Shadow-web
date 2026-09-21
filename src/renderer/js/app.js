@@ -995,8 +995,9 @@ window.App = {
         }
         // 印象留白预设也显示背景模糊开关
         const isOverlay = ['OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
+        const isLogoParam = (s === 'CARD_LOGO_PARAM');
         const rowBgBlur = document.getElementById('rowBgBlur');
-        if (rowBgBlur) rowBgBlur.style.display = (isPersonal || isOverlay) ? '' : 'none';
+        if (rowBgBlur) rowBgBlur.style.display = (isPersonal || isOverlay || isLogoParam) ? '' : 'none';
         // 背景模糊经典/日期:常驻模糊样式,直接显示"模糊程度"滑块(不设开关)
         const isBlurStyle = ['BLUR_CLASSIC','BLUR_DATE'].includes(s);
         if (isBlurStyle) {
@@ -1010,8 +1011,8 @@ window.App = {
         const isBottomBar = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO'].includes(s);
         if (rowPos) rowPos.style.display = isBottomBar ? '' : 'none';
         if (rowType) rowType.style.display = isBottomBar ? '' : 'none';
-        // 品牌大小仅印象毛玻璃/左右/下留白显示
-        const isImpression = ['IMP_FROSTED','OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
+        // 品牌大小/参数缩放:印象毛玻璃/左右/下留白与 logo参数 显示
+        const isImpression = ['IMP_FROSTED','OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM','CARD_LOGO_PARAM'].includes(s);
         const rowBrand = document.getElementById('rowBrandSize');
         if (rowBrand) rowBrand.style.display = isImpression ? '' : 'none';
         const rowParamScale = document.getElementById('rowParamScale');

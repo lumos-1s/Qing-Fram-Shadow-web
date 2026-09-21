@@ -1354,6 +1354,9 @@ AV_OVERLAY_BC2:67 };
         const hasModel = !!modelTxt;
         const l2 = S.useExif ? exifLine(S.cam) : '';
         const innerW = Math.max(80, iw - Math.floor(pad * 2 / 3));
+        // 品牌/参数行字号受品牌大小/参数缩放滑块放大(印象系列同规则)
+        const brandScale = (S.brandScale || 1);
+        const paramScale = (S.paramScale || 1);
         // 品牌行总宽(含字距):品牌 Georgia 衬线 + 型号无衬线,与「签名+参数」同字体
         const brandTotal = (fs) => {
             const ls = Math.round(fs * 0.15), gap = Math.round(fs * 0.3);
@@ -1369,23 +1372,41 @@ AV_OVERLAY_BC2:67 };
             g.letterSpacing = 0;
             return tw;
         };
-        let fBrand = Math.max(14, autoExifSize(S.paramFs, iw));
+        let fBrand = Math.max(14, Math.round(autoExifSize(S.paramFs, iw) * brandScale));
         while (fBrand > 9 && brandTotal(fBrand) > innerW) fBrand--;
         const f1 = fBrand;
         const m1 = { height: Math.round(f1 * 0.78) + Math.round(f1 * 0.22), ascent: Math.round(f1 * 0.78), maxDescent: Math.round(f1 * 0.22) };
         let f2 = null;
         let m2 = textMetrics(g, ' ', 10, true, false, 0);
         if (l2) {
-            f2 = fitFont(g, l2, true, false, Math.max(12, Math.floor(autoExifSize(S.paramFs, iw) * 2 / 3)), innerW, 0);
+            f2 = fitFont(g, l2, true, false, Math.max(12, Math.floor(autoExifSize(S.paramFs, iw) * 2 / 3 * paramScale)), innerW, 0);
             m2 = textMetrics(g, l2, f2, true, false, 0);
         }
         const gap = l2 ? Math.max(8, Math.floor(m1.height / 4)) : 0;
         const blockH = m1.height + (l2 ? gap + m2.height : 0);
         const bandH = Math.max(56, Math.floor(blockH + pad * 2 / 3));
         const w = iw + pad * 2, h = ih + pad + bandH;
-        g.fillStyle = 'rgb(250,250,250)'; g.fillRect(0, 0, w, h);
-        drawCardSoftShadow(g, w, h, pad, pad, iw, ih, arc);
-        g.drawImage(roundedPhoto(img, arc), pad, pad);
+        // 背景:开启「背景模糊」时用模糊照片铺满+压暗,否则米白卡片底
+        if (S.signBgBlur) {
+            g.save();
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
+            const bs = Math.max(w / iw, h / ih);
+            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            g.filter = 'none';
+            g.restore();
+            // 清晰圆角照片带悬浮阴影
+            g.save();
+            g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
+            g.drawImage(roundedPhoto(img, arc), pad, pad);
+            g.restore();
+        } else {
+            g.fillStyle = 'rgb(250,250,250)'; g.fillRect(0, 0, w, h);
+            drawCardSoftShadow(g, w, h, pad, pad, iw, ih, arc);
+            g.drawImage(roundedPhoto(img, arc), pad, pad);
+        }
+        const brandColor = S.signBgBlur ? '#ffffff' : 'rgb(25,25,25)';
+        const paramColor = S.signBgBlur ? 'rgba(255,255,255,0.75)' : 'rgb(130,130,130)';
         const bandTop = ih + pad;
         const y1 = bandTop + Math.floor((bandH - blockH) / 2) + m1.ascent;
         // 品牌行:品牌 Georgia + 字距,型号无衬线,整体居中
@@ -1393,22 +1414,25 @@ AV_OVERLAY_BC2:67 };
         const ls = Math.round(f1 * 0.15), gapT = Math.round(f1 * 0.3);
         g.font = 'bold ' + f1 + "px Georgia, 'Times New Roman', serif";
         g.letterSpacing = 0;
+        if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 4; }
         const bw = g.measureText(brandTxt).width + ls * Math.max(0, brandTxt.length - 1);
         const sx = cx2(w, tw1);
         g.textAlign = 'left';
-        g.fillStyle = 'rgb(25,25,25)';
+        g.fillStyle = brandColor;
         g.fillText(brandTxt, sx, y1);
+        g.shadowBlur = 0;
         g.letterSpacing = 0;
         if (hasModel) {
             g.font = 'bold ' + f1 + "px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
             g.letterSpacing = ls;
+            g.fillStyle = brandColor;
             g.fillText(modelTxt, sx + bw + gapT, y1);
             g.letterSpacing = 0;
         }
         if (l2 && f2) {
             setFont(g, f2, true, false);
             const l2w = g.measureText(l2).width;
-            drawTextL(g, l2, cx2(w, l2w), y1 + gap + m2.height, 'rgb(130,130,130)', f2, true, false, 0);
+            drawTextL(g, l2, cx2(w, l2w), y1 + gap + m2.height, paramColor, f2, true, false, 0);
         }
     }
     function styleCardPureLogo(img, size, g, iw, ih, S) {
