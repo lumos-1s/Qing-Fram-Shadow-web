@@ -2649,6 +2649,7 @@ AV_OVERLAY_BC2:67 };
         // 参数行
         g.fillStyle = pColorSoft;
         g.font = fs + 'px sans-serif';
+        g.textAlign = 'center';
         g.textBaseline = 'middle';
         g.fillText(paramStr, cxRight, barY + Math.round(bottomH * 0.65));
         g.textBaseline = 'alphabetic';
