@@ -162,11 +162,12 @@
                     <button class="tab" data-tab="puzzle">拼图</button>
                 </div>
                 <div class="insp-body">
+                    <div id="modeStatus" class="mode-status" style="display:none"></div>
 
                     <!-- ══ Tab1 参数 ══ -->
                     <div class="tab-panel active" id="panel-param">
                         <div class="param-group">
-                            <div class="pg-title collapsible">画布比例</div>
+                            <div class="pg-title collapsible">画布</div>
                             <div class="param-row">
                                 <label>画布比例</label>
                                 <select id="cbCanvasRatio" class="ctl-sel">
@@ -179,10 +180,6 @@
                                     <option value="2.35:1">2.35:1</option>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="param-group">
-                            <div class="pg-title collapsible">画布边距</div>
                             <div class="param-row">
                                 <label>统一边距</label>
                                 <input type="range" id="slGlobalMargin" class="ctl-rng" min="10" max="300" step="10" value="100" />
@@ -192,30 +189,59 @@
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title collapsible">图片缩放 / 偏移</div>
+                            <div class="pg-title collapsible">照片</div>
                             <div class="param-row">
                                 <label>图片缩放</label>
                                 <input type="range" id="slImgScale" class="ctl-rng" min="10" max="150" step="1" value="100" />
                                 <span class="pval" id="lblImgScale"></span>
                             </div>
-                        </div>
-
-                        <div class="param-group">
-                            <div class="pg-title collapsible">图片圆角</div>
                             <div class="param-row">
-                                <label>图片圆角</label>
+                                <label>照片圆角</label>
                                 <input type="range" id="slCornerRadius" class="ctl-rng" min="0" max="500" value="0" />
                                 <span class="pval" id="lblCornerRadius"></span>
                             </div>
                         </div>
 
                         <div class="param-group">
-                            <div class="pg-title collapsible">参数位置 / 字号</div>
+                            <div class="pg-title collapsible">参数文字</div>
                             <div class="param-row" id="rowParamFontSize">
                                 <label>参数字号</label>
                                 <input type="range" id="slParamFontSize" class="ctl-rng" min="0" max="160" step="1" value="100" />
                                 <span class="pval" id="lblParamFontSize"></span>
                             </div>
+                            <div class="param-row" id="rowParamScale" style="display:none;">
+                                <label>参数缩放</label>
+                                <input type="range" id="slParamScale" class="ctl-rng" min="50" max="300" step="5" value="100" />
+                                <span class="pval" id="lblParamScale"></span>
+                            </div>
+                            <div class="param-row" id="rowParamColor" style="display:none;">
+                                <label>参数颜色</label>
+                                <select id="cbParamColor" class="ctl-sel">
+                                    <option value="auto">自动</option>
+                                    <option value="#000">黑色</option>
+                                    <option value="#fff">白色</option>
+                                </select>
+                            </div>
+                            <div class="param-row" id="rowParamType" style="display:none;">
+                                <label>参数类型</label>
+                                <select id="cbParamType" class="ctl-sel">
+                                    <option value="0">完整参数</option>
+                                    <option value="1">居中参数</option>
+                                    <option value="2">日期参数</option>
+                                </select>
+                            </div>
+                            <div class="param-row" id="rowParamPos" style="display:none;">
+                                <label>参数位置</label>
+                                <select id="cbParamPosition" class="ctl-sel">
+                                    <option value="CENTER">居中</option>
+                                    <option value="RIGHT">居右</option>
+                                    <option value="SPLIT">分列</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="param-group">
+                            <div class="pg-title collapsible">品牌行</div>
                             <div class="param-row" id="rowBrandSize" style="display:none;">
                                 <label>品牌大小</label>
                                 <input type="range" id="slBrandSize" class="ctl-rng" min="50" max="300" step="5" value="100" />
@@ -230,21 +256,20 @@
                                     <option value="3">不显示品牌</option>
                                 </select>
                             </div>
-                            <div class="param-row" id="rowParamScale" style="display:none;">
-                                <label>参数缩放</label>
-                                <input type="range" id="slParamScale" class="ctl-rng" min="50" max="300" step="5" value="100" />
-                                <span class="pval" id="lblParamScale"></span>
-                            </div>
-                            <div id="grpPersonal" style="display:none;">
-                            <div class="param-row" id="rowSignModel">
+                            <div class="param-row" id="rowSignModel" style="display:none;">
                                 <label>品牌行含型号</label>
-                                <input type="checkbox" id="chkSignModel" style="width:auto;" /> <span style="color:#888;font-size:12px;">勾选后相机品牌行显示「品牌+型号」</span>
+                                <input type="checkbox" id="chkSignModel" class="ctl-chk" />
+                                <span class="chk-hint">勾选后品牌行显示「品牌+型号」</span>
                             </div>
-                            <div class="param-row" id="rowSignText">
+                        </div>
+
+                        <div class="param-group">
+                            <div class="pg-title collapsible">签名 / 头像</div>
+                            <div class="param-row" id="rowSignText" style="display:none;">
                                 <label>个性签名</label>
-                                <input type="text" id="inpSignature" placeholder="输入你的签名文字" style="width:100%;padding:6px 8px;background:#2a2a35;border:1px solid #444;border-radius:6px;color:#eee;font-size:13px;box-sizing:border-box;" />
+                                <input type="text" id="inpSignature" class="ctl-tx" placeholder="输入你的签名文字" />
                             </div>
-                            <div class="param-row" id="rowSignFont">
+                            <div class="param-row" id="rowSignFont" style="display:none;">
                                 <label>签名字体</label>
                                 <select id="cbSignFont" class="ctl-sel">
                                     <option value="cursive">手写斜体</option>
@@ -257,7 +282,7 @@
                                     <option value="Mistral">Mistral飘逸</option>
                                 </select>
                             </div>
-                            <div class="param-row" id="rowSignColor">
+                            <div class="param-row" id="rowSignColor" style="display:none;">
                                 <label>签名颜色</label>
                                 <select id="cbSignColor" class="ctl-sel">
                                     <option value="#555">深灰</option>
@@ -270,43 +295,23 @@
                                     <option value="#e67e22">橙色</option>
                                 </select>
                             </div>
-                            <div class="param-row" id="rowAvatarScale">
-                                <label>头像大小 <span id="valAvatarScale" style="float:right;color:#10b981;font-weight:600;">85%</span></label>
-                                <input type="range" id="rgAvatarScale" min="50" max="200" value="85" style="width:100%;" />
+                            <div class="param-row" id="rowSignSize" style="display:none;">
+                                <label>签名大小</label>
+                                <input type="range" id="rgSignSize" min="50" max="200" value="100" />
+                                <span class="pval" id="valSignSize"></span>
                             </div>
-                            <div class="param-row" id="rowSignSize">
-                                <label>签名大小 <span id="valSignSize" style="float:right;color:#10b981;font-weight:600;">100%</span></label>
-                                <input type="range" id="rgSignSize" min="50" max="200" value="100" style="width:100%;" />
+                            <div class="param-row" id="rowAvatarScale" style="display:none;">
+                                <label>头像大小</label>
+                                <input type="range" id="rgAvatarScale" min="50" max="200" value="85" />
+                                <span class="pval" id="valAvatarScale"></span>
                             </div>
-                            <div class="param-row" id="rowParamColor">
-                                <label>参数颜色</label>
-                                <select id="cbParamColor" class="ctl-sel">
-                                    <option value="auto">自动</option>
-                                    <option value="#000">黑色</option>
-                                    <option value="#fff">白色</option>
-                                </select>
-                            </div>
-                            <div class="param-row" id="rowParamType">
-                                <label>参数类型</label>
-                                <select id="cbParamType" class="ctl-sel">
-                                    <option value="0">完整参数</option>
-                                    <option value="1">居中参数</option>
-                                    <option value="2">日期参数</option>
-                                </select>
-                            </div>
-                            <div class="param-row" id="rowParamPos">
-                                <label>参数位置</label>
-                                <select id="cbParamPosition" class="ctl-sel">
-                                    <option value="CENTER">居中</option>
-                                    <option value="RIGHT">居右</option>
-                                    <option value="SPLIT">分列</option>
-                                </select>
-                            </div>
-                            </div>
-                            <div class="param-row" id="rowBgBlur" style="display:none;">
-                                <label>背景模糊
-                                    <input type="checkbox" id="chkBgBlur" style="float:right;width:18px;height:18px;cursor:pointer;accent-color:#10b981;" />
-                                </label>
+                        </div>
+
+                        <div class="param-group">
+                            <div class="pg-title collapsible">背景模糊</div>
+                            <div class="param-row chk-row" id="rowBgBlur" style="display:none;">
+                                <label>背景模糊</label>
+                                <input type="checkbox" id="chkBgBlur" class="ctl-chk" />
                             </div>
                             <div class="param-row" id="rowBgBlurInt" style="display:none;">
                                 <label>模糊程度</label>
@@ -451,7 +456,7 @@
                             <div class="param-row"><label>发光透明度</label><input type="range" id="slGlowOpacity" class="ctl-rng" min="0" max="100" value="60" /><span class="pval" id="lblGlowOpacity"></span></div>
                         </div>
 
-                        <div class="param-group">
+                        <div class="param-group" id="pbTornFilm">
                             <div class="pg-title collapsible">撕边（胶片特效）</div>
                             <div class="param-row chk-row">
                                 <label>撕边</label>
@@ -675,8 +680,10 @@
             <span id="stRes" class="st-item">分辨率 --</span>
             <span id="stInfo" class="st-item">未导入照片</span>
             <span id="stCanvas" class="st-item grow">画布 --×--</span>
-            <button id="btnCompare" class="st-btn" title="按住查看原图"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8v12.4"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4" fill="currentColor" fill-opacity=".25" stroke="none"/></svg>对比原图</button>
+            <button id="btnCompare" class="st-btn" title="按住查看原图（触屏可点按，Shift 短按）/ 松开恢复"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8v12.4"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4" fill="currentColor" fill-opacity=".25" stroke="none"/></svg>对比原图</button>
             <div class="progress-wrap"><div id="progressBar" class="progress-bar"></div></div>
+            <span id="exportProgressText" class="st-item" style="display:none"></span>
+            <button id="btnExportCancel" class="st-btn" style="display:none" title="取消导出">取消</button>
         </footer>
     </div>
 

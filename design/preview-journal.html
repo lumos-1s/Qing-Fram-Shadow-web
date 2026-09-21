@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>html,body{margin:0;padding:0;background:#222}</style>
+</head>
+<body>
+<canvas id="c" width="1000" height="1100"></canvas>
+<script>
+const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
+function javaRandom(seed64) {
+  let s = (BigInt(seed64) ^ MULT) & MASK48;
+  const next = bits => { s = (s * MULT + INC) & MASK48; return Number(s >> BigInt(48 - bits)); };
+  return function nextInt(bound) {
+    if (bound <= 0) return 0;
+    if ((bound & -bound) === bound) return (bound * next(31)) >> 31;
+    let bits, val;
+    do { bits = next(31); val = bits % bound; } while (bits - val + (bound - 1) < 0);
+    return val;
+  };
+}
+const styleNoise = (iw, ih, salt) => javaRandom(iw * 7919 + ih * 104729 + salt);
+function tornHolePath(rnd, iw, ih, amp) {
+  const n = Math.max(3, Math.floor(Math.max(iw, ih) / 16));
+  const p = new Path2D();
+  const pts = [];
+  const j = (v) => v + (rnd(3) - 1) * amp;
+  const px0 = -iw / 2, py0 = -ih / 2;
+  for (let i = 0; i <= n; i++) pts.push([j(px0 + iw * i / n), py0 + (rnd(3) - 1) * amp]);
+  for (let i = 1; i <= n; i++) pts.push([iw / 2 + (rnd(3) - 1) * amp, j(py0 + ih * i / n)]);
+  for (let i = 1; i <= n; i++) pts.push([j(iw / 2 - iw * i / n), ih / 2 + (rnd(3) - 1) * amp]);
+  for (let i = 1; i <= n; i++) pts.push([-iw / 2 + (rnd(3) - 1) * amp, j(ih / 2 - ih * i / n)]);
+  p.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]);
+  p.closePath();
+  return p;
+}
+function fillRoundRectCtx(g, x, y, w, h, r) {
+  g.beginPath();
+  if (g.roundRect) { g.roundRect(x, y, w, h, r, r); g.fill(); return; }
+  g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r);
+  g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r);
+  g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r);
+  g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath(); g.fill();
+}
+function drawTornJournal(img, g, iw, ih) {
+  const rnd = styleNoise(iw, ih, 521);
+  const pad = Math.max(44, Math.round(iw * 0.05));
+  const w = iw + pad * 2, h = ih + pad * 2;
+  const sx = pad, sy = pad, sw = iw, sh = ih;
+  const cx = sx + sw / 2, cy = sy + sh / 2;
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#f1e6cf'); grad.addColorStop(0.5, '#e7d8b8'); grad.addColorStop(1, '#d8c5a1');
+  g.fillStyle = grad; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 200; i++) {
+    g.fillStyle = (i % 3) ? 'rgba(139,110,65,0.10)' : 'rgba(255,252,240,0.08)';
+    g.fillRect(rnd(w), rnd(h), 3 + rnd(9), rnd(3) ? 1 : 2);
+  }
+  const vign = g.createRadialGradient(cx, cy, Math.min(sw, sh) * 0.4, cx, cy, Math.max(w, h) * 0.75);
+  vign.addColorStop(0, 'rgba(0,0,0,0)'); vign.addColorStop(1, 'rgba(90,60,25,0.16)');
+  g.fillStyle = vign; g.fillRect(0, 0, w, h);
+  const amp = Math.max(8, Math.round(Math.min(iw, ih) * 0.032));
+  const hole = tornHolePath(rnd, iw, ih, amp);
+  g.save(); g.translate(cx, cy); g.scale(1.05, 1.05);
+  g.shadowColor = 'rgba(40,25,10,0.30)'; g.shadowBlur = 16; g.shadowOffsetX = 2; g.shadowOffsetY = 4;
+  g.fillStyle = '#fdfcf6'; g.fill(hole); g.restore();
+  g.save(); g.translate(cx, cy); g.clip(hole);
+  g.drawImage(img, -iw / 2, -ih / 2, iw, ih);
+  g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 3; g.stroke(hole); g.restore();
+  const tape = (tx, ty, tw, th, rot, col) => {
+    g.save(); g.translate(tx, ty); g.rotate(rot * Math.PI / 180);
+    g.fillStyle = 'rgba(0,0,0,0.14)'; fillRoundRectCtx(g, -tw / 2 + 1, -th / 2 + 3, tw, th, th / 2);
+    g.fillStyle = col; fillRoundRectCtx(g, -tw / 2, -th / 2, tw, th, th / 2); g.restore();
+  };
+  tape(cx - sw * 0.33, sy - 2, 88 + iw * 0.04, 26, -9, 'rgba(222,193,112,0.72)');
+  tape(cx + sw * 0.30, sy + sh - 2, 80 + iw * 0.04, 24, 9, 'rgba(129,161,140,0.5)');
+  const noteY = sy + sh + Math.round(pad * 0.42);
+  g.fillStyle = 'rgba(120,86,52,0.5)'; g.fillRect(cx - Math.min(sw, 560) / 2, noteY - 1, Math.min(sw, 560), 1.5);
+  g.fillStyle = 'rgba(122,90,58,0.85)';
+  g.font = Math.max(16, Math.round(pad * 0.5)) + 'px "Segoe Script","Comic Sans MS",cursive';
+  g.textAlign = 'center';
+  g.fillText(['开心的一天', '随手记一笔', '舍不得的风景', '老地方,老味道'][rnd(4)], cx, noteY - 8);
+  g.fillStyle = 'rgba(210,132,116,0.5)'; g.beginPath(); g.arc(sx + sw + 14, sy + 14, 11, 0, 6.2832); g.fill();
+}
+
+const c = document.getElementById('c');
+const g = c.getContext('2d');
+const iw = 800, ih = 900;
+
+const photo = document.createElement('canvas');
+photo.width = iw; photo.height = ih;
+const pg = photo.getContext('2d');
+const sky = pg.createLinearGradient(0, 0, 0, ih);
+sky.addColorStop(0, '#7ec8e3'); sky.addColorStop(0.55, '#e78ba0'); sky.addColorStop(1, '#5b4c7a');
+pg.fillStyle = sky; pg.fillRect(0, 0, iw, ih);
+pg.fillStyle = '#ffe9b0'; pg.beginPath(); pg.arc(240, 300, 60, 0, 6.2832); pg.fill();
+pg.fillStyle = '#f6d18a'; pg.beginPath(); pg.arc(232, 298, 150, 0, 6.2832); pg.fill();
+pg.fillStyle = '#4c446b'; pg.beginPath(); pg.moveTo(0, ih);
+pg.lineTo(120, 480); pg.bezierCurveTo(260, 420, 320, 430, 420, 470); pg.lineTo(800, 330); pg.lineTo(800, ih); pg.closePath(); pg.fill();
+pg.fillStyle = '#2c2a46'; pg.beginPath(); pg.moveTo(0, ih);
+pg.lineTo(200, 620); pg.bezierCurveTo(380, 560, 460, 600, 620, 600); pg.lineTo(800, 520); pg.lineTo(800, ih); pg.closePath(); pg.fill();
+
+drawTornJournal(photo, g, iw, ih);
+</script>
+</body>
+</html>

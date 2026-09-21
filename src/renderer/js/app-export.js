@@ -15,12 +15,22 @@ window.App = Object.assign(window.App || {}, {
         targets.forEach(idx => {
             const im = this.images[idx];
             if (!im) return;
-            const tpl = im.customSettings || this.imageTemplates.get(im) ||
-                (this.currentIdx === idx ? this.template : this.defaultTemplate());
+            const tpl = this.exportTemplateFor(im, idx, this.currentIdx, this.template);
             const puzzle = !!(tpl && tpl.puzzle && tpl.puzzle.enabled);
-            jobs.push({ im, puzzle });
+            // blank:未设过边框(默认空模板),多图导出时会被静默当成“原图直出”,与预览预期不符
+            jobs.push({ im, puzzle, blank: !this.hasBorderSettings(tpl), useBase: false });
         });
         if (!jobs.length) { this.setStatus('请先导入照片'); return; }
+
+        // 空模板陷阱:当前正编辑的边框有意义,而其它照片还没有边框 → 给一次选择:沿用当前设计 / 按原图直出
+        let useBaseCount = 0;
+        const blanks = jobs.filter(j => j.blank);
+        if (jobs.length > 1 && blanks.length && this.hasBorderSettings(this.template)) {
+            const names = blanks.slice(0, 3).map(j => (j.im.name || '照片').replace(/\.[^.]+$/, '')).join('、');
+            const more = blanks.length > 3 ? `…等 ${blanks.length} 张` : `共 ${blanks.length} 张`;
+            const ok = window.confirm(`${names}${more}还没有设置边框,默认会按原图导出。\n\n是否改为沿用当前边框设计导出这些照片?`);
+            if (ok) blanks.forEach(j => { j.blank = false; j.useBase = true; useBaseCount++; });
+        }
 
         // ① 先在画布外准备好文件名(不触发任何渲染),单文件时作为默认名
         const files = jobs.map(j => {
@@ -61,18 +71,22 @@ window.App = Object.assign(window.App || {}, {
             });
             return any;
         };
+        const btnCancel = document.getElementById('btnExportCancel');
         try {
             // 导出按逻辑像素渲染(不乘 devicePixelRatio),保证导出分辨率与该选项/“原图尺寸”一致
             this.uiDprOverride = 1;
-            let okCount = 0, failCount = 0;
+            this._exportAbort = false;
+            if (btnCancel) btnCancel.style.display = '';
+            this.setStatus(`正在导出 ${jobs.length} 张…`);
+            let okCount = 0, failCount = 0, aborted = false;
             for (let n = 0; n < jobs.length; n++) {
+                if (this._exportAbort) { aborted = true; break; }
                 const { im, puzzle } = jobs[n];
                 this.image = im;
                 this.invalidateStyleCaches();
                 this.currentIdx = this.images.indexOf(im);
                 // 每张图用各自预设:已自定义/记忆过的用其自身;当前主图用正在编辑的模板;其余未设置的用各自默认边框(不跟随第一张)
-                const srcTpl = im.customSettings || this.imageTemplates.get(im) ||
-                    (this.images.indexOf(im) === originalIdx ? baseTemplate : this.defaultTemplate());
+                const srcTpl = jobs[n].useBase ? baseTemplate : this.exportTemplateFor(im, this.images.indexOf(im), originalIdx, baseTemplate);
                 // 导出专用深拷贝:后续 scaleElPix 的缩放不会污染正在编辑的活模板与已存的 customSettings 快照
                 this.template = JSON.parse(JSON.stringify(srcTpl));
                 this.normalizeTemplate();
@@ -128,18 +142,20 @@ window.App = Object.assign(window.App || {}, {
                 } else if (!files[n].data) {
                     failCount++;
                 }
-                const bar = document.getElementById('progressBar');
-                if (bar) bar.style.width = Math.round(((n + 1) / jobs.length) * 100) + '%';
+                this.showExportProgress(n, jobs.length, im.name);
             }
-            // 剩余文件(单文件模式 / 目录模式仅一张)统一写出
+            // 剩余文件(单文件模式 / 目录模式仅一张)统一写出;已取消导出则丢弃未写盘的结果
             const pending = files.filter(f => !!f.data);
-            if (pending.length) {
+            if (pending.length && !aborted) {
                 const r = await window.qingframe.writeExportFiles({ location: loc, files: pending }) || {};
                 okCount += r.ok || 0; failCount += r.fail || 0;
             }
-            const m = `导出完成：成功 ${okCount}${failCount ? `，失败 ${failCount}` : ''}`;
+            const m = aborted
+                ? `已取消导出：完成 ${okCount}${failCount ? `，失败 ${failCount}` : ''}`
+                : `导出完成：成功 ${okCount}${failCount ? `，失败 ${failCount}` : ''}${useBaseCount ? `（${useBaseCount} 张沿用当前设计）` : ''}`;
             this.setStatus(m);
         } finally {
+            if (btnCancel) btnCancel.style.display = 'none';
             delete this.uiDprOverride;
             delete this.exportScale;
             this.currentIdx = originalIdx;
@@ -169,8 +185,27 @@ window.App = Object.assign(window.App || {}, {
         return files;
     },
 
+    // 每张照片导出用哪个模板:已自定义/记忆过的用其自身;否则当前主图(ownerIdx,导出开始时的图)用 liveTemplate,其余用默认空模板
+    exportTemplateFor(im, idx, ownerIdx, liveTemplate) {
+        return im.customSettings || this.imageTemplates.get(im) ||
+            (idx === ownerIdx ? liveTemplate : this.defaultTemplate());
+    },
+
+    // 导出进度:进度条 + 底部“第 n / N 张”标签
+    showExportProgress(n, total, name) {
+        const bar = document.getElementById('progressBar');
+        if (bar) bar.style.width = Math.round(((n + 1) / total) * 100) + '%';
+        const label = document.getElementById('exportProgressText');
+        if (label) { label.style.display = ''; label.textContent = `导出中 ${n + 1}/${total} · ${String(name || '').replace(/\.[^.]+$/, '')}`; }
+    },
+
     resetProgress() {
         const bar = document.getElementById('progressBar');
         if (bar) setTimeout(() => bar.style.width = '0', 800);
+        const btnCancel = document.getElementById('btnExportCancel');
+        if (btnCancel) btnCancel.style.display = 'none';
+        const label = document.getElementById('exportProgressText');
+        if (label) label.style.display = 'none';
+        delete this._exportAbort;
     }
 });

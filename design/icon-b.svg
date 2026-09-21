@@ -1,0 +1,87 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
+      <stop offset="0" stop-color="#22262f"/>
+      <stop offset="1" stop-color="#0b0d14"/>
+    </radialGradient>
+    <linearGradient id="film" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f4ec"/>
+      <stop offset="1" stop-color="#e6e0d0"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6c177"/>
+      <stop offset="0.5" stop-color="#d0617e"/>
+      <stop offset="1" stop-color="#6f4dd6"/>
+    </linearGradient>
+    <linearGradient id="exifBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#181c27"/>
+      <stop offset="1" stop-color="#11141d"/>
+    </linearGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <clipPath id="photoClip">
+      <rect x="176" y="84" width="160" height="200" rx="18"/>
+    </clipPath>
+  </defs>
+
+  <!-- 底 -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- 胶片条(底面撕边收尾) -->
+  <path d="M 170 40 L 342 40 Q 366 40 366 64 L 366 412
+           L 356 404 L 344 421 L 332 407 L 320 423 L 308 409 L 296 420
+           L 284 406 L 272 422 L 260 408 L 248 419 L 236 405 L 224 420
+           L 212 406 L 200 419 L 188 405 L 176 417 L 146 412
+           L 146 64 Q 146 40 170 40 Z"
+        fill="url(#film)" filter="url(#shadow)"/>
+
+  <!-- 齿孔(左列) -->
+  <g fill="#10141d">
+    <rect x="153" y="86" width="18" height="12" rx="6"/>
+    <rect x="153" y="148" width="18" height="12" rx="6"/>
+    <rect x="153" y="204" width="18" height="12" rx="6"/>
+    <rect x="153" y="300" width="18" height="12" rx="6"/>
+    <rect x="153" y="358" width="18" height="12" rx="6"/>
+  </g>
+  <!-- 齿孔(右列) -->
+  <g fill="#10141d">
+    <rect x="341" y="86" width="18" height="12" rx="6"/>
+    <rect x="341" y="148" width="18" height="12" rx="6"/>
+    <rect x="341" y="204" width="18" height="12" rx="6"/>
+    <rect x="341" y="300" width="18" height="12" rx="6"/>
+    <rect x="341" y="358" width="18" height="12" rx="6"/>
+  </g>
+
+  <!-- 主照片帧 -->
+  <g clip-path="url(#photoClip)">
+    <rect x="176" y="84" width="160" height="200" fill="url(#sky)"/>
+    <circle cx="218" cy="140" r="28" fill="#ffe9b0" opacity="0.95"/>
+    <circle cx="218" cy="140" r="38" fill="#ffe9b0" opacity="0.28"/>
+    <!-- 远山 -->
+    <path d="M 176 284 L 206 190 L 232 240 L 262 168 L 296 236 L 336 184 L 336 284 Z" fill="#3d3768" opacity="0.92"/>
+    <!-- 近山 -->
+    <path d="M 176 284 L 214 228 L 248 276 L 284 214 L 336 272 L 336 284 Z" fill="#231e3c"/>
+    <!-- 胶片颗粒 -->
+    <g fill="#fff" opacity="0.14">
+      <circle cx="208" cy="100" r="1.4"/><circle cx="306" cy="118" r="1.2"/><circle cx="240" cy="96" r="1"/><circle cx="288" cy="252" r="1.3"/>
+    </g>
+  </g>
+
+  <!-- 参数水印条(FUJI 卡片风) -->
+  <rect x="176" y="300" width="160" height="50" rx="10" fill="url(#exifBg)"/>
+  <text x="256" y="324" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="21" font-weight="bold" fill="#f2efe6">50mm&nbsp;f/2.8</text>
+  <text x="256" y="343" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="14" fill="#f2efe6"><tspan fill="#3ddc97">ISO400</tspan>&nbsp;&nbsp;1/125s</text>
+
+  <!-- 撕边像素噪点(品牌绿) -->
+  <g fill="#3ddc97">
+    <rect x="250" y="402" width="5" height="5"/>
+    <rect x="266" y="409" width="4" height="4"/>
+    <rect x="288" y="401" width="5" height="5"/>
+    <rect x="304" y="410" width="4" height="4"/>
+  </g>
+  <g fill="#ffffff" opacity="0.5">
+    <rect x="232" y="407" width="3" height="3"/>
+    <rect x="318" y="402" width="3" height="3"/>
+  </g>
+</svg>

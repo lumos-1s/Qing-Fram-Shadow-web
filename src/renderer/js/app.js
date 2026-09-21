@@ -189,9 +189,23 @@ window.App = {
             const btn = e.target.closest('.tab');
             if (btn) this.switchTab(btn.dataset.tab);
         });
-        d.btnCompare.addEventListener('mousedown', () => this.setCompare(true));
-        d.btnCompare.addEventListener('mouseup', () => this.setCompare(false));
-        d.btnCompare.addEventListener('mouseleave', () => this.setCompare(false));
+        // 对比原图:Pointer 统一鼠标/触屏;另支持 Shift 按住短按。
+        // (不用 Alt:窗口是 autoHideMenuBar,Windows 上 Alt 会唤出菜单栏并抢走按键)
+        d.btnCompare.addEventListener('pointerdown', e => { e.preventDefault(); this.setCompare(true); });
+        d.btnCompare.addEventListener('pointerup', () => this.setCompare(false));
+        d.btnCompare.addEventListener('pointercancel', () => this.setCompare(false));
+        d.btnCompare.addEventListener('pointerleave', () => this.setCompare(false));
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Shift' || e.ctrlKey || e.altKey) return;
+            const el = document.activeElement;
+            const tag = (el && el.tagName) || '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
+            this.setCompare(true);
+        });
+        document.addEventListener('keyup', e => { if (e.key === 'Shift') this.setCompare(false); });
+        window.addEventListener('blur', () => { if (this.draggingCompare) this.setCompare(false); });
+        const btnCancel = document.getElementById('btnExportCancel');
+        if (btnCancel) btnCancel.addEventListener('click', () => { this._exportAbort = true; });
         this.updateTopBar();
             d.loginStatus.addEventListener('click', () => this.openLoginModal());
         d.loginModalClose.addEventListener('click', () => this.closeLoginModal());
@@ -1062,15 +1076,13 @@ window.App = {
     },
 
     updatePersonalVisibility() {
-        const grp = document.getElementById('grpPersonal');
-        if (!grp || !this.template) return;
+        if (!this.template) return;
         const s = this.template.photoFrameStyle || '';
         const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC','AV_OVERLAY_BC2'].includes(s);
         const showSig = isPersonal || s === 'CARD_3D';
-        grp.style.display = showSig ? '' : 'none';
-        // 传统个人样式:全部签名/头像/参数行显示; CARD_3D 只用签名文字,隐藏其余
-        const personalRows = ['rowSignText','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos'];
-        personalRows.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+        // 个人/签名/头像/参数相关行:默认随 showSig 整组显隐(原 grpPersonal 语义)
+        const personalRowsAll = ['rowSignModel','rowSignText','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos'];
+        personalRowsAll.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showSig ? '' : 'none'; });
         // 品牌行含型号:仅签名+参数(SIGN_PARAM,底部右区域品牌/参数行)有此选项
         const rowSM = document.getElementById('rowSignModel');
         if (rowSM) rowSM.style.display = (s === 'SIGN_PARAM') ? '' : 'none';
@@ -1100,10 +1112,16 @@ window.App = {
         if (rowType) rowType.style.display = isBottomBar ? '' : 'none';
         // 品牌大小/参数缩放:印象毛玻璃/左右/下留白与 logo参数 显示
         const isImpression = ['IMP_FROSTED','OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM','CARD_LOGO_PARAM'].includes(s);
+        // 富士系水印预设:参数水印/参数品牌水印画参数 → 给"参数缩放";品牌水印/参数品牌水印画品牌 → 给"品牌大小"
+        const isWmParam = ['FUJI_WM','FUJI_WM_BRAND'].includes(s);
+        const isWmBrand = ['FUJI_WM_BRAND','DARK_BRAND_ONLY'].includes(s);
         const rowBrand = document.getElementById('rowBrandSize');
-        if (rowBrand) rowBrand.style.display = isImpression ? '' : 'none';
+        if (rowBrand) rowBrand.style.display = (isImpression || isWmBrand) ? '' : 'none';
         const rowParamScale = document.getElementById('rowParamScale');
-        if (rowParamScale) rowParamScale.style.display = (isImpression || isBlurStyle) ? '' : 'none';
+        if (rowParamScale) rowParamScale.style.display = (isImpression || isBlurStyle || isWmParam) ? '' : 'none';
+        // 品牌水印不画参数:隐藏"参数字号"(品牌行由"品牌大小"单独控制);CARD_3D 同理(上面已隐藏,这里保持)
+        const rowPf = document.getElementById('rowParamFontSize');
+        if (rowPf) rowPf.style.display = (s === 'DARK_BRAND_ONLY' || s === 'CARD_3D') ? 'none' : '';
         // 相机品牌 Logo:凡品牌名会渲染成行的样式都显示该勾选(匹配 by 品牌池)
         const brandShown = ['WM_CLASSIC','WM_BRAND_LOGO','IMP_FROSTED','IMP_CLASSIC',
             'OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM',
@@ -1282,6 +1300,9 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         const q = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
         q('.ctl-grp-layers').forEach(el => { el.style.display = showLayers ? '' : 'none'; });
         q('.ctl-grp-light').forEach(el => { el.style.display = showLight ? '' : 'none'; });
+        // 撕边(胶片齿孔掩膜)只在默认图层管线读 filmTearConfig;相框样式 / 卡片(模糊底)渲染不走该管线,整组隐藏
+        const torn = document.getElementById('pbTornFilm');
+        if (torn) torn.style.display = showLayers ? '' : 'none';
         const lightTab = document.querySelector('#inspTabs [data-tab="light"]');
         if (lightTab) lightTab.style.display = showLight ? '' : 'none';
         if (!showLight) {
@@ -1290,6 +1311,27 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
                 const firstVis = document.querySelector('#inspTabs .tab:not([style*="display: none"])');
                 if (firstVis) firstVis.click();
             }
+        }
+        // 当前样式条:把"现在走哪条渲染管线"显性化,解释为何部分控件消失
+        const ms = document.getElementById('modeStatus');
+        if (ms) {
+            const frameName = String(t.photoFrameStyle || '').toUpperCase();
+            const isFrame = !!(frameName && frameName !== 'NONE');
+            const isCard = !isFrame && (t.baseMargin || {}).bgBlurEnable === 1;
+            let kind, name;
+            if (isFrame) {
+                kind = '相框样式';
+                const preset = this.presets.find(p => String(p.photoFrameStyle || '').toUpperCase() === frameName);
+                name = preset ? (preset.templateName || frameName) : frameName;
+            } else if (isCard) {
+                kind = '卡片 / 模糊底';
+                name = t.templateName || '';
+            } else {
+                kind = '图层模板';
+                name = t.templateName || '';
+            }
+            ms.style.display = '';
+            ms.textContent = '当前样式：' + kind + (name ? ' · ' + name : '');
         }
     },
 

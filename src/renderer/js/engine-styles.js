@@ -2437,7 +2437,7 @@ AV_OVERLAY_BC2:67 };
                 return { w: iw + p * 2, h: ih + p * 2 };
             }
             case 'TORN_JOURNAL': {
-                const p = Math.max(50, Math.round(iw * 0.06));
+                const p = Math.max(44, Math.round(iw * 0.05));
                 return { w: iw + p * 2, h: ih + p * 2 };
             }
             case 'POLAROID_HAND': {
@@ -2598,11 +2598,12 @@ AV_OVERLAY_BC2:67 };
         const h = ih + outerPad * 2;
         // 白外底
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-        // 深色圆角卡片
+        // 照片角落圆角(cornerConfig):卡片圆角与照片取同一圆角,避免照片圆角外侧露出深色卡底(黑色楔形)
         const cx = outerPad, cy = outerPad, cw = iw, ch = ih;
-        const r = Math.round(Math.min(cw, ch) * 0.03);
+        const photoCr = Math.min(S.cornerAll || 0, Math.min(iw, ih) / 2);
+        const cardR = Math.round(photoCr);
         g.fillStyle = '#0d1b2a';
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.fill(); }
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, cardR); g.fill(); }
         else g.fillRect(cx, cy, cw, ch);
         // 照片完整显示(支持缩放/偏移)
         const sc = S.imgScale || 1;
@@ -2610,12 +2611,12 @@ AV_OVERLAY_BC2:67 };
         const dx = cx + (iw - dw) / 2 + (S.imgOffsetX || 0);
         const dy = cy + (ih - dh) / 2 + (S.imgOffsetY || 0);
         g.save();
-        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, r); g.clip(); }
+        if (typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(cx, cy, cw, ch, photoCr); g.clip(); }
         g.drawImage(img, dx, dy, dw, dh);
         g.restore();
-        // 文字大小(从面板参数)
-        const fParam = Math.max(12, Math.round(S.paramFs || iw * 0.035));
-        const fBrand = Math.max(16, Math.round(fParam * 1.3));
+        // 文字大小(从面板参数):参数字号 × 参数缩放;品牌字再乘 品牌大小(近印象系列映射)
+        const fParam = Math.max(12, Math.round((S.paramFs || iw * 0.035) * (S.paramScale || 1)));
+        const fBrand = Math.max(16, Math.round(fParam * 1.3 * (S.brandScale || 1)));
         g.textAlign = 'center';
         g.textBaseline = 'alphabetic';
         const bottomPad = Math.max(20, Math.round(ih * 0.06));
@@ -2714,32 +2715,78 @@ AV_OVERLAY_BC2:67 };
         g.beginPath(); g.arc(w / 2 + 80, border + ih + 35, 4, 0, Math.PI * 2); g.fill();
     }
 
-    // ══ 撕纸手账风 ══
+    // ══ 撕纸手账风:牛皮纸页 + 撕边白纸贴照片 + 和纸胶带 + 手写批注 ══
     function styleTornJournal(img, size, g, iw, ih) {
-        const pad = Math.max(30, Math.round(size * 0.8));
+        const rnd = styleNoise(iw, ih, 521);
+        const pad = Math.max(44, Math.round(iw * 0.05));
         const w = iw + pad * 2, h = ih + pad * 2;
-        // 牛皮纸底
-        g.fillStyle = '#e8dcc4'; g.fillRect(0, 0, w, h);
-        // 纸纹
-        g.fillStyle = 'rgba(139,119,89,0.1)';
-        for (let i = 0; i < 100; i++) g.fillRect(Math.random() * w, Math.random() * h, 2, 1);
-        // 撕边效果(不规则)
         const sx = pad, sy = pad, sw = iw, sh = ih;
-        g.fillStyle = '#fff';
-        g.beginPath();
-        g.moveTo(sx, sy);
-        for (let x = 0; x <= sw; x += 10) g.lineTo(sx + x, sy + (Math.random() - 0.5) * 8);
-        for (let y = 0; y <= sh; y += 10) g.lineTo(sx + sw + (Math.random() - 0.5) * 8, sy + y);
-        for (let x = sw; x >= 0; x -= 10) g.lineTo(sx + x, sy + sh + (Math.random() - 0.5) * 8);
-        for (let y = sh; y >= 0; y -= 10) g.lineTo(sx + (Math.random() - 0.5) * 8, sy + y);
-        g.closePath(); g.fill();
-        g.save(); g.clip();
-        g.drawImage(img, sx, sy, sw, sh);
+        const cx = sx + sw / 2, cy = sy + sh / 2;
+        // 牛皮纸底(纵向渐变 + 四周暗角)
+        const grad = g.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, '#f1e6cf');
+        grad.addColorStop(0.5, '#e7d8b8');
+        grad.addColorStop(1, '#d8c5a1');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, w, h);
+        // 纸纤维纹理(确定性噪声)
+        for (let i = 0; i < 200; i++) {
+            g.fillStyle = (i % 3) ? 'rgba(139,110,65,0.10)' : 'rgba(255,252,240,0.08)';
+            g.fillRect(rnd(w), rnd(h), 3 + rnd(9), rnd(3) ? 1 : 2);
+        }
+        const vign = g.createRadialGradient(cx, cy, Math.min(sw, sh) * 0.4, cx, cy, Math.max(w, h) * 0.75);
+        vign.addColorStop(0, 'rgba(0,0,0,0)');
+        vign.addColorStop(1, 'rgba(90,60,25,0.16)');
+        g.fillStyle = vign;
+        g.fillRect(0, 0, w, h);
+        // 撕边白纸片;照片略小于纸片即得毛边留白
+        const amp = Math.max(8, Math.round(Math.min(iw, ih) * 0.032));
+        const hole = tornHolePath(rnd, iw, ih, amp);
+        g.save();
+        g.translate(cx, cy);
+        g.scale(1.05, 1.05);
+        g.shadowColor = 'rgba(40,25,10,0.30)';
+        g.shadowBlur = 16;
+        g.shadowOffsetX = 2;
+        g.shadowOffsetY = 4;
+        g.fillStyle = '#fdfcf6';
+        g.fill(hole);
         g.restore();
-        // 胶带
-        g.fillStyle = 'rgba(255,200,50,0.6)';
-        g.fillRect(sx + sw / 2 - 30, sy - 8, 60, 16);
-        g.fillRect(sx - 8, sy + sh / 2 - 8, 16, 60);
+        // 照片裁进撕边孔,孔内缘留一点碎纸白
+        g.save();
+        g.translate(cx, cy);
+        g.clip(hole);
+        g.drawImage(img, -iw / 2, -ih / 2, iw, ih);
+        g.strokeStyle = 'rgba(255,255,255,0.5)';
+        g.lineWidth = 3;
+        g.stroke(hole);
+        g.restore();
+        // 和纸胶带(圆头,微旋,压住照片边缘)
+        const tape = (tx, ty, tw, th, rot, col) => {
+            g.save();
+            g.translate(tx, ty);
+            g.rotate(rot * Math.PI / 180);
+            g.fillStyle = 'rgba(0,0,0,0.14)';
+            fillRoundRectCtx(g, -tw / 2 + 1, -th / 2 + 3, tw, th, th / 2);
+            g.fillStyle = col;
+            fillRoundRectCtx(g, -tw / 2, -th / 2, tw, th, th / 2);
+            g.restore();
+        };
+        tape(cx - sw * 0.33, sy - 2, 88 + iw * 0.04, 26, -9, 'rgba(222,193,112,0.72)');
+        tape(cx + sw * 0.30, sy + sh - 2, 80 + iw * 0.04, 24, 9, 'rgba(129,161,140,0.5)');
+        // 手写批注 + 横线(照片下方牛皮纸留白)
+        const noteY = sy + sh + Math.round(pad * 0.42);
+        g.fillStyle = 'rgba(120,86,52,0.5)';
+        g.fillRect(cx - Math.min(sw, 560) / 2, noteY - 1, Math.min(sw, 560), 1.5);
+        g.fillStyle = 'rgba(122,90,58,0.85)';
+        g.font = Math.max(16, Math.round(pad * 0.5)) + 'px "Segoe Script","Comic Sans MS",cursive';
+        g.textAlign = 'center';
+        g.fillText(['开心的一天', '随手记一笔', '舍不得的风景', '老地方,老味道'][rnd(4)], cx, noteY - 8);
+        // 小点缀:右上角圆贴纸
+        g.fillStyle = 'rgba(210,132,116,0.5)';
+        g.beginPath();
+        g.arc(sx + sw + 14, sy + 14, 11, 0, 6.2832);
+        g.fill();
     }
 
     // ══ 3D卡片翻转 ══
