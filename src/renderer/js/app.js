@@ -2615,6 +2615,22 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 c.appendChild(img);
                 c.addEventListener('click', () => this.armLogoPlacement(l));
                 // 自定义图标右上角加×删除按钮
+                // 自定义图标双击可重命名
+                if (l.custom) {
+                    c.addEventListener('dblclick', async (ev) => {
+                        ev.stopPropagation();
+                        const nn = await this.promptText('重命名自定义图标', l.name);
+                        if (!nn || !nn.trim() || nn.trim() === l.name) return;
+                        l.name = nn.trim();
+                        try {
+                            let saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
+                            saved.forEach(s => { if (s.dataUrl === l.dataUrl) s.name = l.name; });
+                            localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
+                        } catch(e) {}
+                        this.renderLogoPools();
+                        this.setStatus('已重命名');
+                    });
+                }
                 if (l.custom) {
                     const del = document.createElement('span');
                     del.textContent = '×';
@@ -2699,7 +2715,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         const im = new Image();
         await new Promise(r => { im.onload = r; im.onerror = r; im.src = dataUrl; });
         if (!im.naturalWidth) { this.setStatus('图片加载失败'); return; }
-        const logo = { name: res.name || '自定义', dataUrl, custom: true };
+        const defaultName = String(res.name || '自定义').replace(/\.[a-z0-9]+$/i, '');
+        const typed = await this.promptText('给这个 Logo 起个名字(留空则用文件名)', defaultName);
+        if (typed === null) { this.setStatus('已取消添加'); return; }
+        const logo = { name: (typed || '').trim() || defaultName, dataUrl, custom: true };
         this.logos.push(logo);
         this.saveCustomIcon(logo);
         this.addLogoElement(logo);
