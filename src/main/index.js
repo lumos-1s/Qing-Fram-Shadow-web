@@ -124,6 +124,15 @@ ipcMain.handle('list-logos', () => {
     return readImagesAsDataUrls(LOGOS_DIR, ['.png', '.jpg', '.jpeg']);
 });
 
+// 内置自定义图标库(随包分发,作者本地导入的图标固化为初始库)
+ipcMain.handle('list-custom-icons', () => {
+    try {
+        const p = path.join(__dirname, '..', '..', 'shared', 'custom-icons.json');
+        if (!fs.existsSync(p)) return [];
+        return JSON.parse(fs.readFileSync(p, 'utf-8'));
+    } catch (e) { return []; }
+});
+
 ipcMain.handle('list-textures', () => {
     return readImagesAsDataUrls(TEXTURES_DIR, ['.png', '.jpg', '.jpeg']);
 });

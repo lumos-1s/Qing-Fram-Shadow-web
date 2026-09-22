@@ -272,8 +272,12 @@ window.App = Object.assign(window.App || {}, {
         try { this.logos = (await window.qingframe.listLogos()) || []; }
         catch (e) { this.logos = []; }
         try {
+            const builtin = (await window.qingframe.listCustomIcons()) || [];
+            builtin.forEach(c => { if (c && c.dataUrl) this.logos.push(c); });
+        } catch(e) {}
+        try {
             const saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
-            saved.forEach(c => { if (c && c.dataUrl) this.logos.push(c); });
+            saved.forEach(c => { if (c && c.dataUrl && !this.logos.some(l => l.dataUrl === c.dataUrl)) this.logos.push(c); });
         } catch(e) {}
         this.splashTick();
         if (this.dom.stRes) this.renderLogoPools();
