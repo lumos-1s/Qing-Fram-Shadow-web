@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>visual regression harness</title>
+<style>html,body{margin:0}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="../src/renderer/js/engine.js"></script>
+<script src="../src/renderer/js/engine-styles.js"></script>
+<script>
+// ── 确定性 PRNG:替换 Math.random,让 CYBER_GLITCH 等随机风格可复现 ──
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const PRNG = mulberry32(20260922);
+
+// ── 合成测试照片:固定渐变+山体(确定性,与 brandtest 一致) ──
+function makePhoto(iw, ih) {
+  const photo = document.createElement('canvas'); photo.width = iw; photo.height = ih;
+  const pg = photo.getContext('2d');
+  const sky = pg.createLinearGradient(0, 0, 0, ih);
+  sky.addColorStop(0, '#7ec8e3'); sky.addColorStop(0.55, '#e78ba0'); sky.addColorStop(1, '#5b4c7a');
+  pg.fillStyle = sky; pg.fillRect(0, 0, iw, ih);
+  pg.fillStyle = '#ffe9b0'; pg.beginPath(); pg.arc(240, 300, 60, 0, 6.2832); pg.fill();
+  pg.fillStyle = '#f6d18a'; pg.beginPath(); pg.arc(232, 298, 150, 0, 6.2832); pg.fill();
+  pg.fillStyle = '#4c446b'; pg.beginPath(); pg.moveTo(0, ih);
+  pg.lineTo(120, 480); pg.bezierCurveTo(260, 420, 320, 430, 420, 470); pg.lineTo(800, 330); pg.lineTo(800, ih); pg.closePath(); pg.fill();
+  pg.fillStyle = '#2c2a46'; pg.beginPath(); pg.moveTo(0, ih);
+  pg.lineTo(200, 620); pg.bezierCurveTo(380, 560, 460, 600, 620, 600); pg.lineTo(800, 520); pg.lineTo(800, ih); pg.closePath(); pg.fill();
+  return photo;
+}
+
+// ── 合成品牌 Logo:红块 + 白字 CANON ──
+function makeLogo() {
+  const logo = document.createElement('canvas'); logo.width = 360; logo.height = 120;
+  const lg = logo.getContext('2d');
+  lg.fillStyle = '#c8102e'; lg.fillRect(0, 8, 66, 104);
+  lg.fillStyle = '#ffffff'; lg.font = 'bold 78px Arial'; lg.textBaseline = 'middle';
+  lg.fillText('CANON', 82, 62);
+  return logo;
+}
+
+// ── 分块颜色指纹:CW×CH 网格平均 RGBA ──
+function fingerprint(cv) {
+  const W = cv.width, H = cv.height;
+  const N = 32; // 最长边格数,另一方向按比例
+  const cell = Math.max(W, H) / N;
+  const CW = Math.max(8, Math.round(W / cell));
+  const CH = Math.max(8, Math.round(H / cell));
+  const g = cv.getContext('2d');
+  const data = g.getImageData(0, 0, W, H).data;
+  const out = [];
+  for (let cy = 0; cy < CH; cy++) {
+    for (let cx = 0; cx < CW; cx++) {
+      const x0 = Math.floor(cx * cell), x1 = Math.min(W, Math.ceil((cx + 1) * cell));
+      const y0 = Math.floor(cy * cell), y1 = Math.min(H, Math.ceil((cy + 1) * cell));
+      let r = 0, gr = 0, b = 0, n = 0;
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const i = (y * W + x) * 4;
+          r += data[i]; gr += data[i + 1]; b += data[i + 2]; n++;
+        }
+      }
+      out.push(Math.round(r / n), Math.round(gr / n), Math.round(b / n));
+    }
+  }
+  return { CW, CH, data: out };
+}
+
+// ── 布局指标:品牌左缘 / 参数框左缘 / 红色 logo 框(深色调背景或白底两套尺度) ──
+function metricsOf(cv) {
+  const W = cv.width, H = cv.height;
+  const g = cv.getContext('2d');
+  const red = g.getImageData(0, 0, W, H).data;
+  const isRed = (i) => red[i * 4 + 0] > 150 && red[i * 4 + 1] < 90 && red[i * 4 + 2] < 90 && red[i * 4 + 3] > 160;
+  let rx0 = W, rx1 = -1, ry0 = H, ry1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (isRed(y * W + x)) {
+    if (x < rx0) rx0 = x; if (x > rx1) rx1 = x;
+    if (y < ry0) ry0 = y; if (y > ry1) ry1 = y;
+  }
+  const darkMinXAt = (y0, y1) => {
+    const im = g.getImageData(0, y0, W, y1 - y0).data;
+    for (let x = 0; x < W; x++) for (let y = 0; y < (y1 - y0); y++) {
+      const i = (y * W + x) * 4;
+      if (im[i] < 120 && im[i + 1] < 120 && im[i + 2] < 120 && im[i + 3] > 150) return x;
+    }
+    return -1;
+  };
+  const whiteMinXAt = (y0, y1) => {
+    const im = g.getImageData(0, y0, W, y1 - y0).data;
+    for (let x = 0; x < W; x++) for (let y = 0; y < (y1 - y0); y++) {
+      const i = (y * W + x) * 4;
+      if (im[i] > 235 && im[i + 1] > 235 && im[i + 2] > 235 && im[i + 3] > 200) return x;
+    }
+    return -1;
+  };
+  const boxLeft = whiteMinXAt(Math.floor(H * 0.40), Math.floor(H * 0.96));
+  const boxLeftDark = darkMinXAt(Math.floor(H * 0.40), Math.floor(H * 0.96));
+  const brandLeftDark = darkMinXAt(Math.floor(H * 0.05), Math.floor(H * 0.40));
+  return {
+    W, H,
+    ml: boxLeft,
+    boxLeftDark,
+    brandLeftDark,
+    logoRedBox: rx0 >= 0 ? { x0: rx0, x1: rx1, y0: ry0, y1: ry1, w: rx1 - rx0 + 1, h: ry1 - ry0 + 1 } : null
+  };
+}
+
+// ── 捕获引擎 console.warn(识别渲染崩溃后回落原图 / 未注册风格) ──
+function hookConsole() {
+  const msgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => { msgs.push(a.map(String).join(' ')); origWarn.apply(console, a); };
+  const origError = console.error;
+  console.error = (...a) => { msgs.push(a.map(String).join(' ')); origError.apply(console, a); };
+  return () => msgs;
+}
+
+// ── 统一基础模板 ──
+const BASE_T = {
+  photoFrameStyle: 'SIMPLE',
+  brandLogo: 1,
+  paramFontSize: 33,
+  brandSize: 1,
+  paramScale: 1,
+  photoFrameBorderSize: 40,
+  paramPosition: 'LEFT',
+  baseMargin: { imgScale: 1, imgOffsetX: 0, imgOffsetY: 0, globalMargin: 1 },
+  cornerConfig: { cornerRadiusAll: 12 },
+  userSignature: 'Lumos Chan',
+  manualExif: { brand: 'CANON', model: 'EOS R5', focal: '50mm', aperture: 'f/2.8', iso: 'ISO 400', shutter: '1/125' }
+};
+
+const cEl = document.getElementById('c');
+let photoImg = null, logoImg = null, logoData = null;
+let built = false;
+
+async function buildFixture() {
+  if (built) return;
+  const photo = makePhoto(800, 900);
+  const logo = makeLogo();
+  photoImg = new Image();
+  await new Promise(r => { photoImg.onload = r; photoImg.src = photo.toDataURL('image/png'); });
+  logoData = logo.toDataURL('image/png');
+  logoImg = new Image();
+  await new Promise(r => { logoImg.onload = r; logoImg.src = logoData; });
+  built = true;
+}
+
+function renderCase(c) {
+  const template = Object.assign({}, BASE_T, c.extra || {});
+  // 无 photoFrameStyle 的预设(传统 baseMargin/layerList 边框)走真实分流,交给 __render
+  if (c.noStyle) {
+    delete template.photoFrameStyle;
+  } else {
+    template.photoFrameStyle = c.st;
+  }
+  if (c.bl != null) template.brandLogo = c.bl;
+  if (c.pf != null) template.paramFontSize = c.pf;
+  if (c.bs != null) template.brandSize = c.bs;
+  const app = {
+    template,
+    displayMax: 4000,
+    selectedEls: [],
+    uiDprOverride: 1, // setupCanvas 逻辑像素渲染,跨设备确定(DISPLAY_MAX 上限)
+    image: { el: photoImg, exif: {} },
+    dom: { canvas: cEl },
+    logos: [{ name: 'CANON', dataUrl: logoData, custom: true }],
+    logoImgCache: {},
+    scheduleRender() {}, applyZoomStyle() {}
+  };
+  app.logoImgCache[logoData] = logoImg;
+  window.EngineStyles.clearCaches();
+  // 每用例重置随机源,保证 CYBER_GLITCH 等风格可复现
+  Math.random = PRNG;
+  const takeMsgs = hookConsole();
+  let error = null;
+  try {
+    window.__render(app); // 走 renderToCanvas 真实分流(style / card / layer)
+  } catch (e) {
+    error = String((e && e.message) || e);
+  }
+  const warnLog = takeMsgs();
+  if (!error && warnLog.length) error = warnLog.join(' | ');
+  const cv = cEl;
+  const fp = fingerprint(cv);
+  const m = metricsOf(cv);
+  const pfs = template.photoFrameStyle;
+  const path = (pfs && pfs !== 'NONE') ? 'style'
+    : ((template.baseMargin || {}).bgBlurEnable === 1) ? 'card'
+    : ((template.layerList || []).length) ? 'layer' : 'simple';
+  return { id: c.id, st: c.st, path, error, W: cv.width, H: cv.height, fp, m };
+}
+
+window.__QR = {
+  ready: true,
+  async run(cases) {
+    await buildFixture();
+    return cases.map(renderCase);
+  }
+};
+</script>
+</body>
+</html>

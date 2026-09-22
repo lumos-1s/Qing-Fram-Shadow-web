@@ -38,7 +38,7 @@ module.exports = {
         'no-unused-vars': 'warn',
         'no-var': 'warn',
         'prefer-const': 'off',
-        eqeqeq: 'warn',
+        eqeqeq: ['warn', 'smart'],
         'no-mixed-spaces-and-tabs': 'error',
         'no-undef': 'error'
     }

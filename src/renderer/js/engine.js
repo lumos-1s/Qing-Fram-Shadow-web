@@ -973,7 +973,6 @@ function renderCardStyle(app) {
 // 模糊背景:用户背景图优先,否则照片本身模糊拉伸填满全部画布(原版 drawBlurredBackground)
 // 绘制区四周外扩 3 倍模糊半径,避免模糊核采样到图像边缘造成角部半透明
 function drawBlurredBackground(ctx, img, cw, ch, margin) {
-    const imgW = img.naturalWidth, imgH = img.naturalHeight;
     const blurRadius = Math.max(1, margin.bgBlurRadius || 0);
     const pad = Math.ceil(blurRadius * 3);
     const sw = cw + pad * 2, sh = ch + pad * 2;

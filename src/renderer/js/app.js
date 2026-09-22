@@ -747,6 +747,16 @@ window.App = {
         return null;
     },
 
+    // 「最终画布 → 基准画布」的换算尺寸。叠加层/参考线画在最终画布上(canvas.width,含 DPR 与
+    // displayMax 缩放),而元素比例 rx/ry 以基准画布为分母,两者在拖动降分辨率或 DPR>1 时并不相等。
+    // 传给 logoPos 的 cw/ch 必须是基准口径,否则元素会画偏。
+    logoBaseForOverlay() {
+        const cv = this.dom && this.dom.canvas;
+        const b = this.logoBaseSize();
+        if (b) return b;
+        return { w: (cv && cv.width) || 1, h: (cv && cv.height) || 1 };
+    },
+
     // 把像素中心写回元素:优先用相对比例存储(可跨照片尺寸),锚点模式则保留锚点只反算 offset。
     setLogoPixelPos(el, cx, cy) {
         if (!el) return;
@@ -1585,14 +1595,16 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         else ctx.drawImage(b, 0, 0, b.width, b.height, 0, 0, canvas.width, canvas.height);
     },
 
-    _drawDraggedEl(ctx, el, kind, cw, ch) {
+    // 注意不再接收 cw/ch:元素几何一律按「基准画布」口径计算(与引擎 drawLogoElements 一致),
+    // 传入最终画布尺寸反而会误用。保留参数位会让调用方以为尺寸有效,故直接去掉。
+    _drawDraggedEl(ctx, el, kind) {
         if (!el) return;
-        const base = this._dragBase;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        // 元素坐标以「基准画布」像素存储。基准 ≈ 拖动态当时的画布;displayMax 变化时会不一致,
-        // 用 _dragBase 存的尺寸还原系数,与引擎保持一致
-        const s = (base && base.w > 0) ? cw / base.w : 1;
-        if (s !== 1) ctx.scale(s, s);
+        // 关键:引擎在 drawLogoElements 里用 canvas._logW/_logH(基准画布)作为 rel 比例的分母,
+        // 即 rx/ry 是「相对基准画布」的比例,元素几何也在基准口径下计算。
+        // 叠加层必须与引擎完全一致,否则拖动中元素位置/大小会与松手后不同(会跳一下)。
+        // 因此这里不做额外缩放,直接按基准口径绘制(与引擎同一坐标系)。
+        const ovBase = this.logoBaseForOverlay();
         if (kind === 'logo' || kind === 'sticker') {
             const src = kind === 'logo' ? el.dataUrl : el.src;
             if (!src) return;
@@ -1604,14 +1616,9 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if (kind === 'logo') {
                 const ratio = img.naturalHeight / img.naturalWidth || 1;
                 dw = size; dh = size * ratio;
-                if (typeof el.x === 'number' && typeof el.y === 'number') {
-                    cx = el.x; cy = el.y;
-                } else {
-                    const hAlign = el.x || 'right', vAlign = el.y || 'bottom';
-                    const ox = el.offsetX || 20, oy = el.offsetY || 20;
-                    cx = hAlign === 'left' ? ox + dw / 2 : hAlign === 'center' ? cw / 2 : cw - ox - dw / 2;
-                    cy = vAlign === 'top' ? oy + dh / 2 : vAlign === 'center' ? ch / 2 : ch - oy - dh / 2;
-                }
+                // 走 logoPos 统一解析 rel / 锚点 / 旧像素三种形式,并传基准口径尺寸
+                const bp = this.logoPos(el, ovBase.w, ovBase.h, size);
+                cx = bp.cx; cy = bp.cy;
             } else {
                 dw = img.naturalWidth * (el.scale || 1);
                 dh = img.naturalHeight * (el.scale || 1);
@@ -1625,9 +1632,9 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
             ctx.restore();
         } else if (kind === 'text') {
-            // 自由文字直接复用引擎的绘制,保证与整帧渲染像素一致
+            // 自由文字复用引擎绘制,同样传基准口径(引擎也是这么调的)
             if (el.text && el.align === 'free' && window.drawTextLine) {
-                window.drawTextLine(ctx, el, cw, ch, false, 0, 0);
+                window.drawTextLine(ctx, el, ovBase.w, ovBase.h, false, 0, 0);
             }
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1651,8 +1658,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             const dragRef = this._dragEl && this._dragEl.ref;
             if (dragRef && this._dragBaseValid()) {
                 this._blitDragBase();
-                this._drawDraggedEl(this.dom.canvas.getContext('2d'), dragRef, this._dragEl.kind,
-                    this.dom.canvas.width, this.dom.canvas.height);
+                this._drawDraggedEl(this.dom.canvas.getContext('2d'), dragRef, this._dragEl.kind);
                 this.drawSelectionBox();
                 this.drawLogoGuides();
                 this.updateStatusBar();

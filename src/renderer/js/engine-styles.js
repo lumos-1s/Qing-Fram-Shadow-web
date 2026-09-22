@@ -192,27 +192,12 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
 
     // ── 渲染缓存(对齐 Java ConvolveOp/取色缓存):照片不变时模糊底与取色结果不重算 ──
-    const _blurCache = [];
-    const BLUR_CACHE_MAX = 2;
     const _smallCache = {};
     const _edgeCache = {};
     const _bottomCache = {};
     const _domCache = {};
     const _multiCache = {};
     const imgKey = img => (img && img.src ? img.src : '') + '@' + img.naturalWidth + 'x' + img.naturalHeight;
-    function getBlurBacking(key) {
-        for (let i = 0; i < _blurCache.length; i++) {
-            if (_blurCache[i].key === key) { _blurCache[i].last = Date.now(); return _blurCache[i].canvas; }
-        }
-        return null;
-    }
-    function putBlurBacking(key, canvas) {
-        _blurCache.push({ key, canvas, last: Date.now() });
-        if (_blurCache.length > BLUR_CACHE_MAX) {
-            _blurCache.sort((a, b) => a.last - b.last);
-            _blurCache.shift();
-        }
-    }
     function smallImageCached(img, maxEdge) {
         const key = imgKey(img) + ':' + maxEdge;
         let e = _smallCache[key];
@@ -220,7 +205,6 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         return e;
     }
     function clearStyleCaches() {
-        _blurCache.length = 0;
         for (const k in _smallCache) delete _smallCache[k];
         for (const k in _edgeCache) delete _edgeCache[k];
         for (const k in _bottomCache) delete _bottomCache[k];
@@ -897,35 +881,6 @@ AV_OVERLAY_BC2:67 };
         const blockH = (S.paramType === 0 ? (exifSz + scaledPx(4)) + scaledPx(6) + exifSz : exifSz);
         return Math.max(side, Math.round(blockH + scaledPx(24)));
     }
-    function createBlurBacking(img, marginLr, marginTop, marginBottom, blurIntensity) {
-        const key = imgKey(img) + ':' + marginLr + ':' + marginTop + ':' + marginBottom + ':' + blurIntensity;
-        const hit = getBlurBacking(key);
-        if (hit) return hit;
-        const bw = img.naturalWidth + marginLr * 2, bh = img.naturalHeight + marginTop + marginBottom;
-        const temp = newCanvas(bw, bh);
-        const tg = temp.getContext('2d');
-        tg.imageSmoothingEnabled = true;
-        const sc = 1.2 + blurIntensity * 0.003;
-        const sw = Math.round(img.naturalWidth * sc), sh = Math.round(img.naturalHeight * sc);
-        tg.drawImage(img, Math.floor((bw - sw) / 2), Math.floor((bh - sh) / 2), sw, sh);
-        const out = fastBlurCanvas(temp, scaledBlurRadius(blurIntensity));
-        putBlurBacking(key, out);
-        return out;
-    }
-    function drawBlurBackground(g, backing, img, cx, cy, blurMargin) {
-        g.drawImage(backing, 0, 0);
-        const edge = sampleEdgeColor(img);
-        const imgCX = cx + img.naturalWidth / 2, imgCY = cy + img.naturalHeight / 2;
-        const innerR = Math.min(img.naturalWidth, img.naturalHeight) / 2;
-        const outerR = innerR + blurMargin;
-        const d0 = Math.min(1, innerR / outerR);
-        const rad = g.createRadialGradient(imgCX, imgCY, 0, imgCX, imgCY, outerR);
-        rad.addColorStop(0, 'rgba(0,0,0,0)');
-        rad.addColorStop(d0, 'rgba(0,0,0,0)');
-        rad.addColorStop(1, 'rgba(' + edge.r + ',' + edge.g + ',' + edge.b + ',0.71)');
-        g.fillStyle = rad;
-        g.fillRect(0, 0, backing.width, backing.height);
-    }
     function drawMainPhoto(g, img, cx, cy, arc, scale, offX, offY) {
         const iw = img.naturalWidth, ih = img.naturalHeight;
         const sc = scale || 1;
@@ -1278,7 +1233,9 @@ AV_OVERLAY_BC2:67 };
         g.letterSpacing = Math.round(fBrand * 0.15);
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
-        const bmLw = drawBrandMark(g, S, S.brandLogo === 2 ? logoCenterX(S, fBrand, ml, textMetrics(g, brand, fBrand, false, true, Math.round(fBrand * 0.15)).w) : ml, Math.round(h * 0.28), fBrand);
+        // 仅Logo 模式:logo 左对齐 ml(与下方 F/ISO/S 参数框同线),不再按品牌词宽居中——
+        // 居中会随字号放大把 logo 甩离左边缘(品牌词宽无上限增长),导致印象风格左留白错位。
+        const bmLw = drawBrandMark(g, S, ml, Math.round(h * 0.28), fBrand);
         if (S.brandLogo !== 2 || !bmLw) g.fillText(brand, ml + (S.brandLogo === 2 ? 0 : bmLw), Math.round(h * 0.28));
         // 4. 三行圆角方框参数
         if (true && S.useExif && S.cam) {
@@ -1602,18 +1559,19 @@ AV_OVERLAY_BC2:67 };
             const brandW = g.measureText(brand).width;
             const markL = brandMarkW(S, fBrand);
             const onlyLogo = (S.brandLogo === 2 && markL > 0);
-            const contentW = Math.max(onlyLogo ? brandMarkNetW(S, fBrand) : (brandW + markL), exifOn ? boxW + valGap + maxValW : 0);
-            const tx = Math.max(0, Math.round((leftW + 40 - contentW) / 2));
+            // 品牌与参数解耦:各自按自身宽度在空隙中水平居中,调品牌大小只移动品牌,参数行保持原水平位置
+            const txB = Math.max(0, Math.round((leftW + 40 - (onlyLogo ? brandMarkNetW(S, fBrand) : (brandW + markL))) / 2));
+            const txP = Math.max(0, Math.round((leftW + 40 - (exifOn ? boxW + valGap + maxValW : 0)) / 2));
             g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.textAlign = 'left'; g.textBaseline = 'alphabetic';
             if (onlyLogo) {
-                const used = drawBrandMark(g, S, logoCenterX(S, fBrand, tx, textMetrics(g, brand, fBrand, false, true, brandTrack).w), Math.round(h * 0.28), fBrand);
-                if (!used) g.fillText(brand, tx, Math.round(h * 0.28));
+                const used = drawBrandMark(g, S, logoCenterX(S, fBrand, txB, textMetrics(g, brand, fBrand, false, true, brandTrack).w), Math.round(h * 0.28), fBrand);
+                if (!used) g.fillText(brand, txB, Math.round(h * 0.28));
             } else {
-                const markLUsed = drawBrandMark(g, S, tx, Math.round(h * 0.28), fBrand);
-                g.fillText(brand, tx + markLUsed, Math.round(h * 0.28));
+                const markLUsed = drawBrandMark(g, S, txB, Math.round(h * 0.28), fBrand);
+                g.fillText(brand, txB + markLUsed, Math.round(h * 0.28));
             }
-            // 三行参数(和毛玻璃一致)
+            // 三行参数(和毛玻璃一致),锚定 txP,不受品牌大小影响
             if (exifOn) {
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
@@ -1623,16 +1581,16 @@ AV_OVERLAY_BC2:67 };
                     g.strokeStyle = boxColorL;
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                     g.beginPath();
-                    if (typeof g.roundRect === 'function') g.roundRect(tx, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
-                    else g.rect(tx, ry - boxH, boxW, boxH);
+                    if (typeof g.roundRect === 'function') g.roundRect(txP, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                    else g.rect(txP, ry - boxH, boxW, boxH);
                     g.stroke();
                     g.fillStyle = boxColorL;
                     g.font = 'bold ' + fBox + 'px sans-serif';
                     g.textAlign = 'center'; g.textBaseline = 'middle';
-                    g.fillText(row.label, tx + boxW / 2, ry - boxH / 2);
+                    g.fillText(row.label, txP + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
                     g.textAlign = 'left';
-                    g.fillText(row.val, tx + boxW + valGap, ry - boxH / 2);
+                    g.fillText(row.val, txP + boxW + valGap, ry - boxH / 2);
                     ry += Math.round(boxH * 1.9);
                 });
             }
@@ -1784,15 +1742,16 @@ AV_OVERLAY_BC2:67 };
             const brandW = g.measureText(brand).width;
             const markR = brandMarkW(S, fBrand);
             const onlyLogo = (S.brandLogo === 2);
-            const contentW = Math.max(onlyLogo ? brandMarkNetW(S, fBrand) : (brandW + markR), exifOn ? boxW + valGap + maxValW : 0);
+            // 品牌与参数解耦:各自按自身宽度在右侧空隙中水平居中,调品牌大小只移动品牌,参数行保持原水平位置
             const gapW = rightW;
-            const startX = px + iw + Math.round((gapW - contentW) / 2);
+            const startXB = px + iw + Math.round((gapW - (onlyLogo ? brandMarkNetW(S, fBrand) : (brandW + markR))) / 2);
+            const startXP = px + iw + Math.round((gapW - (exifOn ? boxW + valGap + maxValW : 0)) / 2);
             g.fillStyle = S.signBgBlur ? '#ffffff' : '#1a1a1a';
             g.textAlign = 'left';
             g.textBaseline = 'alphabetic';
-            const markRUsed = drawBrandMark(g, S, startX, Math.round(h * 0.28), fBrand);
-            if (!onlyLogo || !markRUsed) g.fillText(brand, startX + markRUsed, Math.round(h * 0.28));
-            // 三行参数(和左留白镜像)
+            const markRUsed = drawBrandMark(g, S, startXB, Math.round(h * 0.28), fBrand);
+            if (!onlyLogo || !markRUsed) g.fillText(brand, startXB + markRUsed, Math.round(h * 0.28));
+            // 三行参数(和左留白镜像),锚定 startXP,不受品牌大小影响
             if (exifOn) {
                 const boxH = Math.round(boxW * 0.55);
                 const fBox = Math.max(11, Math.round(boxH * 0.45));
@@ -1802,16 +1761,16 @@ AV_OVERLAY_BC2:67 };
                     g.strokeStyle = boxColorR;
                     g.lineWidth = Math.max(1.5, Math.round(boxH * 0.08));
                     g.beginPath();
-                    if (typeof g.roundRect === 'function') g.roundRect(startX, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
-                    else g.rect(startX, ry - boxH, boxW, boxH);
+                    if (typeof g.roundRect === 'function') g.roundRect(startXP, ry - boxH, boxW, boxH, Math.round(boxH * 0.2));
+                    else g.rect(startXP, ry - boxH, boxW, boxH);
                     g.stroke();
                     g.fillStyle = boxColorR;
                     g.font = 'bold ' + fBox + 'px sans-serif';
                     g.textAlign = 'center'; g.textBaseline = 'middle';
-                    g.fillText(row.label, startX + boxW / 2, ry - boxH / 2);
+                    g.fillText(row.label, startXP + boxW / 2, ry - boxH / 2);
                     g.font = 'bold ' + fVal + 'px sans-serif';
                     g.textAlign = 'left';
-                    g.fillText(row.val, startX + boxW + valGap, ry - boxH / 2);
+                    g.fillText(row.val, startXP + boxW + valGap, ry - boxH / 2);
                     ry += Math.round(boxH * 1.9);
                 });
             }

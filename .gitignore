@@ -7,6 +7,8 @@ lint-out.txt
 s_err.log
 .DS_Store
 Thumbs.db
+# 视觉回归 dev 输出(基线本身 tests/visual/baseline.json 需入库)
+tests/visual/out/
 icon_new_2048.png
 resume_input.png
 

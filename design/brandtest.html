@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#888}</style>
+</head>
+<body>
+<canvas id="c" width="2" height="2"></canvas>
+<div id="metrics" style="display:none"></div>
+<script src="../src/renderer/js/engine.js"></script>
+<script src="../src/renderer/js/engine-styles.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const pf = Number(q.get('pf') || 33);
+const bl = Number(q.get('bl') || 2);
+const st = q.get('st') || 'IMP_FROSTED';
+const bs = Number(q.get('bs') || 1);
+(async () => {
+  const iw = 800, ih = 900;
+  const photo = document.createElement('canvas'); photo.width = iw; photo.height = ih;
+  const pg = photo.getContext('2d');
+  const sky = pg.createLinearGradient(0, 0, 0, ih);
+  sky.addColorStop(0, '#7ec8e3'); sky.addColorStop(0.55, '#e78ba0'); sky.addColorStop(1, '#5b4c7a');
+  pg.fillStyle = sky; pg.fillRect(0, 0, iw, ih);
+  pg.fillStyle = '#ffe9b0'; pg.beginPath(); pg.arc(240, 300, 60, 0, 6.2832); pg.fill();
+  pg.fillStyle = '#f6d18a'; pg.beginPath(); pg.arc(232, 298, 150, 0, 6.2832); pg.fill();
+  pg.fillStyle = '#4c446b'; pg.beginPath(); pg.moveTo(0, ih);
+  pg.lineTo(120, 480); pg.bezierCurveTo(260, 420, 320, 430, 420, 470); pg.lineTo(800, 330); pg.lineTo(800, ih); pg.closePath(); pg.fill();
+  pg.fillStyle = '#2c2a46'; pg.beginPath(); pg.moveTo(0, ih);
+  pg.lineTo(200, 620); pg.bezierCurveTo(380, 560, 460, 600, 620, 600); pg.lineTo(800, 520); pg.lineTo(800, ih); pg.closePath(); pg.fill();
+  const img = document.createElement('img');
+  await new Promise(r => { img.onload = r; img.src = photo.toDataURL('image/png'); });
+
+  const logo = document.createElement('canvas'); logo.width = 360; logo.height = 120;
+  const lg = logo.getContext('2d');
+  lg.fillStyle = '#c8102e'; lg.fillRect(0, 8, 66, 104);
+  lg.fillStyle = '#ffffff'; lg.font = 'bold 78px Arial'; lg.textBaseline = 'middle';
+  lg.fillText('CANON', 82, 62);
+  fin: {
+    const l = lg.getImageData(0, 0, 360, 120).data;
+    let x0 = 360, x1 = 0, y0 = 120, y1 = 0;
+    for (let y = 0; y < 120; y++) for (let x = 0; x < 360; x++) {
+      if (l[(y * 360 + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+    console.log('logo bbox', x0, y0, x1, y1);
+  }
+  const logoData = logo.toDataURL('image/png');
+  const logoImg = new Image();
+  await new Promise(r => { logoImg.onload = r; logoImg.src = logoData; });
+
+  const c = document.getElementById('c');
+  const template = {
+    photoFrameStyle: st, brandLogo: bl, paramFontSize: pf, brandSize: bs, photoFrameBorderSize: 40,
+    paramPosition: 'LEFT',
+    baseMargin: { imgScale: 1, imgOffsetX: 0, imgOffsetY: 0, globalMargin: 1 },
+    cornerConfig: { cornerRadiusAll: 12 },
+    manualExif: { brand: 'CANON', model: 'EOS R5', focal: '50mm', aperture: 'f/2.8', iso: 'ISO 400', shutter: '1/125' }
+  };
+  const app = {
+    template, displayMax: 2000,
+    image: { el: img, exif: {} },
+    dom: { canvas: c },
+    logos: [{ name: 'CANON', dataUrl: logoData, custom: true }],
+    logoImgCache: {},
+    scheduleRender() {}, applyZoomStyle() {}
+  };
+  app.logoImgCache[logoData] = logoImg;
+  window.EngineStyles.renderPhotoFrame(app);
+  console.log('canvas', c.width, c.height, 'st', st, 'pf', pf, 'bl', bl);
+  document.body.style.width = c.width + 'px';
+  document.body.style.height = c.height + 'px';
+  const d = document.getElementById('metrics');
+  d.style.display = 'block';
+  d.textContent = (function measure(cv) {
+    const W = cv.width, H = cv.height;
+    const g = cv.getContext('2d');
+    const red = g.getImageData(0, 0, W, H).data;
+    const isRed = (i) => red[i * 4 + 0] > 150 && red[i * 4 + 1] < 90 && red[i * 4 + 2] < 90 && red[i * 4 + 3] > 160;
+    let rx0 = W, rx1 = -1, ry0 = H, ry1 = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (isRed(y * W + x)) {
+      if (x < rx0) rx0 = x; if (x > rx1) rx1 = x;
+      if (y < ry0) ry0 = y; if (y > ry1) ry1 = y;
+    }
+    const darkMinXAt = (y0, y1) => {
+      const im = g.getImageData(0, y0, W, y1 - y0).data;
+      for (let x = 0; x < W; x++) for (let y = 0; y < (y1 - y0); y++) {
+        const i = (y * W + x) * 4;
+        if (im[i] < 120 && im[i + 1] < 120 && im[i + 2] < 120 && im[i + 3] > 150) return x;
+      }
+      return -1;
+    };
+    const whiteMinXAt = (y0, y1) => {
+      const im = g.getImageData(0, y0, W, y1 - y0).data;
+      for (let x = 0; x < W; x++) for (let y = 0; y < (y1 - y0); y++) {
+        const i = (y * W + x) * 4;
+        if (im[i] > 235 && im[i + 1] > 235 && im[i + 2] > 235 && im[i + 3] > 200) return x;
+      }
+      return -1;
+    };
+    const boxLeft = whiteMinXAt(Math.floor(H * 0.40), Math.floor(H * 0.96));
+    const boxLeftDark = darkMinXAt(Math.floor(H * 0.40), Math.floor(H * 0.96));
+    const brandLeftDark = darkMinXAt(Math.floor(H * 0.05), Math.floor(H * 0.40));
+    let brandW = -1;
+    const im = g.getImageData(0, Math.floor(H * 0.05), W, Math.floor(H * 0.40)).data;
+    for (let x = 0; x < W; x++) for (let y = 0; y < Math.floor(H * 0.35); y++) {
+      const i = (y * W + x) * 4;
+      if (im[i] > 235 && im[i + 1] > 235 && im[i + 2] > 235 && im[i + 3] > 200) { if (brandW < x) brandW = x; }
+    }
+    return JSON.stringify({ W, H, ml: boxLeft, boxLeftPx: boxLeft, boxLeftDark, brandLeftDark,
+      logoRedBox: rx0 >= 0 ? { x0: rx0, x1: rx1, y0: ry0, y1: ry1, w: rx1 - rx0 + 1, h: ry1 - ry0 + 1 } : null,
+      logoCenterX: rx0 >= 0 ? Math.round((rx0 + rx1) / 2) : -1,
+      rightmostWhiteTop: brandW });
+  })(c);
+})();
+</script>
+</body>
+</html>
