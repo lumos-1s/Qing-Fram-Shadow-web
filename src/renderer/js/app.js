@@ -3063,7 +3063,12 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         document.addEventListener('keydown', e => {
             // 输入框/文本域聚焦时不触发快捷键(避免打字冲突)
             const tag = (document.activeElement && document.activeElement.tagName) || '';
-            const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+            // range 滑块(透明度/缩放/旋转)聚焦不算打字:否则拖完滑块按 Delete 删不掉选中元素
+            let typing = tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+            if (tag === 'INPUT') {
+                const itype = ((document.activeElement.type) || 'text').toLowerCase();
+                typing = ['text', 'search', 'number', 'password', 'email', 'url', 'tel'].includes(itype);
+            }
             if (typing && !e.ctrlKey) return;
 
             if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openImages(); }
@@ -3084,7 +3089,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             }
             else if (e.ctrlKey && e.key.toLowerCase() === 'c') { if (!typing) this.copyElement(); }
             else if (e.ctrlKey && e.key.toLowerCase() === 'v') { if (typing) return; e.preventDefault(); this.pasteElement(); }
-            else if (e.key === 'Delete' && !typing) {
+            else if ((e.key === 'Delete' || e.key === 'Backspace') && !typing) {
                 e.preventDefault();
                 // 优先删拼图字幕(字幕面板打开时)
                 if (this.template && this.template.puzzle && $('cbPuzzleGapPick') && $('cbPuzzleGapPick').value) {
