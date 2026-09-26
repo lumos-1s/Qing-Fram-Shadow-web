@@ -628,6 +628,210 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.drawImage(img, px0, py0);
     }
 
+    // ── 艺术边框组(2026-09) ──
+    function styleNeonGlow(img, size, g, iw, ih) {
+        const pad = Math.max(50, Math.round(iw * 0.06));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#0a0a0f'; g.fillRect(0, 0, w, h);
+        const rnd = styleNoise(iw, ih, 8801);
+        const colors = ['#ff2d78', '#00e5ff', '#b388ff'];
+        const col = colors[rnd(colors.length)];
+        const px0 = pad, py0 = pad;
+        g.save();
+        g.shadowColor = col; g.shadowBlur = Math.round(pad * 0.9);
+        g.fillStyle = '#000';
+        g.fillRect(px0, py0, iw, ih);
+        g.restore();
+        g.drawImage(img, px0, py0);
+        g.strokeStyle = col;
+        g.lineWidth = Math.max(2, Math.round(pad * 0.08));
+        g.strokeRect(px0, py0, iw, ih);
+    }
+
+    function styleBurnedEdge(img, size, g, iw, ih) {
+        const pad = Math.max(40, Math.round(iw * 0.05));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#1a120c'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        const rnd = styleNoise(iw, ih, 8802);
+        g.drawImage(img, px0, py0);
+        const scorch = Math.max(12, Math.round(pad * 0.5));
+        let grad = g.createLinearGradient(0, py0, 0, py0 + scorch);
+        grad.addColorStop(0, 'rgba(10,5,2,0.85)'); grad.addColorStop(1, 'rgba(10,5,2,0)');
+        g.fillStyle = grad; g.fillRect(px0, py0, iw, scorch);
+        grad = g.createLinearGradient(0, py0 + ih, 0, py0 + ih - scorch);
+        grad.addColorStop(0, 'rgba(10,5,2,0.85)'); grad.addColorStop(1, 'rgba(10,5,2,0)');
+        g.fillStyle = grad; g.fillRect(px0, py0 + ih - scorch, iw, scorch);
+        grad = g.createLinearGradient(px0, 0, px0 + scorch, 0);
+        grad.addColorStop(0, 'rgba(10,5,2,0.85)'); grad.addColorStop(1, 'rgba(10,5,2,0)');
+        g.fillStyle = grad; g.fillRect(px0, py0, scorch, ih);
+        grad = g.createLinearGradient(px0 + iw, 0, px0 + iw - scorch, 0);
+        grad.addColorStop(0, 'rgba(10,5,2,0.85)'); grad.addColorStop(1, 'rgba(10,5,2,0)');
+        g.fillStyle = grad; g.fillRect(px0 + iw - scorch, py0, scorch, ih);
+        for (let i = 0; i < 14; i++) {
+            const edge = rnd(4);
+            let bx, by;
+            if (edge === 0) { bx = px0 + rnd(iw); by = py0 + rnd(Math.round(scorch * 0.6)); }
+            else if (edge === 1) { bx = px0 + rnd(iw); by = py0 + ih - rnd(Math.round(scorch * 0.6)); }
+            else if (edge === 2) { bx = px0 + rnd(Math.round(scorch * 0.6)); by = py0 + rnd(ih); }
+            else { bx = px0 + iw - rnd(Math.round(scorch * 0.6)); by = py0 + rnd(ih); }
+            const br = Math.max(4, Math.round(scorch * (0.3 + rnd(80) / 100)));
+            const rg = g.createRadialGradient(bx, by, 0, bx, by, br);
+            rg.addColorStop(0, 'rgba(5,2,0,0.7)'); rg.addColorStop(1, 'rgba(5,2,0,0)');
+            g.fillStyle = rg;
+            g.beginPath(); g.arc(bx, by, br, 0, 6.2832); g.fill();
+        }
+    }
+
+    function styleInkWash(img, size, g, iw, ih) {
+        const pad = Math.max(60, Math.round(iw * 0.08));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#f4efe3'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        const rnd = styleNoise(iw, ih, 8803);
+        for (let i = 0; i < 16; i++) {
+            const edge = rnd(4);
+            let bx, by;
+            if (edge === 0) { bx = px0 + rnd(iw); by = py0 - Math.round(pad * 0.05) + rnd(Math.round(pad * 0.6)); }
+            else if (edge === 1) { bx = px0 + rnd(iw); by = py0 + ih - Math.round(pad * 0.05) + rnd(Math.round(pad * 0.6)); }
+            else if (edge === 2) { bx = px0 - Math.round(pad * 0.05) + rnd(Math.round(pad * 0.6)); by = py0 + rnd(ih); }
+            else { bx = px0 + iw - Math.round(pad * 0.05) + rnd(Math.round(pad * 0.6)); by = py0 + rnd(ih); }
+            const br = Math.max(25, Math.round(pad * (0.6 + rnd(100) / 100)));
+            const shade = 30 + rnd(60);
+            const rg = g.createRadialGradient(bx, by, 0, bx, by, br);
+            rg.addColorStop(0, 'rgba(' + shade + ',' + shade + ',' + shade + ',0.35)');
+            rg.addColorStop(1, 'rgba(' + shade + ',' + shade + ',' + shade + ',0)');
+            g.fillStyle = rg;
+            g.beginPath(); g.arc(bx, by, br, 0, 6.2832); g.fill();
+        }
+        g.drawImage(img, px0, py0);
+        const seal = Math.max(28, Math.round(iw * 0.035));
+        const sx = px0 + iw - seal - Math.round(iw * 0.015);
+        const sy = py0 + ih - seal - Math.round(iw * 0.015);
+        g.fillStyle = '#c0392b';
+        g.fillRect(sx, sy, seal, seal);
+        g.fillStyle = '#f4efe3';
+        g.font = 'bold ' + Math.round(seal * 0.6) + 'px serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('印', sx + seal / 2, sy + seal / 2 + 1);
+    }
+
+    function styleCyanotype(img, size, g, iw, ih) {
+        const pad = Math.max(30, Math.round(iw * 0.035));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#164e7a'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        g.drawImage(img, px0, py0);
+        g.fillStyle = 'rgba(20,80,140,0.38)';
+        g.fillRect(px0, py0, iw, ih);
+        g.strokeStyle = 'rgba(240,245,250,0.85)';
+        g.lineWidth = Math.max(2, Math.round(pad * 0.12));
+        g.strokeRect(px0, py0, iw, ih);
+    }
+
+    function styleOilBrush(img, size, g, iw, ih) {
+        const pad = Math.max(55, Math.round(iw * 0.07));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#f0ebe0'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        const rnd = styleNoise(iw, ih, 8804);
+        const palette = ['#c9a66b', '#8b7355', '#6b5b47', '#a89070', '#d4b896'];
+        for (let i = 0; i < 24; i++) {
+            const edge = rnd(4);
+            let bx, by, ang;
+            if (edge === 0) { bx = px0 + rnd(iw); by = py0 - rnd(Math.round(pad * 0.3)); ang = 0; }
+            else if (edge === 1) { bx = px0 + rnd(iw); by = py0 + ih + rnd(Math.round(pad * 0.3)); ang = Math.PI; }
+            else if (edge === 2) { bx = px0 - rnd(Math.round(pad * 0.3)); by = py0 + rnd(ih); ang = Math.PI / 2; }
+            else { bx = px0 + iw + rnd(Math.round(pad * 0.3)); by = py0 + rnd(ih); ang = -Math.PI / 2; }
+            const col = palette[rnd(palette.length)];
+            g.save();
+            g.translate(bx, by); g.rotate(ang + (rnd(20) - 10) * 0.1);
+            g.fillStyle = col; g.globalAlpha = 0.55;
+            g.beginPath();
+            g.ellipse(0, 0, Math.max(8, Math.round(pad * 0.3)), Math.max(3, Math.round(pad * 0.1)), 0, 0, 6.2832);
+            g.fill();
+            g.restore();
+        }
+        g.globalAlpha = 1;
+        g.drawImage(img, px0, py0);
+    }
+
+    function stylePressedFlower(img, size, g, iw, ih) {
+        const pad = Math.max(50, Math.round(iw * 0.06));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#f7f3e8'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        g.drawImage(img, px0, py0);
+        const leafColor = '#7a8450';
+        const corners = [
+            [px0, py0, 0],
+            [px0 + iw, py0, Math.PI / 2],
+            [px0 + iw, py0 + ih, Math.PI],
+            [px0, py0 + ih, -Math.PI / 2]
+        ];
+        for (let ci = 0; ci < corners.length; ci++) {
+            const cx = corners[ci][0], cy = corners[ci][1], rot = corners[ci][2];
+            g.save();
+            g.translate(cx, cy); g.rotate(rot);
+            g.fillStyle = leafColor;
+            g.beginPath();
+            g.ellipse(0, 0, Math.round(pad * 0.28), Math.round(pad * 0.12), 0, 0, 6.2832);
+            g.fill();
+            g.strokeStyle = 'rgba(60,70,30,0.6)'; g.lineWidth = 1;
+            g.beginPath(); g.moveTo(-Math.round(pad * 0.28), 0); g.lineTo(Math.round(pad * 0.28), 0); g.stroke();
+            g.restore();
+        }
+    }
+
+    function styleWaxSeal(img, size, g, iw, ih) {
+        const pad = Math.max(45, Math.round(iw * 0.055));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#3a2a1f'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        g.fillStyle = '#f5f0e6';
+        g.fillRect(px0 - Math.round(pad * 0.15), py0 - Math.round(pad * 0.15), iw + Math.round(pad * 0.3), ih + Math.round(pad * 0.3));
+        g.drawImage(img, px0, py0);
+        const sr = Math.round(iw * 0.05);
+        const sx = px0 + iw + Math.round(pad * 0.05);
+        const sy = py0 + ih + Math.round(pad * 0.05);
+        g.save();
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 8; g.shadowOffsetY = 3;
+        const rg = g.createRadialGradient(sx - sr * 0.3, sy - sr * 0.3, sr * 0.1, sx, sy, sr);
+        rg.addColorStop(0, '#e74c3c'); rg.addColorStop(1, '#922b21');
+        g.fillStyle = rg;
+        g.beginPath(); g.arc(sx, sy, sr, 0, 6.2832); g.fill();
+        g.restore();
+        g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2;
+        g.beginPath(); g.arc(sx, sy, sr * 0.65, 0, 6.2832); g.stroke();
+    }
+
+    function stylePrismatic(img, size, g, iw, ih) {
+        const pad = Math.max(40, Math.round(iw * 0.05));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        g.fillStyle = '#0d0d12'; g.fillRect(0, 0, w, h);
+        const px0 = pad, py0 = pad;
+        g.save();
+        g.shadowColor = '#ffffff'; g.shadowBlur = Math.round(pad * 0.8);
+        g.fillStyle = '#000';
+        g.fillRect(px0, py0, iw, ih);
+        g.restore();
+        g.drawImage(img, px0, py0);
+        const bw = Math.max(3, Math.round(pad * 0.1));
+        let lg = g.createLinearGradient(px0, 0, px0 + iw, 0);
+        lg.addColorStop(0, '#ff004c'); lg.addColorStop(0.25, '#ff8a00');
+        lg.addColorStop(0.5, '#ffee00'); lg.addColorStop(0.75, '#00e676');
+        lg.addColorStop(1, '#2979ff');
+        g.fillStyle = lg;
+        g.fillRect(px0, py0 - bw, iw, bw);
+        g.fillRect(px0, py0 + ih, iw, bw);
+        lg = g.createLinearGradient(0, py0, 0, py0 + ih);
+        lg.addColorStop(0, '#ff004c'); lg.addColorStop(0.25, '#b388ff');
+        lg.addColorStop(0.5, '#00e5ff'); lg.addColorStop(0.75, '#00e676');
+        lg.addColorStop(1, '#ffee00');
+        g.fillStyle = lg;
+        g.fillRect(px0 - bw, py0, bw, ih);
+        g.fillRect(px0 + iw, py0, bw, ih);
+    }
 
     // ── 阶段二基设:风格序号 / Java Random(原件 cameraFor 的 seed RNG)──
     const ORD = { NONE:0,SIMPLE:1,POLAROID:2,FILM_STRIP:3,ROUNDED:4,DOUBLE_LINE:5,VINTAGE:6,GRADIENT:7,DROP_SHADOW:8,
@@ -2515,6 +2719,14 @@ AV_OVERLAY_BC2:67 };
                 const bh = Math.round(iw * 0.15);
                 return { w: iw + p * 2, h: ih + p + bh };
             }
+            case 'NEON_GLOW': { const p = Math.max(50, Math.round(iw * 0.06)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'BURNED_EDGE': { const p = Math.max(40, Math.round(iw * 0.05)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'INK_WASH': { const p = Math.max(60, Math.round(iw * 0.08)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'CYANOTYPE': { const p = Math.max(30, Math.round(iw * 0.035)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'OIL_BRUSH': { const p = Math.max(55, Math.round(iw * 0.07)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'PRESSED_FLOWER': { const p = Math.max(50, Math.round(iw * 0.06)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'WAX_SEAL': { const p = Math.max(45, Math.round(iw * 0.055)); return { w: iw + p * 2, h: ih + p * 2 }; }
+            case 'PRISMATIC': { const p = Math.max(40, Math.round(iw * 0.05)); return { w: iw + p * 2, h: ih + p * 2 }; }
             default:
                 return { w: iw + 60, h: ih + 60 };
         }
@@ -3458,7 +3670,11 @@ AV_OVERLAY_BC2:67 };
             STAMP_POSTAGE: styleStampPostage, TEARED_PAPER: styleTornPaper,
             FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape,
             VHS_TAPE: styleVhsTape, ALBUM_CORNER: styleAlbumCorner,
-            MOVIE_TICKET: styleMovieTicket, WATERCOLOR_BLEED: styleWatercolorBleed,
+                        MOVIE_TICKET: styleMovieTicket, WATERCOLOR_BLEED: styleWatercolorBleed,
+            NEON_GLOW: styleNeonGlow, BURNED_EDGE: styleBurnedEdge,
+            INK_WASH: styleInkWash, CYANOTYPE: styleCyanotype,
+            OIL_BRUSH: styleOilBrush, PRESSED_FLOWER: stylePressedFlower,
+            WAX_SEAL: styleWaxSeal, PRISMATIC: stylePrismatic,
             CYBER_GLITCH: styleCyberGlitch, POLAROID_HAND: stylePolaroidHand,
             TORN_JOURNAL: styleTornJournal, CARD_3D: styleCard3D,
             COMIC_PANEL: styleComicPanel, NEWSPAPER: styleNewspaper,
