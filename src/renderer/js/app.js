@@ -1160,6 +1160,15 @@ window.App = {
         le.lightLeakType = $('cbLeakType') ? $('cbLeakType').value : 'warm';
         le.lightLeakOpacity = $('slLeakOpacity') ? parseInt($('slLeakOpacity').value, 10) : 40;
         le.lightLeakAngle = $('slLeakAngle') ? parseInt($('slLeakAngle').value, 10) : 225;
+        // 颗粒只有一个滑块,没有独立开关:强度 0 即"关闭"。
+        // 这样面板少一行,而且不会出现"开关开着但强度是 0,看着像坏了"的组合。
+        // filmGrainEnable 仍然写进模型 —— 8 个老预设(NOMO复古相机/胶片相机/黑金胶片/
+        // 怀旧相机/富士写真胶片/拍立得滤镜/拍立得相纸/轻胶片电影感)早就带着
+        // filmGrainEnable:1 + filmGrainIntensity:6~18,只是引擎从来没读过(见 engine.js
+        // applyFilmGrain 上方注释)。引擎认这个 flag,所以从预设载入时必须保留它。
+        const fgv = $('slFilmGrain') ? parseInt($('slFilmGrain').value, 10) : 0;
+        le.filmGrainIntensity = fgv;
+        if (fgv > 0) le.filmGrainEnable = 1;
 
         if ($('cbExifText')) decor.exifAutoText = $('cbExifText').checked ? 1 : 0;
         decor.cornerDecorEnable = ($('cbCornerDecor') && $('cbCornerDecor').checked) ? 1 : 0;
@@ -1366,6 +1375,14 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if ($('slLeakAngle')) $('slLeakAngle').value = le.lightLeakAngle != null ? le.lightLeakAngle : 225;
             this.updateLabel('lblLeakOpacity', (le.lightLeakOpacity != null ? le.lightLeakOpacity : 40) + '%');
             this.updateLabel('lblLeakAngle', (le.lightLeakAngle != null ? le.lightLeakAngle : 225) + '°');
+            // 颗粒:以 enable 为准显示,而不是直接显示 intensity。
+            // 绝大多数预设存的是 filmGrainEnable:0 + filmGrainIntensity:10(那个 10 是
+            // 没人读过的历史遗留值)。若直接显示 intensity,滑块会显示 10% 而画面上
+            // 一点颗粒都没有 —— 用户会以为控件坏了。
+            const fgOn = le.filmGrainEnable === 1;
+            const fgVal = fgOn ? (le.filmGrainIntensity || 0) : 0;
+            if ($('slFilmGrain')) $('slFilmGrain').value = fgVal;
+            this.updateLabel('lblFilmGrain', fgVal + '%');
 
             if ($('cbCornerDecor')) $('cbCornerDecor').checked = (decor.cornerDecorEnable || 0) === 1;
             if ($('cbCornerDecorType')) $('cbCornerDecorType').value = decor.cornerDecorType || 'line';
@@ -2226,7 +2243,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             'slGlobalMargin', 'slImgScale', 'slCornerTL', 'slCornerTR', 'slCornerBL', 'slCornerBR', 'slCornerRadius',
             'slParamFontSize', 'slBrandSize', 'slParamScale', 'slFillOpacity', 'slGradientAngle', 'slTextureScale', 'slStrokeWidth', 'slStrokeOpacity',
             'slShadowX', 'slShadowY', 'slShadowBlur', 'slShadowSpread', 'slShadowOpacity', 'slGlowBlur', 'slGlowOpacity',
-            'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle',
+            'slTearStrength', 'slTearDensity', 'slVignetteStrength', 'slVignetteFeather', 'slLeakOpacity', 'slLeakAngle', 'slFilmGrain',
             'slCornerDecorSize', 'slActiveIconOpacity', 'slElementRotation', 'slPuzzleGap', 'slPuzzleCorner',
             'slCapSize1', 'slCapSize2', 'slCapSpacing', 'slSlotOffsetX', 'slSlotOffsetY', 'slSlotZoom',
             'slLayerCornerTL', 'slLayerCornerTR', 'slLayerCornerBL', 'slLayerCornerBR', 'slLayerCornerRadius',
@@ -2501,6 +2518,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             slVignetteStrength: ['lblVignetteStrength', v + '%'], slVignetteFeather: ['lblVignetteFeather', v],
             slBrandSize: ['lblBrandSize', v + '%'], slParamScale: ['lblParamScale', v + '%'],
             slLeakOpacity: ['lblLeakOpacity', v + '%'], slLeakAngle: ['lblLeakAngle', v + '°'],
+            slFilmGrain: ['lblFilmGrain', v + '%'],
             slCornerDecorSize: ['lblCornerDecorSize', v],
             slPuzzleGap: ['lblPuzzleGap', v], slPuzzleCorner: ['lblPuzzleCorner', v + '%'], slCapSize1: ['lblCapSize1', v], slCapSize2: ['lblCapSize2', v],
             slCapSpacing: ['lblCapSpacing', v + '%'], slSlotOffsetX: ['lblSlotOffsetX', v], slSlotOffsetY: ['lblSlotOffsetY', v],

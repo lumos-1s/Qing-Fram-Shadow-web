@@ -624,7 +624,69 @@ function drawFilmPerforations(ctx, config, cw, ch, margin) {
     }
 }
 
-// 全局光影(原版 applyGlobalLight:暗角 MULTIPLY + 漏光 SCREEN;无胶片颗??
+// 全局光影(暗角 MULTIPLY + 漏光 SCREEN + 胶片颗粒 OVERLAY)
+// ── 胶片颗粒 ──
+// 噪声砖缓存:key = 砖边长(强度不进 key,同一张砖用不同 alpha 复用)。
+// 之所以要缓存:一帧 4000×3455 的画布若每帧重算 1400 万个随机数,拖滑块会直接卡死。
+const GRAIN_TILE_CACHE = {};
+// 固定盐值:同一张图 + 同一个尺寸永远得到同一张颗粒图。
+// 绝不能用 Math.random() —— 否则每帧颗粒都在跳(预览"沙沙"响),
+// 而且视觉回归基线永远对不上。
+const GRAIN_SALT = 20240816;
+
+function grainTile(size) {
+    if (GRAIN_TILE_CACHE[size]) return GRAIN_TILE_CACHE[size];
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const g = c.getContext('2d');
+    const img = g.createImageData(size, size);
+    const d = img.data;
+    // 固定种子的 LCG:不用 Math.random,理由见 GRAIN_SALT
+    let seed = (Math.imul(size, 2654435761) ^ GRAIN_SALT) >>> 0;
+    for (let i = 0; i < d.length; i += 4) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        // 取高 16 位映射到 0..255,低 16 位在这类 LCG 里周期过短、分布不均
+        const v = 58 + ((seed >>> 16) & 255) * (140 / 255);   // 58..198,均值 128
+        d[i] = v; d[i + 1] = v; d[i + 2] = v;
+        d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    GRAIN_TILE_CACHE[size] = c;
+    return c;
+}
+
+// 颗粒层:强度 0~100(%)
+// 砖边长跟着画布走(约 min/3.2),而不是写死 —— 写死的话预览(约 1000px)和
+// 导出(4000px)的颗粒相对大小会差 4 倍,导出后"看不清颗粒",预览与成品对不上。
+    // 300px 短边 → 94px 砖;3000px 短边(4000x3000 图)→ 938px 砖,
+    // 两者的"每张画布几颗颗粒"一致。
+    // 单块上限 1408px 是为了让超大图别生成上千万像素的砖(约 6MB,首次会卡一下);
+    // 超出后颗粒相对画布会略微变细,对观感无影响。
+function applyFilmGrain(ctx, light, cw, ch) {
+    if (!light || light.filmGrainEnable !== 1) return;
+    const amt = clamp((light.filmGrainIntensity || 0) / 100, 0, 1);
+    if (amt <= 0) return;
+    const size = clamp(Math.round(Math.min(cw, ch) / 3.2), 96, 1408);
+    const tile = grainTile(size);
+    ctx.save();
+    // OVERLAY:亮处被提亮、暗处被压暗 —— 这才是胶片颗粒的质感。
+    // 用 'lighter'(纯加噪)会把整张图提成灰雾,像蒙了层纱,不是颗粒。
+    // 噪声砖必须**居中在 128**:OVERLAY 的枢轴是 0.5,overlay(base,128) === base,
+    // 砖均值偏离 128 就等于给照片加了一层曝光。实测均值 172 的砖会把 1200px 图的
+    // 平均亮度从 172 抬到 201(强度 100% 时),那就不是颗粒而是"把照片调亮了"。
+    ctx.globalCompositeOperation = 'overlay';
+    // 强度→alpha 用 1.5 次幂(而不是平方)。这条曲线是被仓库里已有的 10 个
+    // filmGrainEnable:1 预设逼出来的:它们的 filmGrainIntensity 全落在 6~18。
+    // 平方曲线下 6 档的 alpha 只有 0.0036,实测最大 RGB 差 0 —— 加载后画面一个
+    // 像素都不变,等于"字段有、渲染无"换了个形式又造一遍。1.5 次幂把
+    // 6/10/18 档变成 1.5%/3.2%/7.6% alpha,颗粒细腻但确实看得见;
+    // 100 档仍是 alpha=1,推得满。
+    ctx.globalAlpha = Math.pow(amt, 1.5);
+    const pat = ctx.createPattern(tile, 'repeat');
+    if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, cw, ch); }
+    ctx.restore();
+}
+
 function applyGlobalLight(ctx, light, cw, ch) {
     if (!light) return;
     if (light.vignetteEnable === 1) {
@@ -672,6 +734,9 @@ function applyGlobalLight(ctx, light, cw, ch) {
         ctx.fillRect(0, 0, cw, ch);
         ctx.restore();
     }
+    // 颗粒放在最后:暗角/漏光之后再叠,才是"拍完再冲印"的顺序。
+    // 放前面的话,漏光的 SCREEN 会把颗粒一起提亮,看起来像加了层灰纱。
+    applyFilmGrain(ctx, light, cw, ch);
 }
 
 // 文字字号:exif 自适行??2000px 基准缩放(0.5~2.5 ??,其余保持原??原版 autoExifTextSize)
