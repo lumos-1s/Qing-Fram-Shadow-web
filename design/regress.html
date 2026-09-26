@@ -157,6 +157,10 @@ async function buildFixture() {
 
 function renderCase(c) {
   const template = Object.assign({}, BASE_T, c.extra || {});
+  // baseMargin / cornerConfig 是嵌套对象,Object.assign 是浅拷贝 —— 必须重建,
+  // 否则用例改一个字段就会污染 BASE_T,后续全部用例被连带毒化。
+  template.baseMargin = Object.assign({}, BASE_T.baseMargin, (c.extra && c.extra.baseMargin) || {});
+  template.cornerConfig = Object.assign({}, BASE_T.cornerConfig, (c.extra && c.extra.cornerConfig) || {});
   // 无 photoFrameStyle 的预设(传统 baseMargin/layerList 边框)走真实分流,交给 __render
   if (c.noStyle) {
     delete template.photoFrameStyle;
@@ -166,6 +170,10 @@ function renderCase(c) {
   if (c.bl != null) template.brandLogo = c.bl;
   if (c.pf != null) template.paramFontSize = c.pf;
   if (c.bs != null) template.brandSize = c.bs;
+  if (c.cr != null) template.cornerConfig.cornerRadiusAll = c.cr;
+  if (c.gm != null) template.baseMargin.globalMargin = c.gm;
+  if (c.isc != null) template.baseMargin.imgScale = c.isc;
+  if (c.bi != null) template.blurIntensity = c.bi;
   const app = {
     template,
     displayMax: 4000,

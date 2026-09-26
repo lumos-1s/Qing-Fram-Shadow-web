@@ -1216,62 +1216,17 @@ window.App = {
         if ($('slGlobalMargin')) { const g = m.globalMargin != null ? m.globalMargin : 1; $('slGlobalMargin').value = Math.round(g * 100); this.updateLabel('lblGlobalMargin', Math.round(g * 100) + '%'); }
     },
 
+    // 面板行显隐:判定全部来自 style-caps.js(能力表)。
+    // 五个数值滑块(参数字号/圆角/统一边距/图片缩放/背景模糊程度)按**实测**能力显示 ——
+    // 即"该风格在引擎里真的读这个参数"才露出来,不再给用户拖了没反应的滑块。
+    // 实测数据由 npm run gen:caps 从视觉回归基线生成,本函数不做任何名单判断。
     updatePersonalVisibility() {
         if (!this.template) return;
-        const s = this.template.photoFrameStyle || '';
-        const isPersonal = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO','AV_OVERLAY','AV_OVERLAY_TR','AV_OVERLAY_BR','AV_OVERLAY_BC','AV_OVERLAY_BC2'].includes(s);
-        const showSig = isPersonal || s === 'CARD_3D';
-        // 个人/签名/头像/参数相关行:默认随 showSig 整组显隐(原 grpPersonal 语义)
-        const personalRowsAll = ['rowSignModel','rowSignText','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos'];
-        personalRowsAll.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showSig ? '' : 'none'; });
-        // 品牌行含型号:仅签名+参数(SIGN_PARAM,底部右区域品牌/参数行)有此选项
-        const rowSM = document.getElementById('rowSignModel');
-        if (rowSM) rowSM.style.display = (s === 'SIGN_PARAM') ? '' : 'none';
-        if (s === 'CARD_3D') {
-            ['rowParamFontSize','rowSignFont','rowSignColor','rowAvatarScale','rowSignSize','rowParamColor','rowParamType','rowParamPos','rowBgBlur','rowBgBlurInt'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = 'none';
-            });
+        const rows = window.StyleCaps.visibleRows(this.template.photoFrameStyle || '');
+        for (const id in rows) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = rows[id] ? '' : 'none';
         }
-        // 印象留白预设也显示背景模糊开关
-        const isOverlay = ['OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM'].includes(s);
-        const isLogoParam = (s === 'CARD_LOGO_PARAM');
-        const rowBgBlur = document.getElementById('rowBgBlur');
-        if (rowBgBlur) rowBgBlur.style.display = (isPersonal || isOverlay || isLogoParam) ? '' : 'none';
-        // 背景模糊经典/日期:常驻模糊样式,直接显示"模糊程度"滑块(不设开关)
-        const isBlurStyle = ['BLUR_CLASSIC','BLUR_DATE'].includes(s);
-        if (isBlurStyle) {
-            const rowBgBlurInt = document.getElementById('rowBgBlurInt');
-            if (rowBgBlurInt) rowBgBlurInt.style.display = '';
-            const rowBgBlur2 = document.getElementById('rowBgBlur');
-            if (rowBgBlur2) rowBgBlur2.style.display = 'none';
-        }
-        const rowPos = document.getElementById('rowParamPos');
-        const rowType = document.getElementById('rowParamType');
-        const isBottomBar = ['SIGNATURE','SIGN_PARAM','AVATAR_MEMO'].includes(s);
-        if (rowPos) rowPos.style.display = isBottomBar ? '' : 'none';
-        if (rowType) rowType.style.display = isBottomBar ? '' : 'none';
-        // 品牌大小/参数缩放:印象毛玻璃/左右/下留白与 logo参数 显示
-        const isImpression = ['IMP_FROSTED','OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM','CARD_LOGO_PARAM'].includes(s);
-        // 富士系水印预设:参数水印/参数品牌水印画参数 → 给"参数缩放";品牌水印/参数品牌水印画品牌 → 给"品牌大小"
-        const isWmParam = ['FUJI_WM','FUJI_WM_BRAND'].includes(s);
-        const isWmBrand = ['FUJI_WM_BRAND','DARK_BRAND_ONLY'].includes(s);
-        const rowBrand = document.getElementById('rowBrandSize');
-        if (rowBrand) rowBrand.style.display = (isImpression || isWmBrand) ? '' : 'none';
-        const rowParamScale = document.getElementById('rowParamScale');
-        if (rowParamScale) rowParamScale.style.display = (isImpression || isBlurStyle || isWmParam) ? '' : 'none';
-        // 品牌水印不画参数:隐藏"参数字号"(品牌行由"品牌大小"单独控制);CARD_3D 同理(上面已隐藏,这里保持)
-        const rowPf = document.getElementById('rowParamFontSize');
-        if (rowPf) rowPf.style.display = (s === 'DARK_BRAND_ONLY' || s === 'CARD_3D') ? 'none' : '';
-        // 相机品牌 Logo:凡品牌名会渲染成行的样式都显示该勾选(匹配 by 品牌池)
-        const brandShown = ['WM_CLASSIC','WM_BRAND_LOGO','IMP_FROSTED','IMP_CLASSIC',
-            'OVERLAY_PARAM_LEFT','OVERLAY_PARAM_RIGHT','OVERLAY_PARAM_BOTTOM',
-            'CARD_LEICA','CARD_LOGO_PARAM','CARD_PURE_LOGO','CARD_SIMPLE','CARD_IMMERSION',
-            'FUJI_WM_BRAND','DARK_BRAND_ONLY','OVERLAY_LOGO_BOTTOM',
-            'SIGN_PARAM','SIGN_BLUR','BLUR_CLASSIC','BLUR_DATE',
-            'FUJI_WHITE','COLOR_CLASSIC','ART_CARD'].includes(s);
-        const rowBrandLogo = document.getElementById('rowBrandLogo');
-        if (rowBrandLogo) rowBrandLogo.style.display = brandShown ? '' : 'none';
     },
 
     // 回显:模板 -> 控件

@@ -1,0 +1,266 @@
+// 面板控件显隐回归:锁定「切风格 → 哪些参数行可见」的行为。
+// 用法:
+//   node tools/test-panel-visibility.js            # 比对当前基线,任何变化即失败(日常/CI)
+//   node tools/test-panel-visibility.js --audit    # 比对**能力表接入前**的冻结基线,
+//                                                    #   变化必须全部落在下面两张登记表里
+//   node tools/test-panel-visibility.js --update   # 重建当前基线
+//   node tools/test-panel-visibility.js --update-pre  # 重建冻结基线(仅在故意回退能力表时用)
+//
+// 为什么需要它:updatePersonalVisibility() 只改 CSS display,不碰画布 —— 视觉回归完全覆盖不到它。
+// 而这层一旦改错,用户看到的就是「换了预设但面板控件该在的不在 / 不该在的还在」,且无法肉眼定位。
+//
+// 两种模式各管一件事:
+//   默认模式  = 防未来漂移。任何显隐变化都是回归,直接失败。
+//   --audit   = 保住"接入能力表到底改了什么"这份证据链。冻结基线永远不动,
+//               所以任何人改坏显隐逻辑时,都能复查这份变更清单是否仍然属实。
+//
+// 断言口径刻意不对称,两张表都要求人签字:
+//   HIDE_OK(原先可见→现在隐藏):该风格下这个参数实测不生效,滑块露着是误导,收起来。
+//   SHOW_OK(原先隐藏→现在可见):该参数其实生效,以前是白藏了,放出来是修复。
+//   未登记的变化一律失败;登记了却没发生的变化同样失败(防登记腐化)。
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { app, BrowserWindow, ipcMain, protocol, net } = require('electron');
+const { pathToFileURL } = require('url');
+
+// 退出码收尾。Electron 主进程**完全忽略 process.exitCode** —— 实测:app.quit() 之后设 42
+// 得到 0;连 app.quit() 都不调、只 win.destroy() 也得到 0。只有 app.exit(code) 能带出非 0。
+// 必须在所有 console 输出之后再调用(app.exit 是立即终止;实测 200 行输出不会丢)。
+function finish(code) { app.exit(code || 0); }
+
+const ROOT = path.resolve(__dirname, '..');
+const SNAP = path.join(ROOT, 'tests', 'panel-visibility.json');
+const SNAP_PRE = path.join(ROOT, 'tests', 'panel-visibility.pre-caps.json');
+const ENGINE = path.join(ROOT, 'src', 'renderer', 'js', 'engine-styles.js');
+
+// 允许的行为变化登记处。格式 'STYLE/rowId'。
+//   HIDE_OK:原先可见 → 现在隐藏。语义:该风格下这个控件对应的参数确实不生效,露出来是误导。
+//   SHOW_OK:原先隐藏 → 现在可见。语义:该参数其实生效,以前是白藏了(露出来是修复)。
+// 两张表都要求"人签字":改引擎后若某风格的能力变了,这里就该跟着变;没登记的变化一律失败。
+// 表项失效(登记了但实际没变化)也会失败,防止登记腐化。
+//
+// ── 接入 style-caps 能力表时的行为变更清单(2026-09)──
+// 基线是接入前(旧 app.js if/else 梯子)抓的,清单即本次 diff 的全部内容:
+//
+// 1) 68 处收紧,全部是"参数本就不生效、滑块却一直露着"的那一类:
+//    · rowParamFontSize × 31 个风格 —— 引擎不读 paramFontSize(实测指纹不变)
+//    · rowBgBlurInt  × 37 个风格 —— 其中大部分是**旧代码的状态泄漏**:
+//      旧梯子只在 isBlurStyle 分支把该行设为可见、从来没有 else 藏回去,于是它的显隐取决于
+//      你之前切过哪个预设(切过 BLUR_CLASSIC 后再切 WM_CLASSIC 也一直显示)。新实现是无状态纯函数。
+//    · 其余为零星几处,同样是实测不生效。
+//
+// 2) 4 处放宽,都是把以前错藏的控件放出来:
+//    · SIGN_BLUR / SIG_BLUR / AV_BLUR / rowBgBlurInt —— 这三个签名风格引擎确实读
+//      S.blurIntensity(实测指纹差 0.9~1.3),但旧梯子只对 BLUR_CLASSIC / BLUR_DATE 显示该滑块,
+//      用户根本没法调。属于修复。
+//    · DARK_BRAND_ONLY / rowParamFontSize —— 旧代码硬编码隐藏("品牌水印不画参数"),
+//      但实测 pf=160 时指纹差 11.3,说明它确实会画参数。旧注释的前提已不成立,按实测放行。
+//
+// 3) 另有一处 DECLARED(手写)行的收紧,属产品判断、已确认:见 CARD_3D/rowSignText。
+const HIDE_OK = new Set([
+    'SIMPLE/rowParamFontSize', 'WHITE_PLAIN/rowParamFontSize', 'ROUNDED/rowParamFontSize',
+    'FILM_STRIP/rowParamFontSize', 'DOUBLE_LINE/rowParamFontSize', 'VINTAGE/rowParamFontSize',
+    'GRADIENT/rowParamFontSize', 'DROP_SHADOW/rowParamFontSize', 'TEARED_PAPER/rowParamFontSize',
+    'FOLD_CORNER/rowParamFontSize', 'PINBOARD_TAPE/rowParamFontSize', 'VHS_TAPE/rowParamFontSize',
+    'ALBUM_CORNER/rowParamFontSize', 'MOVIE_TICKET/rowParamFontSize', 'WATERCOLOR_BLEED/rowParamFontSize',
+    'POLAROID_HAND/rowParamFontSize', 'TORN_JOURNAL/rowParamFontSize', 'COMIC_PANEL/rowParamFontSize',
+    'NEWSPAPER/rowParamFontSize', 'SIGNATURE/rowParamFontSize', 'AVATAR_MEMO/rowParamFontSize',
+    'AV_OVERLAY/rowParamFontSize', 'AV_OVERLAY_TR/rowParamFontSize', 'AV_OVERLAY_BR/rowParamFontSize',
+    'AV_OVERLAY_BC/rowParamFontSize', 'AV_OVERLAY_BC2/rowParamFontSize',
+    'AV_BLUR/rowParamFontSize', 'SIG_BLUR/rowParamFontSize',
+    // CARD_3D:旧梯子的隐藏清单漏了 rowSignText,导致"签名文字"单独露着,而同行��字体/颜色/头像
+    // 全被藏掉。3D 卡片风格不画签名,整组收齐更自洽。
+    'CARD_3D/rowSignText',
+    // rowBgBlurInt:旧代码状态泄漏 + 本就只在 BLUR_CLASSIC/BLUR_DATE 显形,其余一律收到"隐藏"口径
+    'WM_CLASSIC/rowBgBlurInt', 'WM_SINGLE/rowBgBlurInt', 'WM_BRAND_LOGO/rowBgBlurInt',
+    'WM_AI/rowBgBlurInt', 'IMP_FROSTED/rowBgBlurInt', 'IMP_CLASSIC/rowBgBlurInt',
+    'XIAOMI_IMP/rowBgBlurInt', 'CARD_LEICA/rowBgBlurInt', 'CARD_LOGO_PARAM/rowBgBlurInt',
+    'CARD_PURE_LOGO/rowBgBlurInt', 'CARD_SIMPLE/rowBgBlurInt', 'CARD_IMMERSION/rowBgBlurInt',
+    'OVERLAY_PARAM_LEFT/rowBgBlurInt', 'OVERLAY_PARAM_RIGHT/rowBgBlurInt',
+    'OVERLAY_PARAM_BOTTOM/rowBgBlurInt', 'FUJI_WM/rowBgBlurInt', 'FUJI_WM_BRAND/rowBgBlurInt',
+    'DARK_BRAND_ONLY/rowBgBlurInt', 'OVERLAY_LOGO_BOTTOM/rowBgBlurInt', 'COLOR_CLASSIC/rowBgBlurInt',
+    'COLOR_REFINED/rowBgBlurInt', 'ART_CARD/rowBgBlurInt', 'FUJI_WHITE/rowBgBlurInt',
+    'SIMPLE_FILM/rowBgBlurInt', 'PARAM_TOP_LEFT/rowBgBlurInt', 'PARAM_BOTTOM_LEFT/rowBgBlurInt',
+    'PARAM_BOTTOM_SINGLE/rowBgBlurInt', 'STAMP_POSTAGE/rowBgBlurInt', 'TEARED_PAPER/rowBgBlurInt',
+    'FOLD_CORNER/rowBgBlurInt', 'PINBOARD_TAPE/rowBgBlurInt', 'VHS_TAPE/rowBgBlurInt',
+    'ALBUM_CORNER/rowBgBlurInt', 'MOVIE_TICKET/rowBgBlurInt', 'WATERCOLOR_BLEED/rowBgBlurInt',
+    'POLAROID_HAND/rowBgBlurInt', 'TORN_JOURNAL/rowBgBlurInt',
+]);
+
+const SHOW_OK = new Set([
+    'SIGN_BLUR/rowBgBlurInt',
+    'SIG_BLUR/rowBgBlurInt',
+    'AV_BLUR/rowBgBlurInt',
+    'DARK_BRAND_ONLY/rowParamFontSize'
+    // 注意 PARAM_BOTTOM_LEFT/rowParamFontSize 与 STAMP_POSTAGE/rowParamFontSize 已从本表移除。
+    // 它们曾因能力表判据缺陷(用全图平均差)被误判为不生效而收进 HIDE_OK;判据改成
+    // "单格最大差 + 变化格数"后确认是真实响应(分别改动 51 / 29 格),于是又露了出来 ——
+    // 而冻结基线里它们本来就是可见的,所以相对冻结基线**净变化为零**,不进变更集。
+    // 详见 tools/gen-style-caps.js 顶部关于"为什么不能用全图平均差"的说明。
+]);
+
+// 接入能力表时在 index.html 上补 id 的三个行(原先没有任何 id,故永远显示、也没法纳入快照)。
+// 冻结基线里不存在这些行,audit 时按"新增行"单独记账,不算覆盖缺口。
+const NEW_ROWS = new Set(['rowCornerRadius', 'rowGlobalMargin', 'rowImgScale']);
+
+function drawKeys() {
+    const src = fs.readFileSync(ENGINE, 'utf8');
+    const at = src.indexOf('const draw = {');
+    if (at < 0) throw new Error('引擎源码里找不到 const draw = {');
+    const from = src.indexOf('{', at);
+    let depth = 0;
+    for (let i = from; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) {
+            return [...src.slice(from, i).matchAll(/(?:^|[\s,{])([A-Z][A-Z0-9_]*)\s*:/g)].map(m => m[1]);
+        }
+    }
+    throw new Error('const draw = { 括号未配平');
+}
+
+const CHECK = `
+async () => {
+    const App = window.App;
+    await App.loadPresets();
+    const rowIds = [...document.querySelectorAll('[id^="row"]')].map(e => e.id).sort();
+    const styles = window.__CAP_STYLES;
+    const out = {};
+    for (const s of styles) {
+        App.template = App.template || App.defaultTemplate();
+        App.template.photoFrameStyle = s;
+        App.updatePersonalVisibility();
+        const vis = {};
+        for (const id of rowIds) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            vis[id] = getComputedStyle(el).display !== 'none';
+        }
+        out[s] = vis;
+    }
+    return { rowIds, out };
+}
+`;
+
+protocol.registerSchemesAsPrivileged([
+    { scheme: 'qflocal', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+]);
+ipcMain.handle('list-presets', () => []);
+ipcMain.handle('load-preset', () => null);
+ipcMain.handle('list-logos', () => []);
+ipcMain.handle('list-textures', () => []);
+ipcMain.handle('list-templates', () => []);
+ipcMain.handle('get-prefs', () => ({}));
+ipcMain.handle('get-user', () => null);
+ipcMain.handle('save-prefs', () => ({ ok: true }));
+for (const c of ['open-image', 'open-images', 'open-sticker-image', 'import-template', 'open-qfs', 'save-template', 'load-template', 'delete-template', 'rename-template', 'export-template', 'export-qfs', 'save-user', 'logout-user', 'read-exif']) {
+    ipcMain.handle(c, () => (c.startsWith('open') ? { canceled: true } : { ok: true }));
+}
+
+app.whenReady().then(async () => {
+    protocol.handle('qflocal', (req) => {
+        try {
+            const u = new URL(req.url); const p = u.searchParams.get('p');
+            if (!p || !fs.existsSync(p)) return new Response('NF', { status: 404 });
+            return net.fetch(pathToFileURL(p).href);
+        } catch (e) { return new Response('NF', { status: 404 }); }
+    });
+    const win = new BrowserWindow({
+        width: 1400, height: 900, show: false,
+        webPreferences: { preload: path.join(__dirname, 'preload-measure.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
+    });
+    await win.loadFile(path.join(ROOT, 'src', 'renderer', 'index.html'));
+    for (let i = 0; i < 120; i++) {
+        if (await win.webContents.executeJavaScript('!!(window.App && window.App.dom && window.App.presets)')) break;
+        await new Promise(r => setTimeout(r, 250));
+    }
+    const styles = drawKeys();
+    await win.webContents.executeJavaScript(`window.__CAP_STYLES = ${JSON.stringify(styles)}`);
+    const got = await win.webContents.executeJavaScript(`(${CHECK})()`);
+    app.quit();
+
+    const isUpdate = process.argv.includes('--update');
+    const isUpdatePre = process.argv.includes('--update-pre');
+    const isAudit = process.argv.includes('--audit');
+
+    if (isUpdate || isUpdatePre) {
+        const target = isUpdatePre ? SNAP_PRE : SNAP;
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, JSON.stringify({ rowIds: got.rowIds, styles: got.out }, null, 1), 'utf8');
+        console.log(`[panel:update] ${isUpdatePre ? '冻结基线' : '当前基线'}已重建:${styles.length} 风格 × ${got.rowIds.length} 行 → ${path.relative(ROOT, target)}`);
+        finish(0);
+        return;
+    }
+
+    const refPath = isAudit ? SNAP_PRE : SNAP;
+    const refLabel = isAudit ? '能力表接入前(冻结)' : '当前基线';
+    if (!fs.existsSync(refPath)) {
+        console.error(`参照文件不存在:${path.relative(ROOT, refPath)}`);
+        finish(1);
+        return;
+    }
+    const base = JSON.parse(fs.readFileSync(refPath, 'utf8'));
+
+    const hide = [], show = [], missingRow = [], missingStyle = [], newRows = [];
+    for (const s of styles) {
+        const b = base.styles[s], g = got.out[s];
+        if (!b) { missingStyle.push(s); continue; }
+        for (const id of got.rowIds) {
+            if (!(id in b)) {
+                if (NEW_ROWS.has(id)) newRows.push(id);
+                else missingRow.push(s + '/' + id);
+                continue;
+            }
+            if (b[id] === g[id]) continue;
+            const key = s + '/' + id;
+            if (b[id] && !g[id]) hide.push([key, HIDE_OK.has(key)]);
+            else show.push([key, SHOW_OK.has(key)]);
+        }
+    }
+
+    console.log(`== 面板显隐回归 (${isAudit ? 'audit · 对照 ' + refLabel : refLabel}) ==`);
+    console.log(`  风格 ${styles.length} / 行 ${got.rowIds.length}`);
+    if (missingStyle.length) console.log(`  参照缺风格 ${missingStyle.length}: ${missingStyle.slice(0, 5).join(', ')}${missingStyle.length > 5 ? '…' : ''}`);
+    if (missingRow.length) console.log(`  参照缺行 ${missingRow.length}: ${missingRow.slice(0, 5).join(', ')}${missingRow.length > 5 ? '…' : ''}`);
+    if (newRows.length) console.log(`  新增行(冻结基线中不存在,按新增记账): ${[...new Set(newRows)].join(', ')}`);
+
+    // 注意:退出码只能走 app.exit() —— 见文件头 finish() 的注释。app.quit() 之后再调
+    // process.exit() 不会立即终止(本 async 函数会继续往下跑,踩过:后面整段审计逻辑被意外执行);
+    // 而只设 process.exitCode 又会被 Electron 主进程忽略(实测恒为 0)。
+    if (!isAudit) {
+        // 默认模式:当前基线即真理,任何变化都是回归
+        const all = hide.map(h => h[0]).concat(show.map(h => h[0]));
+        if (all.length) {
+            console.log('--- 与当前基线不一致 ✖(显隐逻辑发生了未预期的变化)---');
+            all.forEach(k => console.log('  ' + k));
+        } else {
+            console.log('  一致');
+        }
+        finish(all.length || missingRow.length || missingStyle.length ? 1 : 0);
+        return;
+    }
+
+    // audit 模式:冻结基线是"接入能力表之前"的真实行为,变化必须逐条有登记
+    const badHide = hide.filter(h => !h[1]);
+    const badShow = show.filter(h => !h[1]);
+    const staleReg = [
+        ...[...HIDE_OK].filter(k => !hide.some(h => h[0] === k)).map(k => ['HIDE_OK', k]),
+        ...[...SHOW_OK].filter(k => !show.some(h => h[0] === k)).map(k => ['SHOW_OK', k])
+    ];
+    console.log(`  收紧(可见→隐藏) ${hide.length}  未登记 ${badHide.length}`);
+    console.log(`  放宽(隐藏→可见) ${show.length}  未登记 ${badShow.length}`);
+    for (const [list, title] of [[badHide, '收紧但未登记 ✖'], [badShow, '放宽但未登记 ✖']]) {
+        if (!list.length) continue;
+        console.log(`--- ${title} ---`);
+        list.forEach(h => console.log('  ' + h[0]));
+    }
+    if (staleReg.length) {
+        console.log(`--- 登记已失效 ${staleReg.length} 条(从对应表删掉)---`);
+        staleReg.forEach(([t, k]) => console.log('  ' + t + ' ' + k));
+    }
+    if (!badHide.length && !badShow.length && !staleReg.length) {
+        console.log('  ✓ 变更集与文档登记完全一致');
+    }
+    finish(badHide.length || badShow.length || staleReg.length || missingRow.length || missingStyle.length ? 1 : 0);
+}).catch(e => { console.error(e); finish(1); });

@@ -180,7 +180,7 @@
                                     <option value="2.35:1">2.35:1</option>
                                 </select>
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowGlobalMargin">
                                 <label>统一边距</label>
                                 <input type="range" id="slGlobalMargin" class="ctl-rng" min="10" max="300" step="10" value="100" />
                                 <span class="pval" id="lblGlobalMargin"></span>
@@ -190,12 +190,12 @@
 
                         <div class="param-group">
                             <div class="pg-title collapsible">照片</div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowImgScale">
                                 <label>图片缩放</label>
                                 <input type="range" id="slImgScale" class="ctl-rng" min="10" max="150" step="1" value="100" />
                                 <span class="pval" id="lblImgScale"></span>
                             </div>
-                            <div class="param-row">
+                            <div class="param-row" id="rowCornerRadius">
                                 <label>照片圆角</label>
                                 <input type="range" id="slCornerRadius" class="ctl-rng" min="0" max="500" value="0" />
                                 <span class="pval" id="lblCornerRadius"></span>
@@ -778,6 +778,7 @@
     <script src="js/presets.js"></script>
     <script src="js/engine.js"></script>
     <script src="js/engine-styles.js"></script>
+  <script src="js/style-caps.js"></script>
     <script src="js/app.js"></script>
     <script src="js/app-state.js"></script>
     <script src="js/app-templates.js"></script>

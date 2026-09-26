@@ -25,41 +25,43 @@ const FP_TOL = 2.0;        // 指纹平均通道差(0-255)
 const POS_TOL = 2;         // 指标 px 容差
 const WARN_TOL = 3;        // 预设冒烟:量有偏差但很小
 
+// 退出码收尾。Electron 主进程**完全忽略 process.exitCode** —— 实测:app.quit() 之后设 42
+// 得到 0;连 app.quit() 都不调、只 win.destroy() 也得到 0。只有 app.exit(code) 能带出非 0。
+// 必须在所有 console 输出之后再调用(app.exit 是立即终止;实测 200 行输出不会丢)。
+function finish(code) { app.exit(code || 0); }
+
 // ── 测试矩阵 ──
-// 全量 63 风格(engine-styles.js draw 映射),bl=1(文字+logo) pf=33 bs=1 基准
-const STYLE_NAMES = [
-  'SIMPLE', 'WHITE_PLAIN', 'ROUNDED', 'FILM_STRIP', 'POLAROID', 'DOUBLE_LINE', 'VINTAGE',
-  'GRADIENT', 'DROP_SHADOW', 'BLUR_CLASSIC', 'BLUR_DATE',
-  'WM_CLASSIC', 'WM_SINGLE', 'WM_BRAND_LOGO', 'WM_AI', 'IMP_FROSTED', 'IMP_CLASSIC', 'XIAOMI_IMP',
-  'CARD_LEICA', 'CARD_LOGO_PARAM', 'CARD_PURE_LOGO', 'CARD_SIMPLE', 'CARD_IMMERSION',
-  'OVERLAY_PARAM_LEFT', 'OVERLAY_PARAM_RIGHT', 'OVERLAY_PARAM_BOTTOM',
-  'FUJI_WM', 'FUJI_WM_BRAND', 'DARK_BRAND_ONLY', 'OVERLAY_LOGO_BOTTOM',
-  'COLOR_CLASSIC', 'COLOR_REFINED', 'ART_CARD', 'FUJI_WHITE',
-  'SIMPLE_FILM', 'PARAM_TOP_LEFT', 'PARAM_BOTTOM_LEFT', 'PARAM_BOTTOM_SINGLE',
-  'STAMP_POSTAGE', 'TEARED_PAPER', 'FOLD_CORNER', 'PINBOARD_TAPE', 'VHS_TAPE', 'ALBUM_CORNER',
-  'MOVIE_TICKET', 'WATERCOLOR_BLEED', 'CYBER_GLITCH', 'POLAROID_HAND', 'TORN_JOURNAL',
-  'CARD_3D', 'COMIC_PANEL', 'NEWSPAPER', 'SIGNATURE', 'SIGN_PARAM', 'AVATAR_MEMO',
-  'SIGN_BLUR', 'SIG_BLUR', 'AV_BLUR', 'AV_OVERLAY', 'AV_OVERLAY_TR', 'AV_OVERLAY_BR',
-  'AV_OVERLAY_BC', 'AV_OVERLAY_BC2'
-];
+// 风格清单直接取自 engine-styles.js 的 `const draw = {...}` 映射表 ——
+// 引擎新增风格时本矩阵自动跟上,不会再出现"引擎画了但回归没测"的盲区。
+// (原先这里是手抄的 63 个名字,和引擎、与 validate-presets.js 各存一份,必然漂移。)
+// 提取方式与 tools/validate-presets.js 相同:括号配平截取,不能按子串切。
+function engineDrawKeys() {
+    const src = fs.readFileSync(path.join(ROOT, 'src', 'renderer', 'js', 'engine-styles.js'), 'utf8');
+    const at = src.indexOf('const draw = {');
+    if (at < 0) throw new Error('engine-styles.js 里找不到 const draw = {');
+    const from = src.indexOf('{', at);
+    let depth = 0;
+    for (let i = from; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) {
+            return [...src.slice(from, i).matchAll(/(?:^|[\s,{])([A-Z][A-Z0-9_]*)\s*:/g)].map(m => m[1]);
+        }
+    }
+    throw new Error('engine-styles.js: const draw = { 括号未配平');
+}
+const STYLE_NAMES = engineDrawKeys();
+if (!STYLE_NAMES.length) throw new Error('从引擎 draw 表里没提取到任何风格名');
 
-// 品牌 logo 会出现的风格:跑 brandLogo × brandSize 组合
-const BRAND_STYLES = [
-  'WM_CLASSIC', 'WM_BRAND_LOGO', 'IMP_FROSTED', 'IMP_CLASSIC',
-  'OVERLAY_PARAM_LEFT', 'OVERLAY_PARAM_RIGHT', 'OVERLAY_PARAM_BOTTOM',
-  'CARD_LEICA', 'CARD_LOGO_PARAM', 'CARD_PURE_LOGO', 'CARD_SIMPLE', 'CARD_IMMERSION',
-  'FUJI_WM_BRAND', 'DARK_BRAND_ONLY', 'OVERLAY_LOGO_BOTTOM',
-  'SIGN_PARAM', 'SIGN_BLUR', 'BLUR_CLASSIC', 'BLUR_DATE',
-  'FUJI_WHITE', 'COLOR_CLASSIC', 'ART_CARD'
-];
+// 能力维度(全风格覆盖)与品牌 logo 名单都取自 style-caps.js —— 单一事实来源,不要在本文件另抄一份。
+// 五个滑块(paramFontSize / 圆角 / 统一边距 / 图片缩放 / 背景模糊程度)在面板上对所有风格可见,
+// 所以每个风格 × 每个维度都取两个极值:指纹与该风格 __base 相同 = 该风格不读这个参数。
+// 这份数据同时是 gen-style-caps.js 生成能力表的输入。
+const StyleCaps = require('../src/renderer/js/style-caps.js');
+const ALL_DIMS = StyleCaps.DIMS.map(d => [d.key, d.probe]);
+const BRAND_STYLES = StyleCaps.BRAND_LOGO_STYLES;
 
-// 参数放大会显著影响布局的风格:跑 paramFontSize 极值
-const PARAM_STYLES = [
-  'IMP_FROSTED', 'OVERLAY_PARAM_LEFT', 'OVERLAY_PARAM_RIGHT', 'OVERLAY_PARAM_BOTTOM',
-  'CARD_LOGO_PARAM', 'CARD_LEICA', 'WM_CLASSIC', 'WM_SINGLE', 'WM_BRAND_LOGO', 'WM_AI',
-  'BLUR_CLASSIC', 'BLUR_DATE', 'SIGN_PARAM', 'SIGN_BLUR', 'FUJI_WM_BRAND', 'AV_BLUR',
-  'CARD_IMMERSION'
-];
+// 注:原先的 PARAM_STYLES 子集(17 个风格 × paramFontSize 极值)已被下面的
+// 「全风格 × ALL_DIMS」完全覆盖,故删除 —— 留着会产生重复 case id。
 
 function buildCases() {
   const cases = [];
@@ -74,9 +76,15 @@ function buildCases() {
       cases.push({ id: st + tag, st, bl, pf: 33, bs });
     }
   }
-  for (const st of PARAM_STYLES) {
-    for (const pf of [16, 160]) {
-      cases.push({ id: st + '__pf' + pf, st, bl: 1, pf, bs: 1 });
+  // 全风格 × 全维度:能力表(style-caps)的数据源。
+  // 指纹与 __base 相同即"该风格不吃这个参数",gen-style-caps.js 据此反推能力表,
+  // 避免手维护的表和真实行为腐烂。用例 id 的数值写法由 style-caps.caseSuffix 统一,
+  // 改它等于作废整个基线。
+  for (const st of STYLE_NAMES) {
+    for (const [dim, vals] of ALL_DIMS) {
+      for (const v of vals) {
+        cases.push({ id: StyleCaps.dimCaseId(st, dim, v), st, bl: 1, pf: 33, bs: 1, [dim]: v });
+      }
     }
   }
   return cases;
@@ -178,7 +186,7 @@ function main() {
         console.log('--- render errors ---');
         for (const r of bad) console.log('  ' + r.id + ': ' + r.error.slice(0, 120));
       }
-      process.exit(bad.length ? 1 : 0);
+      finish(bad.length ? 1 : 0);
       return;
     }
 
@@ -196,13 +204,14 @@ function main() {
       }
       console.log('  路径分布: ' + Object.keys(byPath).map(k => k + ':' + byPath[k]).join('  '));
       console.log(`  通过 ${ok} / 失败 ${fail}`);
-      process.exit(fail ? 1 : 0);
+      finish(fail ? 1 : 0);
       return;
     }
 
     // update / compare
     const updated = {};
     let diffList = [];
+    let newList = [];
     let renderErrors = 0;
 
     for (const r of results) {
@@ -211,7 +220,7 @@ function main() {
       updated[r.id] = mine;
       const ref = baseline[r.id];
       if (isUpdate) continue;
-      if (!ref) continue; // 新增用例,update 时自动收录
+      if (!ref) { newList.push(r.id); continue; } // 新增用例:update 时自动收录,compare 不算通过
       let over = false, why = '';
       if (ref.W !== r.W || ref.H !== r.H) { over = true; why = `尺寸 ${ref.W}x${ref.H} -> ${r.W}x${r.H}`; }
       const fd = fpDiff(ref.fp, r.fp);
@@ -224,15 +233,19 @@ function main() {
     if (isUpdate) {
       saveBaseline(updated);
       console.log(`[visual:update] 基线已重建:${Object.keys(updated).length} 用例 (renderErrors=${renderErrors})`);
-      process.exit(renderErrors ? 1 : 0);
+      finish(renderErrors ? 1 : 0);
       return;
     }
 
     const total = Object.keys(updated).length;
-    const matched = total - diffList.length;
+    const matched = total - diffList.length - newList.length;
     console.log(`== 视觉回归 (${mode}) ==`);
     console.log(`  渲染 ${runCases.length} 用例 / 无错 ${total} / 渲染失败 ${renderErrors}`);
-    console.log(`  与基线比对:一致 ${matched} / 差异 ${diffList.length}`);
+    console.log(`  与基线比对:一致 ${matched} / 差异 ${diffList.length} / 无基线 ${newList.length}`);
+    if (newList.length) {
+      console.log('--- 无基线(需 --update 收录) ---');
+      for (const id of newList) console.log('  ' + id);
+    }
     if (diffList.length) {
       console.log('--- 差异明细 ---');
       for (const d of diffList) console.log('  ' + d.id + ': ' + d.why);
@@ -241,7 +254,7 @@ function main() {
     if (stale.length) {
       console.log(`  (基线含 ${stale.length} 个已不存在的用例,可用 --update 清理)`);
     }
-    process.exit(renderErrors || diffList.length ? 1 : 0);
+    finish(renderErrors || diffList.length || newList.length ? 1 : 0);
   });
 }
 
