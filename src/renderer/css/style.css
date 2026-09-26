@@ -471,9 +471,12 @@ html.dark .import-progress { background: rgba(30,32,40,.94); }
 }
 /* 自适应类参数的值可能是一句中文(如"自适应"),46px 装不下,单独放宽 */
 .param-row .pval-wide { flex: 0 0 58px; }
-/* 档位值旁边的说明小字:解释这个数字不是最终像素,不参与布局计算宽度之外的排版 */
+/* 档位值旁边的说明小字:解释这个数字不是最终像素。
+   面板行只有 ~255px 宽,若让小字参与同一行的 flex 分配,滑块会被从 97px 挤到 18px
+   (1 像素 ≈ 80 个档位,完全无法微调)。故整行换行,小字独占第二行。 */
+.param-row:has(> .pval-note:not(:empty)) { flex-wrap: wrap; }
 .param-row .pval-note {
-    flex: 0 0 auto; margin-left: 5px; color: var(--text-3);
+    flex: 1 0 100%; order: 9; color: var(--text-3);
     font-size: 11px; line-height: 1.2; white-space: nowrap;
 }
 .param-row .pval-note:empty { display: none; }

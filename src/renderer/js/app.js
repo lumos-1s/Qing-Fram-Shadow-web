@@ -2238,6 +2238,26 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if (el) el.addEventListener('input', () => this.onSliderCustom(id, parseInt(el.value, 10)));
         });
 
+        // 参数字号:双击滑块回到默认档位(= 刚加完边框那一刻软件给的字号)。
+        // 默认档在滑块中段(33/160),想回去得一路拖,太精细;双击给一条直达路径。
+        // 走的是与拖动完全相同的 onSliderCustom 通路,标签刷新、重绘、撤销栈都不会分叉。
+        // 只给这一个滑块加:其余 range 滑块(统一边距/图片缩放/参数缩放/品牌大小/背景模糊程度)
+        // 全是 min>=10 的百分比区间,引擎侧没有"默认"档位,没有可回退的目标。
+        //
+        // 注意:目标不是档位 0。0 是 autoPf = clamp(round(min(iw,ih)/45), 20, 64)
+        // (engine-styles.js buildState),与默认档是两条不同公式:小图上 0 档偏小约 1.7 倍,
+        // 大图上因撞 64 档上限反而偏大 1.9 倍。所以双击回的是 defaultTemplate() 的那个值。
+        const slPF = $('slParamFontSize');
+        if (slPF) {
+            slPF.title = '双击回到默认字号';
+            slPF.addEventListener('dblclick', () => {
+                const def = Number(this.defaultTemplate().paramFontSize) || 33;
+                if (parseInt(slPF.value, 10) === def) return;  // 已在默认档,不做无谓重绘
+                slPF.value = String(def);
+                this.onSliderCustom('slParamFontSize', def);
+            });
+        }
+
         // 复选框 -> onSettingCommit
         const chks = ['cbCornerLock', 'cbShadow', 'cbGlow', 'cbTearEnable',
             'cbVignette', 'cbLightLeak', 'cbCornerDecor', 'cbCapBgBar', 'cbLayerCornerLock', 'cbExifText'];

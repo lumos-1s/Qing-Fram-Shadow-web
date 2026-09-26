@@ -12,6 +12,11 @@
 //
 // 这层测试的价值不在"数字对不对",而在**照片宽度不变性**:同一档位换任何图宽,标签必须
 // 逐字相同。曾经把 px 折算进来的改法就是在这里被挡住的。
+//
+// 另一件事:滑块双击的终点。必须是 defaultTemplate() 的默认档(= 刚加完边框那一刻的字号),
+// **不是档位 0**。0 走的是 autoPf = clamp(round(min(iw,ih)/45), 20, 64)(engine-styles.js
+// buildState),与默认档是两条不同公式:小图上偏小约 1.7 倍,大图撞 64 上限后偏大约 1.9 倍。
+// 把"回默认"错做成"回 0 档"时,只有这条断言能拦住。
 'use strict';
 
 const fs = require('fs');
@@ -50,7 +55,41 @@ const CHECK = `
       out.push({ pf: pf, w: w, val: val.textContent, note: note.textContent });
     }
   }
-  return out;
+  // 双击滑块回到默认档位(= 刚加完边框那一刻的字号):走真实 DOM 事件,验证绑定、模板落值、滑块位置、标签四者一致
+  const sl = document.getElementById('slParamFontSize');
+  if (!sl) throw new Error('找不到 slParamFontSize');
+  const defPf = App.defaultTemplate().paramFontSize;
+  const dbl = [];
+  for (const start of [0, 1, 33, 100, 160]) {
+    App.image = { w: 1200, h: 900 };
+    App.template = { paramFontSize: start };
+    sl.value = String(start);
+    sl.dispatchEvent(new Event('input', { bubbles: true }));
+    const before = { tpl: App.template.paramFontSize, val: val.textContent, note: note.textContent, sl: sl.value };
+    sl.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    dbl.push({ start: start, before: before, tpl: App.template.paramFontSize, val: val.textContent, note: note.textContent, sl: sl.value });
+  }
+  // 已在默认档时再双击:应保持不变且不产生额外渲染(用计数器观察)
+  let renders = 0;
+  const origRender = App.renderPreview;
+  App.renderPreview = function () { renders++; return origRender.apply(this, arguments); };
+  App.template = { paramFontSize: defPf };
+  sl.value = String(defPf);
+  sl.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+  App.renderPreview = origRender;
+  // 调节精度:说明小字不得挤占滑块横向空间。
+  // 面板行只有 ~255px 宽,若"按图宽自适应"(66px)与滑块同行参与 flex 分配,
+  // 滑块会从 97px 被压到 18px —— 1 像素 = 80 个档位,滑块等于废掉(用户报"一下就是10")。
+  // 这里量 note 空/非空两种状态下的滑块宽度,要求一致。
+  const noteBox = document.getElementById('lblParamFontNote');
+  const keep = noteBox.textContent;
+  noteBox.textContent = '';
+  const wEmpty = sl.getBoundingClientRect().width;
+  noteBox.textContent = keep || ${JSON.stringify(NOTE_MANUAL)};
+  const wNote = sl.getBoundingClientRect().width;
+  const perPx = (sl.max - sl.min) / Math.max(1, wNote - 16);
+  return { rows: out, dbl: dbl, idleRenders: renders, defPf: defPf,
+           track: { wEmpty: wEmpty, wNote: wNote, perPx: perPx } };
 })()
 `;
 
@@ -63,7 +102,7 @@ app.whenReady().then(async () => {
 
   const fails = [];
   const byPf = {};
-  for (const r of got) (byPf[r.pf] = byPf[r.pf] || []).push(r);
+  for (const r of got.rows) (byPf[r.pf] = byPf[r.pf] || []).push(r);
 
   for (const pf of Object.keys(byPf).map(Number).sort((a, b) => a - b)) {
     const rows = byPf[pf];
@@ -91,6 +130,31 @@ app.whenReady().then(async () => {
     const tag = pf === 0 ? '自适应' : '手动';
     console.log(`  ${String(pf).padStart(3)} 档位  [${tag}]  标签="${r.val}"  说明="${r.note}"  (${WIDTHS.length} 种图宽下逐字相同)`);
   }
+
+  console.log('─'.repeat(64));
+  console.log('  双击滑块 → 回到默认档位(刚加完边框的字号):');
+  const DEF = got.defPf;
+  for (const d of got.dbl) {
+    const ok = d.tpl === DEF && d.val === String(DEF) && d.note === NOTE_MANUAL && d.sl === String(DEF);
+    if (!ok) fails.push(`档位 ${d.start} 双击后未回到默认 ${DEF}: 模板=${d.tpl} 标签="${d.val}" 说明="${d.note}" 滑块=${d.sl}`);
+    console.log(`    ${String(d.start).padStart(3)} → ${ok ? 'OK' : '✖'}  模板=${d.tpl}  标签="${d.val}"  滑块=${d.sl}`);
+  }
+  // 双击终点必须等于"刚加完边框"的默认档,而不是档位 0。
+  // 0 档走 autoPf = clamp(round(min(iw,ih)/45), 20, 64),与默认档是两条公式:
+  // 小图偏小约 1.7 倍,大图撞 64 上限后偏大 1.9 倍。滑块两端都要覆盖到。
+  if (DEF === 0) fails.push('defaultTemplate().paramFontSize 为 0,双击将退回 autoPf 档而非刚加完边框的字号');
+  console.log(`    默认档位(取自 defaultTemplate()): ${DEF}`);
+  if (got.idleRenders !== 0) fails.push(`已在默认档 ${DEF} 时双击仍产生了 ${got.idleRenders} 次重绘(应为 0)`);
+  console.log(`    已在默认档再双击: ${got.idleRenders === 0 ? 'OK(无重绘)' : '✖ ' + got.idleRenders + ' 次重绘'}`);
+
+  // 调节精度:说明小字显示时,滑块不能被挤窄
+  const t = got.track;
+  const shrink = t.wEmpty - t.wNote;
+  if (shrink > 1) fails.push(`说明小字挤占滑块宽度:空 ${t.wEmpty.toFixed(1)}px → 有 ${t.wNote.toFixed(1)}px(窄了 ${shrink.toFixed(1)}px)`);
+  if (t.perPx > 3) fails.push(`滑块调节过粗:1 像素 = ${t.perPx.toFixed(2)} 个档位(应 ≤ 3)`);
+  console.log('─'.repeat(64));
+  console.log(`  调节精度: 滑块 空${t.wEmpty.toFixed(0)}px / 有说明${t.wNote.toFixed(0)}px, 1 像素 = ${t.perPx.toFixed(2)} 档`);
+
   console.log('─'.repeat(64));
   if (fails.length) {
     console.log(`✖ ${fails.length} 项不符:`);
