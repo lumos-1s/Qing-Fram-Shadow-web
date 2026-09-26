@@ -1329,8 +1329,14 @@ AV_OVERLAY_BC2:67 };
         g2.beginPath();
         g2.arc(pad + dotD / 2, capCenter, dotD / 2, 0, Math.PI * 2);
         g2.fill();
-        const brandLw = drawBrandMark(g2, S, S.brandLogo === 2 ? logoCenterX(S, bf, pad + dotD + dotGap, bm.w) : pad + dotD + dotGap, baseY, bf);
-        if (!(S.brandLogo === 2 && brandLw)) drawTextL(g2, brand, pad + dotD + dotGap + (S.brandLogo === 2 ? 0 : brandLw), baseY, 'rgb(30,30,30)', bf, false, true, 0);
+        // logo 顶替品牌文字时,本意是让 logo 居中于文字原来的区域(logoCenterX)。
+        // 但 logo 比文字宽时,居中会把左边缘反向推到红点身上:Leica 是宽字标,
+        // 实测 logo 宽高比 ≥6:1 (如 240×40) 时红点被完全盖住,≥10:1 (400×40) 时
+        // logo 左缘还会越出画布。故夹住下界,永远不早于文字起点 brandX。
+        // logo 比文字窄时居中结果本就在 brandX 右侧,夹取不生效,行为完全不变。
+        const brandX = pad + dotD + dotGap;
+        const brandLw = drawBrandMark(g2, S, S.brandLogo === 2 ? Math.max(brandX, logoCenterX(S, bf, brandX, bm.w)) : brandX, baseY, bf);
+        if (!(S.brandLogo === 2 && brandLw)) drawTextL(g2, brand, brandX + (S.brandLogo === 2 ? 0 : brandLw), baseY, 'rgb(30,30,30)', bf, false, true, 0);
         if (pf && pl) drawTextL(g2, pl, w - pad - pm.w, baseY, 'rgb(120,120,120)', pf, true, false, 0);
     }
     function styleCardLogoParam(img, size, g, iw, ih, S) {
@@ -2694,17 +2700,29 @@ AV_OVERLAY_BC2:67 };
         // 照片
         g.drawImage(img, border, border, iw, ih);
         // 底部手写日期
+        // 字号原来硬编码 18px,而 border / bottomPad 都跟着 iw 缩放 —— 图越大字越小:
+        // 18px 在 800px 图上占白条 16%,到 4000px 图只剩 3.2%,基本看不见。
+        // 改为按照片下方**实际**白条高度取(白条高度 = 画布高 - 照片下缘,自动吸收
+        // styleDims 与本函数 border/bottomPad 两处口径不同的历史差异),不会溢出画布。
+        const bandH = h - (border + ih);
+        const dateFs = Math.max(18, Math.round(bandH * 0.25));
+        const dateTxt = new Date().toLocaleDateString('zh-CN');
+        const baseY = border + ih + Math.round(bandH * 0.55);
         g.fillStyle = '#333';
-        g.font = 'italic 18px "Comic Sans MS", cursive';
+        g.font = 'italic ' + dateFs + 'px "Comic Sans MS", cursive';
         g.textAlign = 'center';
         g.save();
-        g.translate(w / 2, border + ih + 40);
+        g.translate(w / 2, baseY);
         g.rotate(-0.03);
-        g.fillText(new Date().toLocaleDateString('zh-CN'), 0, 0);
+        g.fillText(dateTxt, 0, 0);
         g.restore();
-        // 小爱心装饰
+        // 小爱心装饰:贴在日期右端外侧,半径随字号缩放
+        // (原来固定 +80px / r=4,字号一大就陷进文字里了)
+        const heartR = Math.max(4, Math.round(dateFs * 0.22));
         g.fillStyle = '#ff6b9d';
-        g.beginPath(); g.arc(w / 2 + 80, border + ih + 35, 4, 0, Math.PI * 2); g.fill();
+        g.beginPath();
+        g.arc(w / 2 + g.measureText(dateTxt).width / 2 + heartR * 3, baseY - dateFs * 0.3, heartR, 0, Math.PI * 2);
+        g.fill();
     }
 
     // ══ 撕纸手账风:牛皮纸页 + 撕边白纸贴照片 + 和纸胶带 + 手写批注 ══
