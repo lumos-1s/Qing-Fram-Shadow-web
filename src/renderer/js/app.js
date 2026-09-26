@@ -1467,12 +1467,20 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (el) el.textContent = String(text);
     },
 
+    // 字号标签只报「档位」,不报像素。
+    // 档位会按照片宽度缩放(autoExifSize = 档位 × clamp(iw/1200, 0.5, 8)),同一档位在
+    // 1200px 与 4000px 宽的照片上能差 3 倍以上。所以这里若折算成 px,标签就是个会跳的
+    // 假数字 —— 用户拖到 100 看到"333px",换张图又变 213px,正是"字号不跟随"的观感来源。
+    // 自适应本身就是按图宽算的,报一个具体 px 只会让人误以为它是定值,故只报"自适应"。
     updateParamFontLabel() {
         const v = this.template.paramFontSize != null ? this.template.paramFontSize : 33;
         if (v <= 0) {
-            const s = this.image ? Math.min(Math.max(Math.round(Math.min(this.image.w, this.image.h) / 45), 20), 64) : 24;
-            this.updateLabel('lblParamFontSize', `自适应(≈${s}px)`);
-        } else this.updateLabel('lblParamFontSize', v + 'px');
+            this.updateLabel('lblParamFontSize', '自适应');
+            this.updateLabel('lblParamFontNote', '');
+        } else {
+            this.updateLabel('lblParamFontSize', String(v));
+            this.updateLabel('lblParamFontNote', '按图宽自适应');
+        }
     },
 
     currentLayer() {

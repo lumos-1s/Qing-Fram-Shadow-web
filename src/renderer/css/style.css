@@ -469,6 +469,14 @@ html.dark .import-progress { background: rgba(30,32,40,.94); }
     flex: 0 0 46px; text-align: right; color: var(--text);
     font-size: 12px; font-variant-numeric: tabular-nums;
 }
+/* 自适应类参数的值可能是一句中文(如"自适应"),46px 装不下,单独放宽 */
+.param-row .pval-wide { flex: 0 0 58px; }
+/* 档位值旁边的说明小字:解释这个数字不是最终像素,不参与布局计算宽度之外的排版 */
+.param-row .pval-note {
+    flex: 0 0 auto; margin-left: 5px; color: var(--text-3);
+    font-size: 11px; line-height: 1.2; white-space: nowrap;
+}
+.param-row .pval-note:empty { display: none; }
 .param-row select, .param-row input[type=text], .param-row .ctl-tx, .param-row .ctl-sel, .param-row .ctl-num {
     flex: 1; min-width: 0; border: 1px solid var(--border-strong);
     border-radius: 9px; background: var(--surface); padding: 5px 7px; font-size: 12px; color: var(--text);
