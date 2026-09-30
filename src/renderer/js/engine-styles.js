@@ -1202,7 +1202,7 @@ AV_OVERLAY_BC2:67 };
         styleBlurCommon(img, size, g, iw, ih, S, side, bottom, true, cwO, chO);
     }
     function styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurBottom, dateLayout, cwO, chO) {
-        // 全出血模糊:「背景模糊」设计就是模糊铺满画布。当目标画布因默认比例被扩边时,
+        // 全出血模糊:「背景模糊」设计就是模糊铺满画布。当目标画布因显式比例被扩边时,
         // 把自然内容块(照片+四周模糊带+底部参数带)在扩出的画布内居中,模糊底连续铺满
         // 整张画布——扩边处是同一张模糊的延伸,不出现硬性实色补边。
         const naturalW = blurMargin + iw + blurMargin;
@@ -1728,6 +1728,34 @@ AV_OVERLAY_BC2:67 };
         else if (pos === 1) g.fillRect(w - band, 0, band, h);
         else g.fillRect(0, h - band, w, band);
     }
+    // 背景模糊时给清晰照片加悬浮阴影,使照片与模糊底分离、看起来有厚度。
+    // 两层:①环境阴影(四周均匀,零偏移)造出「一圈」包裹感;②主投影(向下偏移)定立体感。
+    // 模糊半径/偏移随照片显示尺寸缩放(与 drawMainPhoto 同源公式),大图影子更宽更柔;
+    // 圆角时先画圆角填充(阴影随填充渲染),再裁剪画照片;非模糊模式完全等低于原直绘。
+    function drawLiftedPhoto(g, img, dx, dy, dw, dh, cr, blurOn) {
+        g.save();
+        if (blurOn) {
+            const sb = Math.max(6, Math.round(Math.min(dw, dh) * 0.035));
+            const so = Math.max(3, Math.round(sb * 0.8));
+            g.fillStyle = '#ffffff';
+            const path = () => { g.beginPath();
+                if (cr > 0 && typeof g.roundRect === 'function') g.roundRect(dx, dy, dw, dh, cr);
+                else g.rect(dx, dy, dw, dh); };
+            // ①环境阴影:四边等量外扩,形成环绕照片的一圈暗边
+            g.shadowColor = 'rgba(0,0,0,0.32)'; g.shadowBlur = sb * 1.1; g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+            path(); g.fill();
+            // ②主投影:向下偏移,压出悬浮感
+            g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = sb * 1.5; g.shadowOffsetX = 0; g.shadowOffsetY = so * 1.5;
+            path(); g.fill();
+            g.shadowColor = 'transparent';
+            g.shadowBlur = 0;
+            g.shadowOffsetX = 0;
+            g.shadowOffsetY = 0;
+        }
+        if (cr > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dx, dy, dw, dh, cr); g.clip(); }
+        g.drawImage(img, dx, dy, dw, dh);
+        g.restore();
+    }
     function styleOverlayParams(img, size, g, iw, ih, S, pos, cwO, chO) {
         // LEFT(pos=0): 白底+照片在右+左侧品牌名和参数
         if (pos === 0) {
@@ -1759,10 +1787,7 @@ AV_OVERLAY_BC2:67 };
             const dpxL = px + Math.round((iw - pdwL) / 2) + (S.imgOffsetX || 0);
             const dpyL = py + Math.round((ih - pdhL) / 2) + (S.imgOffsetY || 0);
             const crL = S.cornerAll || 0;
-            g.save();
-            if (crL > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxL, dpyL, pdwL, pdhL, crL); g.clip(); }
-            g.drawImage(img, dpxL, dpyL, pdwL, pdhL);
-            g.restore();
+            drawLiftedPhoto(g, img, dpxL, dpyL, pdwL, pdhL, crL, !!S.signBgBlur);
             // 左侧品牌+三行参数整体在"画布左缘→照片左缘(leftW+40)"空隙中水平居中
             g.save();
             g.translate(0, oy);
@@ -1860,10 +1885,7 @@ const w = natW;
             const dpxB = px + Math.round((iw - pdwB) / 2) + (S.imgOffsetX || 0);
             const dpyB = py + Math.round((ih - pdhB) / 2) + (S.imgOffsetY || 0);
             const crB = S.cornerAll || 0;
-            g.save();
-            if (crB > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxB, dpyB, pdwB, pdhB, crB); g.clip(); }
-            g.drawImage(img, dpxB, dpyB, pdwB, pdhB);
-            g.restore();
+            drawLiftedPhoto(g, img, dpxB, dpyB, pdwB, pdhB, crB, !!S.signBgBlur);
             const by = py + ih + Math.round(bottomH * 0.3);
             const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
             const fBrand = Math.max(18, Math.round(bottomH * 0.2 * pfScale * (S.brandScale || 1)));
@@ -1953,10 +1975,7 @@ const w = natW;
             const dpxR = px + Math.round((iw - pdwR) / 2) + (S.imgOffsetX || 0);
             const dpyR = py + Math.round((ih - pdhR) / 2) + (S.imgOffsetY || 0);
             const crR = S.cornerAll || 0;
-            g.save();
-            if (crR > 0 && typeof g.roundRect === 'function') { g.beginPath(); g.roundRect(dpxR, dpyR, pdwR, pdhR, crR); g.clip(); }
-            g.drawImage(img, dpxR, dpyR, pdwR, pdhR);
-            g.restore();
+            drawLiftedPhoto(g, img, dpxR, dpyR, pdwR, pdhR, crR, !!S.signBgBlur);
             // 右侧品牌+三行参数整体在"照片右缘→画布右缘(rightW+40)"空隙中水平居中(与左留白镜像)
             g.save();
             g.translate(0, oy);
@@ -3785,7 +3804,7 @@ const w = natW;
                 stylePlaceholder(img, styleName, g, iw, ih);
             } else {
                 const dims = styleDims(styleName, iw, ih, size, S);
-                // 全出血模糊铺满画布的风格:把默认比例算进画布本体,由风格自身铺模糊并居中内容块,
+                // 全出血模糊铺满画布的风格:把显式比例算进画布本体,由风格自身铺模糊并居中内容块,
                 // 扩边处是同一张模糊的延伸,不出现硬性实色补边。
                 //  BLUR_CLASSIC/BLUR_DATE 恒定模糊底;签名/头像/印象留白/logo参数 只在用户
                 //  开启「背景模糊」(signBgBlur)时才进入,未开模糊时保持原卡片样式不扩展。
@@ -3796,7 +3815,7 @@ const w = natW;
                     (styleName === 'BLUR_CLASSIC' || styleName === 'BLUR_DATE' || (S && S.signBgBlur));
                 let targetW = dims.w, targetH = dims.h;
                 if (blurMode) {
-                    const er2 = effectiveCanvasRatio(t, iw, ih);
+                    const er2 = effectiveCanvasRatio(t);
                     const wh2 = parseRatio(er2);
                     if (wh2 && wh2[0] > 0 && wh2[1] > 0) {
                         const tr2 = wh2[0] / wh2[1], cr2 = dims.w / dims.h;
@@ -3851,7 +3870,7 @@ const w = natW;
             // 相框样式也支持画布比例(只扩大、不裁切)。仅当用户启用了背景模糊(bgBlurEnable)
             // 时补边才用模糊照片延伸,否则回退四角采样纯色,避免没开模糊却出现模糊
             const useBlurFill = (t.baseMargin && (t.baseMargin.bgBlurEnable || 0) === 1);
-            out = expandToRatio(out, effectiveCanvasRatio(t, iw, ih), useBlurFill ? img : null, (t.baseMargin && t.baseMargin.bgBlurRadius) || 30);
+            out = expandToRatio(out, effectiveCanvasRatio(t), useBlurFill ? img : null, (t.baseMargin && t.baseMargin.bgBlurRadius) || 30);
 
             const finalScale = Math.min(1, displayMax / Math.max(out.width, out.height));
             canvas.width = Math.max(1, Math.round(out.width * finalScale));

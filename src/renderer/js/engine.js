@@ -49,15 +49,10 @@ function parseRatio(ratio) {
 }
 
 // 默认画布比例:模板/用户显式声明了比例(非 original)则尊重显式值;
-// 否则按图片方向自动套用竖图 3:4、横图 4:3,方图保持原图比例。
-function effectiveCanvasRatio(template, oW, oH) {
+// 未声明时一律按原图比例出图(不再按图片方向强套竖 3:4 / 横 4:3)。
+function effectiveCanvasRatio(template) {
     const r = template && template.canvasRatio;
-    if (r && r !== 'original') return r;
-    const w = Number(oW), h = Number(oH);
-    if (w > 0 && h > 0) {
-        if (h > w) return '3:4';
-        if (w > h) return '4:3';
-    }
+    if (r && r !== 'original' && r !== 'auto') return r;
     return 'original';
 }
 
@@ -69,7 +64,7 @@ function computeCanvasSize(imgW, imgH, template) {
     let canvasH = imgH + t.top + t.bottom;
     const shadowSpace = getShadowSpace(template);
     if (shadowSpace > 0) { canvasW += shadowSpace * 2; canvasH += shadowSpace * 2; }
-    const ratio = effectiveCanvasRatio(template, imgW, imgH);
+    const ratio = effectiveCanvasRatio(template);
     if (ratio && ratio !== 'original') {
         const wh = parseRatio(ratio);
         if (wh) {
@@ -942,7 +937,7 @@ function renderCardStyle(app) {
     let canvasW = originW + (margin.marginLeft || 0) + (margin.marginRight || 0);
     let canvasH = originH + (margin.marginTop || 0) + (margin.marginBottom || 0);
 
-    const ratio = effectiveCanvasRatio(template, originW, originH);
+    const ratio = effectiveCanvasRatio(template);
     if (ratio && ratio !== 'original') {
         const wh = parseRatio(ratio);
         if (wh) {
