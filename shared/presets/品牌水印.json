@@ -1,6 +1,6 @@
 {
   "templateName": "品牌水印",
-  "templateTag": "Logo参数",
+  "templateTag": "水印",
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 1,
