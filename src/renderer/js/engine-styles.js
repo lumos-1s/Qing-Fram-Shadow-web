@@ -1550,7 +1550,7 @@ AV_OVERLAY_BC2:67 };
         if (!(S.brandLogo === 2 && brandLw)) drawTextL(g2, brand, brandX + (S.brandLogo === 2 ? 0 : brandLw), baseY, 'rgb(30,30,30)', bf, false, true, 0);
         if (pf && pl) drawTextL(g2, pl, w - pad - pm.w, baseY, 'rgb(120,120,120)', pf, true, false, 0);
     }
-    function styleCardLogoParam(img, size, g, iw, ih, S) {
+    function styleCardLogoParam(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(28, Math.floor(size * 3 / 5));
         const arc = Math.max(12, Math.floor(size / 4));
         const brand = trim(S.cam.brand), model = S.cam.model || '';
@@ -1590,23 +1590,32 @@ AV_OVERLAY_BC2:67 };
         const gap = l2 ? Math.max(8, Math.floor(m1.height / 4)) : 0;
         const blockH = m1.height + (l2 ? gap + m2.height : 0);
         const bandH = Math.max(56, Math.floor(blockH + pad * 2 / 3));
-        const w = iw + pad * 2, h = ih + pad + bandH;
+        const natW = iw + pad * 2, natH = ih + pad + bandH;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        const w = natW, h = natH;
         // 背景:开启「背景模糊」时用模糊照片铺满+压暗,否则米白卡片底
         if (S.signBgBlur) {
             g.save();
-            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
             g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
-            const bs = Math.max(w / iw, h / ih);
-            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            const bs = Math.max(cw / iw, ch / ih);
+            g.drawImage(img, (cw - iw * bs) / 2, (ch - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
             g.restore();
+        } else {
+            g.fillStyle = 'rgb(250,250,250)'; g.fillRect(0, 0, cw, ch);
+        }
+        g.save();
+        g.translate(ox, oy);
+        if (S.signBgBlur) {
             // 清晰圆角照片带悬浮阴影
             g.save();
             g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
             g.drawImage(roundedPhoto(img, arc), pad, pad);
             g.restore();
         } else {
-            g.fillStyle = 'rgb(250,250,250)'; g.fillRect(0, 0, w, h);
             drawCardSoftShadow(g, w, h, pad, pad, iw, ih, arc);
             g.drawImage(roundedPhoto(img, arc), pad, pad);
         }
@@ -1643,6 +1652,7 @@ AV_OVERLAY_BC2:67 };
             const l2w = g.measureText(l2).width;
             drawTextL(g, l2, cx2(w, l2w), y1 + gap + m2.height, paramColor, f2, true, false, 0);
         }
+        g.restore();
     }
     function styleCardPureLogo(img, size, g, iw, ih, S) {
         const pad = Math.max(32, size);
@@ -1718,14 +1728,16 @@ AV_OVERLAY_BC2:67 };
         else if (pos === 1) g.fillRect(w - band, 0, band, h);
         else g.fillRect(0, h - band, w, band);
     }
-    function styleOverlayParams(img, size, g, iw, ih, S, pos) {
+    function styleOverlayParams(img, size, g, iw, ih, S, pos, cwO, chO) {
         // LEFT(pos=0): 白底+照片在右+左侧品牌名和参数
         if (pos === 0) {
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             // 完全对齐印象毛玻璃布局,白底黑字(尺寸公式与 styleDims 一致,无 gm)
             const leftW = Math.max(180, Math.round(iw * 0.35));
             const topBotPad = Math.max(50, Math.round(size * 1.2));
-            const h = ih + topBotPad * 2;
+            const natH = ih + topBotPad * 2;
+            const h = natH;
+            const oy = chO ? Math.max(0, Math.round((chO - natH) / 2)) : 0;
             // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
             if (S.signBgBlur) {
                 const cw = g.canvas.width, ch = g.canvas.height;
@@ -1752,6 +1764,8 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, dpxL, dpyL, pdwL, pdhL);
             g.restore();
             // 左侧品牌+三行参数整体在"画布左缘→照片左缘(leftW+40)"空隙中水平居中
+            g.save();
+            g.translate(0, oy);
             const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
             const fBrand = Math.max(22, Math.round(leftW * 0.14 * pfScale * (S.brandScale || 1)));
             const brandTrack = Math.round(fBrand * 0.15);
@@ -1811,6 +1825,7 @@ AV_OVERLAY_BC2:67 };
                     ry += Math.round(boxH * 1.9);
                 });
             }
+            g.restore();
             return;
         }
         // BOTTOM(pos=2): 白底+照片在上+底部品牌名和参数
@@ -1819,20 +1834,25 @@ AV_OVERLAY_BC2:67 };
             const pfScale = (S.paramFs != null && S.paramFs > 0) ? S.paramFs / 33 : 1;
             const bottomH = Math.max(120, Math.round(ih * 0.25 * gm));
             const sidePad = Math.max(30, Math.round(size * 0.8 * gm));
-            const w = iw + sidePad * 2;
-            const h = ih + bottomH + sidePad;
+            const natW = iw + sidePad * 2, natH = ih + bottomH + sidePad;
+            const cw2 = cwO || natW, ch2 = chO || natH;
+            const ox = Math.max(0, Math.round((cw2 - natW) / 2));
+            const oy = Math.max(0, Math.round((ch2 - natH) / 2));
+const w = natW;
             // 背景:白底或模糊照片(80%模糊)
             if (S.signBgBlur) {
                 g.save();
-                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+                g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw2, ch2);
                 g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.68)';
-                const bs = Math.max(w / iw, h / ih);
-                g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+                const bs = Math.max(cw2 / iw, ch2 / ih);
+                g.drawImage(img, (cw2 - iw * bs) / 2, (ch2 - ih * bs) / 2, iw * bs, ih * bs);
                 g.filter = 'none';
                 g.restore();
             } else {
-                g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, cw2, ch2);
             }
+            g.save();
+            g.translate(ox, oy);
             const px = Math.round((w - iw) / 2);
             const py = sidePad;
             const pscB = S.imgScale || 1;
@@ -1897,6 +1917,7 @@ AV_OVERLAY_BC2:67 };
                     bx += itemW + between;
                 });
             }
+            g.restore();
             return;
         }
         // RIGHT(pos=1): 白底+照片在左+右侧品牌名和参数(印象右留白)
@@ -1906,7 +1927,9 @@ AV_OVERLAY_BC2:67 };
             const rightW = Math.max(180, Math.round(iw * 0.35));
             const leftPad = Math.round(rightW / 2);
             const topBotPad = Math.max(50, Math.round(size * 1.2));
-            const h = ih + topBotPad * 2;
+            const natH = ih + topBotPad * 2;
+            const h = natH;
+            const oy = chO ? Math.max(0, Math.round((chO - natH) / 2)) : 0;
             // 背景:白底或模糊照片(50%模糊);背景必须铺满整个画布(styleDims 尺寸),否则最右侧会漏出透明缝
             if (S.signBgBlur) {
                 const cw = g.canvas.width, ch = g.canvas.height;
@@ -1935,6 +1958,8 @@ AV_OVERLAY_BC2:67 };
             g.drawImage(img, dpxR, dpyR, pdwR, pdhR);
             g.restore();
             // 右侧品牌+三行参数整体在"照片右缘→画布右缘(rightW+40)"空隙中水平居中(与左留白镜像)
+            g.save();
+            g.translate(0, oy);
             const brand = brandHidden(S) ? '' : ((S.cam && S.cam.brand) ? S.cam.brand.toUpperCase() : 'SONY');
             const fBrand = Math.max(22, Math.round(rightW * 0.14 * pfScale * (S.brandScale || 1)));
             const brandTrack = Math.round(fBrand * 0.15);
@@ -1991,6 +2016,7 @@ AV_OVERLAY_BC2:67 };
                     ry += Math.round(boxH * 1.9);
                 });
             }
+            g.restore();
             return;
         }
         // LEFT/BOTTOM 分支保持原样
@@ -3109,21 +3135,26 @@ AV_OVERLAY_BC2:67 };
 
 
     // ══ 签名纪念 ══
-    function styleSignature(img, size, g, iw, ih, S) {
+    function styleSignature(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(30, Math.round(iw * 0.04));
         const bottomH = Math.round(iw * 0.10);
-        const w = iw + pad * 2, h = ih + pad + bottomH;
+        const natW = iw + pad * 2, natH = ih + pad + bottomH;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
         if (S.signBgBlur) {
             g.save();
-            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
             g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
-            const bs = Math.max(w / iw, h / ih);
-            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            const bs = Math.max(cw / iw, ch / ih);
+            g.drawImage(img, (cw - iw * bs) / 2, (ch - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
             g.restore();
         } else {
-            g.fillStyle = '#faf8f5'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#faf8f5'; g.fillRect(0, 0, cw, ch);
         }
+        g.save();
+        g.translate(ox, oy);
         g.save();
         if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
@@ -3132,29 +3163,36 @@ AV_OVERLAY_BC2:67 };
         g.font = 'italic ' + Math.round(iw * 0.05 * (S.signSize || 1)) + 'px "' + (S.signFont || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'center';
         g.save();
-        g.translate(w / 2, pad + ih + Math.round(bottomH * 0.6));
+        g.translate(natW / 2, pad + ih + Math.round(bottomH * 0.6));
         g.rotate(-0.02);
         g.fillText(S.userSignature || '— my memory —', 0, 0);
+        g.restore();
         g.restore();
     }
 
     // ══ 签名+参数:底部左头像+签名,右品牌+参数 ══
-    function styleSignParam(img, size, g, iw, ih, S) {
+    function styleSignParam(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(30, Math.round(iw * 0.04));
         const fs = Math.max(11, Math.round(autoExifSize(S.paramFs, iw)));
         const bottomH = Math.round(iw * 0.14);
-        const w = iw + pad * 2, h = ih + pad + bottomH;
+        const natW = iw + pad * 2, natH = ih + pad + bottomH;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        const w = natW;
         if (S.signBgBlur) {
             g.save();
-            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
             g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
-            const bs = Math.max(w / iw, h / ih);
-            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            const bs = Math.max(cw / iw, ch / ih);
+            g.drawImage(img, (cw - iw * bs) / 2, (ch - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
             g.restore();
         } else {
-            g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch);
         }
+        g.save();
+        g.translate(ox, oy);
         g.save();
         if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
@@ -3257,24 +3295,31 @@ AV_OVERLAY_BC2:67 };
         g.fillText(paramStr, cxRight, barY + Math.round(bottomH * 0.65));
         g.textBaseline = 'alphabetic';
         g.textAlign = 'center';
+        g.restore();
     }
 
     // ══ 头像纪念 ══
-    function styleAvatarMemo(img, size, g, iw, ih, S) {
+    function styleAvatarMemo(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(30, Math.round(iw * 0.05));
         const bottomH = Math.round(iw * 0.16);
-        const w = iw + pad * 2, h = ih + pad + bottomH;
+        const natW = iw + pad * 2, natH = ih + pad + bottomH;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        const w = natW;
         if (S.signBgBlur) {
             g.save();
-            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
             g.filter = 'blur(' + signBlurRad(S) + 'px) brightness(0.6)';
-            const bs = Math.max(w / iw, h / ih);
-            g.drawImage(img, (w - iw * bs) / 2, (h - ih * bs) / 2, iw * bs, ih * bs);
+            const bs = Math.max(cw / iw, ch / ih);
+            g.drawImage(img, (cw - iw * bs) / 2, (ch - ih * bs) / 2, iw * bs, ih * bs);
             g.filter = 'none';
             g.restore();
         } else {
-            g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, w, h);
+            g.fillStyle = '#f5f0eb'; g.fillRect(0, 0, cw, ch);
         }
+        g.save();
+        g.translate(ox, oy);
         g.save();
         if (S.signBgBlur) { g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8; }
         g.drawImage(img, pad, pad, iw, ih);
@@ -3305,6 +3350,7 @@ AV_OVERLAY_BC2:67 };
         g.textAlign = 'right';
         g.fillText(new Date().toLocaleDateString('zh-CN'), w - pad, barY + bottomH * 0.7);
         g.textAlign = 'center';
+        g.restore();
     }
 
     // ══ 签名+背景模糊:模糊照片铺满背景,清晰照片+底部条 ══
@@ -3457,10 +3503,11 @@ AV_OVERLAY_BC2:67 };
     }
 
     // 头像系列通用边框:开启「背景模糊」用模糊照片铺满+压暗,否则纯白底;照片主体带悬浮阴影
-    function drawAvBg(g, img, pad, w, h, S) {
+    // px/py 为清晰照片的左上角,可从画布中心随内容块整体偏移(全出血时由前缀偏移注入)
+    function drawAvBg(g, img, px, py, w, h, S) {
         if (!S.signBgBlur) {
             g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-            g.drawImage(img, pad, pad, img.naturalWidth, img.naturalHeight);
+            g.drawImage(img, px, py, img.naturalWidth, img.naturalHeight);
             return;
         }
         g.save();
@@ -3472,15 +3519,21 @@ AV_OVERLAY_BC2:67 };
         g.restore();
         g.save();
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 20; g.shadowOffsetY = 8;
-        g.drawImage(img, pad, pad, img.naturalWidth, img.naturalHeight);
+        g.drawImage(img, px, py, img.naturalWidth, img.naturalHeight);
         g.restore();
     }
 
     // ══ 头像·左下:头像+签名直接放在照片上 ══
-    function styleAvOverlay(img, size, g, iw, ih, S) {
+    function styleAvOverlay(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(20, Math.round(iw * 0.03));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        drawAvBg(g, img, pad, w, h, S);
+        const natW = iw + pad * 2, natH = ih + pad * 2;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        drawAvBg(g, img, pad + ox, pad + oy, cw, ch, S);
+        // 头像/签名随照片一起居中
+        g.save();
+        g.translate(ox, oy);
         // 头像在左下角
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + avatarR + Math.round(iw * 0.03);
@@ -3511,13 +3564,19 @@ AV_OVERLAY_BC2:67 };
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
         g.fillText(signTxt, ax + avatarR + 12, ay);
         g.shadowBlur = 0;
+        g.restore();
     }
 
     // ══ 头像·右上:头像在右上角,签名在下方 ══
-    function styleAvOverlayTR(img, size, g, iw, ih, S) {
+    function styleAvOverlayTR(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(20, Math.round(iw * 0.03));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        drawAvBg(g, img, pad, w, h, S);
+        const natW = iw + pad * 2, natH = ih + pad * 2;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        drawAvBg(g, img, pad + ox, pad + oy, cw, ch, S);
+        g.save();
+        g.translate(ox, oy);
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + iw - avatarR - Math.round(iw * 0.03);
         const ay = pad + avatarR + Math.round(iw * 0.03);
@@ -3546,13 +3605,19 @@ AV_OVERLAY_BC2:67 };
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
         g.fillText(signTxt, ax, ay + avatarR + Math.round(iw * 0.015));
         g.shadowBlur = 0;
+        g.restore();
     }
 
     // ══ 头像·右下:头像在右下角,签名在左边 ══
-    function styleAvOverlayBR(img, size, g, iw, ih, S) {
+    function styleAvOverlayBR(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(20, Math.round(iw * 0.03));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        drawAvBg(g, img, pad, w, h, S);
+        const natW = iw + pad * 2, natH = ih + pad * 2;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        drawAvBg(g, img, pad + ox, pad + oy, cw, ch, S);
+        g.save();
+        g.translate(ox, oy);
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + iw - avatarR - Math.round(iw * 0.03);
         const ay = pad + ih - avatarR - Math.round(iw * 0.03);
@@ -3580,13 +3645,19 @@ AV_OVERLAY_BC2:67 };
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
         g.fillText(signTxt, ax - avatarR - 12, ay);
         g.shadowBlur = 0;
+        g.restore();
     }
 
     // ══ 头像·下中:头像底部居中,签名在下方 ══
-    function styleAvOverlayBC(img, size, g, iw, ih, S) {
+    function styleAvOverlayBC(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(20, Math.round(iw * 0.03));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        drawAvBg(g, img, pad, w, h, S);
+        const natW = iw + pad * 2, natH = ih + pad * 2;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        drawAvBg(g, img, pad + ox, pad + oy, cw, ch, S);
+        g.save();
+        g.translate(ox, oy);
         const avatarR = Math.round(Math.min(iw, ih) * 0.06 * (S.avatarScale || 0.85));
         const ax = pad + Math.round(iw / 2);
         const ay = pad + ih - avatarR - Math.round(iw * 0.04);
@@ -3615,13 +3686,19 @@ AV_OVERLAY_BC2:67 };
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
         g.fillText(signTxt, ax, ay + avatarR + Math.round(iw * 0.012));
         g.shadowBlur = 0;
+        g.restore();
     }
 
     // ══ 头像·下排:头像左+签名右,同一排,整体底部居中 ══
-    function styleAvOverlayBC2(img, size, g, iw, ih, S) {
+    function styleAvOverlayBC2(img, size, g, iw, ih, S, cwO, chO) {
         const pad = Math.max(20, Math.round(iw * 0.03));
-        const w = iw + pad * 2, h = ih + pad * 2;
-        drawAvBg(g, img, pad, w, h, S);
+        const natW = iw + pad * 2, natH = ih + pad * 2;
+        const cw = cwO || natW, ch = chO || natH;
+        const ox = Math.max(0, Math.round((cw - natW) / 2));
+        const oy = Math.max(0, Math.round((ch - natH) / 2));
+        drawAvBg(g, img, pad + ox, pad + oy, cw, ch, S);
+        g.save();
+        g.translate(ox, oy);
         const avatarR = Math.round(Math.min(iw, ih) * 0.05 * (S.avatarScale || 0.85));
         const globalAv = window.__qfsAvatarImg;
         // 先量签名宽度
@@ -3652,6 +3729,7 @@ AV_OVERLAY_BC2:67 };
         g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 4;
         g.fillText(signTxt, cx + avatarR * 2 + gap, cy);
         g.shadowBlur = 0;
+        g.restore();
     }
 
     const draw = {
@@ -3664,9 +3742,9 @@ AV_OVERLAY_BC2:67 };
             IMP_FROSTED: styleImpFrosted, IMP_CLASSIC: styleImpClassic, XIAOMI_IMP: styleXiaomiImp,
             CARD_LEICA: styleCardLeica, CARD_LOGO_PARAM: styleCardLogoParam, CARD_PURE_LOGO: styleCardPureLogo,
             CARD_SIMPLE: styleCardSimple, CARD_IMMERSION: styleCardImmersion,
-            OVERLAY_PARAM_LEFT: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 0),
-            OVERLAY_PARAM_RIGHT: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 1),
-            OVERLAY_PARAM_BOTTOM: (img, size, g, iw, ih, S2) => styleOverlayParams(img, size, g, iw, ih, S2, 2),
+            OVERLAY_PARAM_LEFT: (img, size, g, iw, ih, S2, cwO, chO) => styleOverlayParams(img, size, g, iw, ih, S2, 0, cwO, chO),
+            OVERLAY_PARAM_RIGHT: (img, size, g, iw, ih, S2, cwO, chO) => styleOverlayParams(img, size, g, iw, ih, S2, 1, cwO, chO),
+            OVERLAY_PARAM_BOTTOM: (img, size, g, iw, ih, S2, cwO, chO) => styleOverlayParams(img, size, g, iw, ih, S2, 2, cwO, chO),
         FUJI_WM: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,false),
         FUJI_WM_BRAND: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,true),
         DARK_BRAND_ONLY: (img,size,g,iw,ih,S) => styleFujifilm(img,size,g,iw,ih,S,true,false),
@@ -3707,10 +3785,17 @@ AV_OVERLAY_BC2:67 };
                 stylePlaceholder(img, styleName, g, iw, ih);
             } else {
                 const dims = styleDims(styleName, iw, ih, size, S);
-                // 模糊铺满画布的风格(BLUR_CLASSIC/BLUR_DATE):把默认比例算进画布本体,
-                // 由风格自身全出血铺模糊并居中内容块,扩边处是同一张模糊的延伸。
+                // 全出血模糊铺满画布的风格:把默认比例算进画布本体,由风格自身铺模糊并居中内容块,
+                // 扩边处是同一张模糊的延伸,不出现硬性实色补边。
+                //  BLUR_CLASSIC/BLUR_DATE 恒定模糊底;签名/头像/印象留白/logo参数 只在用户
+                //  开启「背景模糊」(signBgBlur)时才进入,未开模糊时保持原卡片样式不扩展。
+                const BLUR_FULLBLEED = ['BLUR_CLASSIC', 'BLUR_DATE', 'SIGNATURE', 'SIGN_PARAM', 'AVATAR_MEMO',
+                    'AV_OVERLAY', 'AV_OVERLAY_TR', 'AV_OVERLAY_BR', 'AV_OVERLAY_BC', 'AV_OVERLAY_BC2',
+                    'OVERLAY_PARAM_LEFT', 'OVERLAY_PARAM_RIGHT', 'OVERLAY_PARAM_BOTTOM', 'CARD_LOGO_PARAM'];
+                const blurMode = BLUR_FULLBLEED.indexOf(styleName) !== -1 &&
+                    (styleName === 'BLUR_CLASSIC' || styleName === 'BLUR_DATE' || (S && S.signBgBlur));
                 let targetW = dims.w, targetH = dims.h;
-                if (styleName === 'BLUR_CLASSIC' || styleName === 'BLUR_DATE') {
+                if (blurMode) {
                     const er2 = effectiveCanvasRatio(t, iw, ih);
                     const wh2 = parseRatio(er2);
                     if (wh2 && wh2[0] > 0 && wh2[1] > 0) {
@@ -3750,7 +3835,8 @@ AV_OVERLAY_BC2:67 };
                         }
                     };
                 }
-                draw(img, size, g, iw, ih, S, targetW, targetH);
+                if (blurMode) draw(img, size, g, iw, ih, S, targetW, targetH);
+                else draw(img, size, g, iw, ih, S);
                 g.drawImage = origDrawImage;
                 // 整体画布边框圆角
                 const borderR = t.borderRadius || 0;
