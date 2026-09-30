@@ -232,11 +232,9 @@ window.App = Object.assign(window.App || {}, {
         if (kind === 'film') p = this.presets.find(x => /胶片/i.test(x.templateName)) || this.presets[0];
         else p = this.presets.find(x => /证件照/i.test(x.templateName)) || this.presets[0];
         if (p) {
-            this.template = JSON.parse(JSON.stringify(p));
-            this.normalizeTemplate();
-            this.saveCurrentTemplate();
-            this.refreshUI();
-            this.scheduleRender(true);
+            // 走 applyPreset 统一入口,保留用户的 logo/贴纸/自由文字(见 applyPreset 注释)。
+            // undo 快照已由上面的 onSettingCommit() 压入,这里不要重复 pushUndo。
+            this.applyPreset(p);
             this.setStatus(`已应用预设「${p.templateName}」`);
         }
     },
@@ -454,8 +452,50 @@ window.App = Object.assign(window.App || {}, {
         this.buildTree(this._searchVal || '');
     },
 
+    // 应用预设 = 换「边框方案」,不是换整张图。
+    //
+    // 旧实现直接 this.template = p,把用户已经加的 logo / 贴纸 / 文字一起丢掉。
+    // 实测:先加 logo 再点任意预设,template.logoElements 变空 —— 画布上还留着上一帧的
+    // 渲染残影,所以看起来「logo 还在」,但数据已不存在,于是点不中、拖不动、不能放缩。
+    //
+    // 统计全部 78 个预设:logoElements 字段虽然存在(45 个),但**全部为空数组**,
+    // 从不携带 logo;stickers 也恒为 0。唯一例外是 textLines(27 个预设有),
+    // 那是预设自带的排版文字(align 为 top/bottom/center 锚点对齐),属于边框方案本身,
+    // 应当跟随预设替换。
+    //
+    // 区分用户文字与预设文字的依据:用户手动加的自由文字 align='free' 且带真实 x/y
+    // (app-export.js 导出缩放时也按这个约定区分),预设文字一律是锚点对齐。
+    // 因此只保留 align==='free' 的行,预设自带的排版照常跟随预设更新。
     applyPreset(p) {
-        this.template = JSON.parse(JSON.stringify(p));
+        const prev = this.template || {};
+        const next = JSON.parse(JSON.stringify(p));
+
+        // 用户内容:logo(品牌/自定义图标)与贴纸
+        if (Array.isArray(prev.logoElements) && prev.logoElements.length) next.logoElements = JSON.parse(JSON.stringify(prev.logoElements));
+        const prevStk = (prev.decorConfig && prev.decorConfig.stickers) || [];
+        const prevTxt = (prev.decorConfig && prev.decorConfig.textLines) || [];
+        const userFreeTxt = prevTxt.filter(t => t && t.align === 'free');
+        const userStk = prevStk.length ? JSON.parse(JSON.stringify(prevStk)) : [];
+        const userFree = userFreeTxt.length ? JSON.parse(JSON.stringify(userFreeTxt)) : [];
+
+        // 预设自带的锚点排版文字要保留(它是边框方案的一部分),
+        // 但若用户在同一处加过自由文字,则以用户的为准,避免两套文字叠在一起。
+        const presetTxt = ((next.decorConfig && next.decorConfig.textLines) || []).filter(t => t && t.align !== 'free');
+        const mergedTxt = presetTxt.concat(userFree);
+        next.decorConfig = Object.assign({}, next.decorConfig || {}, {});
+        if (mergedTxt.length || userStk.length) {
+            if (mergedTxt.length) next.decorConfig.textLines = mergedTxt;
+            else delete next.decorConfig.textLines;
+            if (userStk.length) next.decorConfig.stickers = userStk;
+            else delete next.decorConfig.stickers;
+        }
+
+        // 签名相关:8 个预设带 userSignature,用户自己填的签名不该被预设覆盖
+        for (const k of ['userSignature', 'signFont', 'signColor', 'avatarScale', 'signSize', 'signIncludeModel']) {
+            if (prev[k] !== undefined && (next[k] === undefined || next[k] === '' || next[k] === null)) next[k] = prev[k];
+        }
+
+        this.template = next;
         this.normalizeTemplate();
         this.saveCurrentTemplate();
         this.refreshUI();
@@ -482,11 +522,8 @@ window.App = Object.assign(window.App || {}, {
         if (!this.presets.length) return;
         this.pushUndo();
         let p = this.presets[Math.floor(Math.random() * this.presets.length)];
-        this.template = JSON.parse(JSON.stringify(p));
-        this.normalizeTemplate();
-        this.saveCurrentTemplate();
-        this.refreshUI();
-        this.scheduleRender(true);
+        // 同样保留用户的 logo/贴纸/自由文字,理由见 applyPreset 注释
+        this.applyPreset(p);
         this.setStatus(`已应用随机边框：${p.templateName}`);
     },
 

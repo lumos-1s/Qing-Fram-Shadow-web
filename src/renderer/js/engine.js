@@ -48,6 +48,19 @@ function parseRatio(ratio) {
     } catch (e) { return null; }
 }
 
+// 默认画布比例:模板/用户显式声明了比例(非 original)则尊重显式值;
+// 否则按图片方向自动套用竖图 3:4、横图 4:3,方图保持原图比例。
+function effectiveCanvasRatio(template, oW, oH) {
+    const r = template && template.canvasRatio;
+    if (r && r !== 'original') return r;
+    const w = Number(oW), h = Number(oH);
+    if (w > 0 && h > 0) {
+        if (h > w) return '3:4';
+        if (w > h) return '4:3';
+    }
+    return 'original';
+}
+
 // 计算渲染画布尺寸(含画布比例调??+ 侧投影预留空??，与原版 computeCanvasSize 一??
 function computeCanvasSize(imgW, imgH, template) {
     const margin = template.baseMargin || {};
@@ -56,7 +69,7 @@ function computeCanvasSize(imgW, imgH, template) {
     let canvasH = imgH + t.top + t.bottom;
     const shadowSpace = getShadowSpace(template);
     if (shadowSpace > 0) { canvasW += shadowSpace * 2; canvasH += shadowSpace * 2; }
-    const ratio = template.canvasRatio;
+    const ratio = effectiveCanvasRatio(template, imgW, imgH);
     if (ratio && ratio !== 'original') {
         const wh = parseRatio(ratio);
         if (wh) {
@@ -929,7 +942,7 @@ function renderCardStyle(app) {
     let canvasW = originW + (margin.marginLeft || 0) + (margin.marginRight || 0);
     let canvasH = originH + (margin.marginTop || 0) + (margin.marginBottom || 0);
 
-    const ratio = template.canvasRatio;
+    const ratio = effectiveCanvasRatio(template, originW, originH);
     if (ratio && ratio !== 'original') {
         const wh = parseRatio(ratio);
         if (wh) {
@@ -1070,14 +1083,14 @@ function drawLogoElements(ctx, elements, cw, ch) {
         const dw = size, dh = size * ratio;
         let cx, cy;
         if (el.rel && typeof el.rx === 'number' && typeof el.ry === 'number') {
-            // 相对比例存储:按「基准画布」比例还原,同一模板套到不同尺寸照片上位置一致。
-            // 基准画布尺寸记在 canvas._logW/_logH 上(由 setupCanvas/renderPhotoFrame 写入);
-            // app 侧另有 logoPos 做同样解析,两处必须一致。
+            // 相对比例以「显示画布 canvas.width/height」为分母(rx∈[0,1]):预览在可能
+            // canvas=_logW×dpr 的画布上按同一分数解析,导出(canvas=_logW)亦然,两处位置一致。
+            // 旧模板(rx 以基准画布为分母)由 app 侧 normalizeTemplate 的 migrateRelCanvasFrac
+            // 在渲染前一次性换算,这里直接按显示画布还原即可。
             const cvEl = (typeof window !== 'undefined' && window.App && window.App.dom && window.App.dom.canvas) || null;
-            const logW = cvEl && cvEl._logW, logH = cvEl && cvEl._logH;
-            if (logW > 1 && logH > 1) {
-                cx = el.rx * logW;
-                cy = el.ry * logH;
+            if (cvEl && cvEl.width > 1 && cvEl.height > 1) {
+                cx = el.rx * cvEl.width;
+                cy = el.ry * cvEl.height;
             }
         }
         if (cx === undefined) {

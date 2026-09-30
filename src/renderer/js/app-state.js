@@ -6,6 +6,10 @@ window.App = Object.assign(window.App || {}, {
         this.syncModelFromUI();
         this.saveCurrentTemplate();
         this.scheduleRender();
+        // 导出尺寸提示依赖当前相框样式,样式一变就得重算。
+        // 这是高频路径(拖滑块每帧都调),但 updateExportSizeNote 只做几次整数运算 + 一次
+        // textContent 赋值,且尺寸下拉框多数时候为「原图尺寸」会直接早退,成本可忽略。
+        this.updateExportSizeNote();
         this._autoSaveTimer && clearTimeout(this._autoSaveTimer);
         this._autoSaveTimer = setTimeout(() => this.autoSaveState(), 800);
     },

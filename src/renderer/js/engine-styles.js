@@ -920,7 +920,7 @@ AV_OVERLAY_BC2:67 };
             if (!b && !m) b = 'CAMERA';
             return { brand: b, model: m, focal, aperture: aper, iso, shutter: shut };
         }
-        const rnd = javaRandom(iw * 313 + ih * 997 + ORD[styleName]);
+        const rnd = javaRandom(iw * 313 + ih * 997 + (ORD[styleName] || 0));
         const focals = ['24mm','28mm','35mm','50mm','85mm','135mm','200mm'];
         const apert = ['f/1.4','f/2.0','f/2.8','f/4.0','f/5.6','f/8.0','f/11'];
         const isos = ['ISO 100','ISO 200','ISO 400','ISO 800','ISO 1600','ISO 3200'];
@@ -1191,19 +1191,26 @@ AV_OVERLAY_BC2:67 };
 
     // ── 阶段二:文本类风格(原版 addXxx 逐行移植)──
     const cx2 = (w, tw) => (w - tw) / 2;
-    function styleBlurClassic(img, size, g, iw, ih, S) {
+    function styleBlurClassic(img, size, g, iw, ih, S, cwO, chO) {
         const side = blurBand(size, iw, ih, S.blurIntensity);
         const bottom = blurBottom(size, iw, ih, S);
-        styleBlurCommon(img, size, g, iw, ih, S, side, bottom, false);
+        styleBlurCommon(img, size, g, iw, ih, S, side, bottom, false, cwO, chO);
     }
-    function styleBlurDate(img, size, g, iw, ih, S) {
+    function styleBlurDate(img, size, g, iw, ih, S, cwO, chO) {
         const side = blurBand(size, iw, ih, S.blurIntensity);
         const bottom = blurBottom(size, iw, ih, S);
-        styleBlurCommon(img, size, g, iw, ih, S, side, bottom, true);
+        styleBlurCommon(img, size, g, iw, ih, S, side, bottom, true, cwO, chO);
     }
-    function styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurBottom, dateLayout) {
-        const cw = blurMargin + iw + blurMargin;
-        const ch = blurMargin + ih + blurBottom;
+    function styleBlurCommon(img, size, g, iw, ih, S, blurMargin, blurBottom, dateLayout, cwO, chO) {
+        // 全出血模糊:「背景模糊」设计就是模糊铺满画布。当目标画布因默认比例被扩边时,
+        // 把自然内容块(照片+四周模糊带+底部参数带)在扩出的画布内居中,模糊底连续铺满
+        // 整张画布——扩边处是同一张模糊的延伸,不出现硬性实色补边。
+        const naturalW = blurMargin + iw + blurMargin;
+        const naturalH = blurMargin + ih + blurBottom;
+        const cw = cwO || naturalW;
+        const ch = chO || naturalH;
+        const exPadX = Math.max(0, Math.round((cw - naturalW) / 2));
+        const exPadY = Math.max(0, Math.round((ch - naturalH) / 2));
         // 印象式模糊底:照片 cover 铺满整张画布,整体高斯模糊后压暗
         g.save();
         g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, cw, ch);
@@ -1215,7 +1222,7 @@ AV_OVERLAY_BC2:67 };
         g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(0, 0, cw, ch);
         g.restore();
         const photoCr = Math.min(S.cornerAll, Math.min(iw, ih) / 2);
-        const cx = blurMargin, cy = blurMargin;
+        const cx = blurMargin + exPadX, cy = blurMargin + exPadY;
         drawMainPhoto(g, img, cx, cy, photoCr, S.imgScale, S.imgOffsetX, S.imgOffsetY);
 
         if (!S.useExif) return;
@@ -3700,7 +3707,19 @@ AV_OVERLAY_BC2:67 };
                 stylePlaceholder(img, styleName, g, iw, ih);
             } else {
                 const dims = styleDims(styleName, iw, ih, size, S);
-                out = newCanvas(dims.w, dims.h);
+                // 模糊铺满画布的风格(BLUR_CLASSIC/BLUR_DATE):把默认比例算进画布本体,
+                // 由风格自身全出血铺模糊并居中内容块,扩边处是同一张模糊的延伸。
+                let targetW = dims.w, targetH = dims.h;
+                if (styleName === 'BLUR_CLASSIC' || styleName === 'BLUR_DATE') {
+                    const er2 = effectiveCanvasRatio(t, iw, ih);
+                    const wh2 = parseRatio(er2);
+                    if (wh2 && wh2[0] > 0 && wh2[1] > 0) {
+                        const tr2 = wh2[0] / wh2[1], cr2 = dims.w / dims.h;
+                        if (cr2 > tr2) targetH = Math.max(1, Math.round(dims.w / tr2));
+                        else targetW = Math.max(1, Math.round(dims.h * tr2));
+                    }
+                }
+                out = newCanvas(targetW, targetH);
                 const g = out.getContext('2d');
                 g.imageSmoothingEnabled = true;
                 // 劫持drawImage:画原始照片时自动应用cornerConfig圆角
@@ -3731,7 +3750,7 @@ AV_OVERLAY_BC2:67 };
                         }
                     };
                 }
-                draw(img, size, g, iw, ih, S);
+                draw(img, size, g, iw, ih, S, targetW, targetH);
                 g.drawImage = origDrawImage;
                 // 整体画布边框圆角
                 const borderR = t.borderRadius || 0;
@@ -3746,7 +3765,7 @@ AV_OVERLAY_BC2:67 };
             // 相框样式也支持画布比例(只扩大、不裁切)。仅当用户启用了背景模糊(bgBlurEnable)
             // 时补边才用模糊照片延伸,否则回退四角采样纯色,避免没开模糊却出现模糊
             const useBlurFill = (t.baseMargin && (t.baseMargin.bgBlurEnable || 0) === 1);
-            out = expandToRatio(out, t.canvasRatio, useBlurFill ? img : null, (t.baseMargin && t.baseMargin.bgBlurRadius) || 30);
+            out = expandToRatio(out, effectiveCanvasRatio(t, iw, ih), useBlurFill ? img : null, (t.baseMargin && t.baseMargin.bgBlurRadius) || 30);
 
             const finalScale = Math.min(1, displayMax / Math.max(out.width, out.height));
             canvas.width = Math.max(1, Math.round(out.width * finalScale));

@@ -1,6 +1,9 @@
 // 跨照片尺寸的元素位置一致性回归测试
 // 背景:元素坐标原为「绝对画布像素」,同一套模板套到尺寸不同的照片上会跑出画布。
-// 现改为按「基准画布」相对比例(rel + rx/ry)存储,本测试锁定该行为不回退。
+// 现按相对比例(rel + rx/ry)存储,且 rx/ry 统一以「显示画布」为分母:
+// 预览(可能 canvas=_logW×dpr)与导出(canvas=_logW)按同一分数还原,位置必然一致;
+// 旧格式(rx 以基准画布为分母)由 migrateRelCanvasFrac 在加载时一次性换算。
+// 本测试锁定该行为不回退。
 const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, ipcMain, protocol, net } = require('electron');
@@ -115,6 +118,85 @@ async () => {
             label: '锚点元素(字符串坐标,含纵横比)', ok: okAnchor,
             base: '-', stored: "x='right' y='bottom'", px: Math.round(p.cx) + ',' + Math.round(p.cy),
             rel: [p.cx / 1000, p.cy / 800], expect: '期望 ' + ex + ',' + ey,
+        });
+    }
+    // 导出态:app-export.js 渲染时设 uiDprOverride=1,画布回到逻辑尺寸。
+    // 旧口径 rx 以基准画布为分母,导出画布=_logW 时同一数值被放大画布/基准倍,
+    // 表现为「预览居中、导出跑到角上/贴边」。新口径 rx 统一为「显示画布分数」,
+    // 旧格式模板(rel 为真值)由 migrateRelCanvasFrac 在加载时一次性换算到新口径,
+    // 换算前后预览像素不变,预览与导出必然一致。这里复刻导出的三段状态断言:
+    //  ① 比值≠1 的显示环境(DPR>1 模板通道)旧格式必须已被迁移为 rel='canvas';
+    //  ② 预览归一化位置 == 导出归一化位置(两段导出 canvas 下都一致)。
+    {
+        // 独立元素:上面两个兼容 case 把 App.template 整个换掉了,不能复用 logoElements[0]
+        const eRel = { name: 'L', dataUrl: LOGO, x: 0, y: 0, size: 200, ratio: 0.4, opacity: 100, z: 10, rel: true, rx: 0.5, ry: 0.5 };
+        App.currentIdx = 0; App.image = big; App.selectedIdx = [0];
+        App.template = App.defaultTemplate();
+        App.template.logoElements = [eRel];
+        App.normalizeTemplate();
+        App.invalidateStyleCaches();
+        App.scheduleRender(true);
+        await new Promise(r => setTimeout(r, 800));
+
+        const bPrev = App.logoBaseSize();
+        const ratio = bPrev ? bPrev.w / App.dom.canvas.width : 1;
+        const needConv = Math.abs(ratio - 1) > 1e-9;
+        const migrated = eRel.rel === 'canvas';
+
+        const cv = App.dom.canvas;
+        const readNorm = () => { const p = App.logoPos(eRel, cv.width, cv.height, eRel.size); return [p.cx / cv.width, p.cy / cv.height]; };
+        const previewNorm = readNorm();
+
+        App.uiDprOverride = 1;
+        App.displayMax = undefined; delete App.exportScale;
+        App.scheduleRender(true);
+        await new Promise(r => setTimeout(r, 700));
+        const expBase = App.logoBaseSize();
+        const expNorm = readNorm();
+
+        App.displayMax = Math.max(App.image.w, App.image.h);
+        App.scheduleRender(true);
+        await new Promise(r => setTimeout(r, 700));
+        const exp2Norm = readNorm();
+
+        delete App.uiDprOverride; App.displayMax = undefined; delete App.exportScale;
+        App.scheduleRender(true);
+        await new Promise(r => setTimeout(r, 600));
+
+        const close = (a, b) => Math.abs(a - b) < 0.01;
+        const okExport = expBase !== null && (migrated === needConv)
+            && close(expNorm[0], previewNorm[0]) && close(expNorm[1], previewNorm[1])
+            && close(exp2Norm[0], previewNorm[0]) && close(exp2Norm[1], previewNorm[1]);
+        cases.push({
+            label: '导出态(uiDprOverride=1)位置与预览一致,旧格式已迁移', ok: okExport,
+            base: '预览基准=' + (bPrev ? bPrev.w + 'x' + bPrev.h : 'null') + ' 导出基准=' + (expBase ? expBase.w + 'x' + expBase.h : 'null(守卫失配!)'),
+            stored: 'rel=' + eRel.rel + ' rx=' + (eRel.rx != null ? eRel.rx.toFixed(3) : '-'),
+            px: '预览 ' + previewNorm.map(v => v.toFixed(3)).join(',') + ' → 导出 ' + expNorm.map(v => v.toFixed(3)).join(','),
+            rel: exp2Norm, offscreen: false,
+            expect: okExport ? '' : '导出阶段 logoBaseSize 须可用;预览与导出归一化须一致;比值≠1 时旧格式须已迁移',
+        });
+    }
+
+    // 切图后基准不串:logoBaseSize 的 dpr 守卫放宽成「枚举 1 与 devicePixelRatio」后,
+    // 必须确认它仍能识别"渲染未完成、_logW 还是上一张图"的残留,否则比例会按错基准算。
+    {
+        const img2 = await mkImg(1400, 1400);
+        App.images.push(img2);
+        App.currentIdx = 2; App.image = img2;
+        const el2 = { name: 'L', dataUrl: LOGO, x: 0, y: 0, size: 200, ratio: 0.4, opacity: 100, z: 10, rel: 'canvas', rx: 0.3, ry: 0.7 };
+        App.template.logoElements = [el2];
+        App.scheduleRender(true);
+        await new Promise(r => setTimeout(r, 800));
+        const cv = App.dom.canvas;
+        const p = App.logoPos(el2, cv.width, cv.height, el2.size);
+        const nx = p.cx / cv.width, ny = p.cy / cv.height;
+        const okSwap = Math.abs(nx - 0.3) < 0.01 && Math.abs(ny - 0.7) < 0.01;
+        cases.push({
+            label: '切到 1400x1400 后比例不串', ok: okSwap,
+            base: '基准=' + (App.logoBaseSize() ? App.logoBaseSize().w + 'x' + App.logoBaseSize().h : 'null'),
+            stored: 'rx=0.300 ry=0.700', px: Math.round(p.cx) + ',' + Math.round(p.cy),
+            rel: [nx, ny], offscreen: false,
+            expect: okSwap ? '' : '期望归一化 0.300,0.700',
         });
     }
     return cases;
