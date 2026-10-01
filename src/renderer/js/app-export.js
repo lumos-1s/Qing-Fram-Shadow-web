@@ -195,6 +195,126 @@ window.App = Object.assign(window.App || {}, {
         this.updateStatusBar();
     },
 
+    // ── 九宫格切图:当前画布(含边框/水印/元素,所见即所得)按 3×3 切成 9 张,适配小红书九宫格 ──
+    async exportGridCrop() {
+        if (!this.image) { this.setStatus('请先导入照片'); return; }
+        const fmt = this.dom.selFormat.value;
+        const mime = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[fmt] || 'image/jpeg';
+        const ext = fmt === 'jpeg' ? 'jpg' : fmt;
+        const quality = (fmt === 'jpeg' || fmt === 'webp') ? Math.min(1, Math.max(0.6, (parseInt(this.dom.slExportQuality.value, 10) || 92) / 100)) : 1;
+        const needsBg = fmt === 'jpeg';
+
+        // 高分辨率渲染一帧:长边限制 3000,切块后每块约 1000px,小红书发图足够清晰
+        const prevMax = this.displayMax;
+        const prevDpr = this.uiDprOverride;
+        this.displayMax = 3000;
+        this.uiDprOverride = 1;
+        this.setStatus('正在渲染九宫格…');
+        await new Promise(res => requestAnimationFrame(() => { window.__render(this, false); res(); }));
+
+        let src = this.dom.canvas;
+        if (needsBg) { // JPG 无透明:垫白底,避免无边框预设时透明区转黑
+            const bg = document.createElement('canvas');
+            bg.width = src.width; bg.height = src.height;
+            const bx = bg.getContext('2d');
+            bx.fillStyle = '#ffffff'; bx.fillRect(0, 0, bg.width, bg.height);
+            bx.drawImage(src, 0, 0);
+            src = bg;
+        }
+        if (prevMax === undefined) delete this.displayMax; else this.displayMax = prevMax;
+        if (prevDpr === undefined) delete this.uiDprOverride; else this.uiDprOverride = prevDpr;
+
+        // 3×3 等分,行优先编号 1..9(左→右、上→下),第 3 列/行取剩余尺寸避免漏缝
+        const cw = src.width, ch = src.height;
+        const baseName = (this.image.name || 'photo').replace(/\.[^.]+$/, '');
+        const files = [];
+        for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < 3; c++) {
+                const x = Math.round(c * cw / 3), y = Math.round(r * ch / 3);
+                const w = Math.round((c + 1) * cw / 3) - x, h = Math.round((r + 1) * ch / 3) - y;
+                const cv = document.createElement('canvas');
+                cv.width = w; cv.height = h;
+                cv.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
+                files.push({ data: cv.toDataURL(mime, quality).split(',')[1], stem: baseName + '_九宫格_' + (r * 3 + c + 1), ext });
+            }
+        }
+
+        // 选目录并批量写盘(9 张一次性提交)
+        const loc = await window.qingframe.pickExportLocation({ count: 9, hintName: baseName + '_九宫格' });
+        if (!loc || loc.canceled) { this.setStatus('已取消切图'); this.scheduleRender(true); return; }
+        const wr = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
+        this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') : '切图导出失败');
+        this.resetProgress();
+        this.updateStatusBar();
+        if (this.scheduleRender) this.scheduleRender(true);
+    },
+
+    // ── 自动更新 UI:渲染层横幅处理(主进程 electron-updater 事件经 preload 推送) ──
+    initUpdater() {
+        const api = window.qingframe;
+        if (!api || !api.onUpdaterEvent) return;
+        this._updater = { state: 'idle' };
+        this._updaterOff = api.onUpdaterEvent((ev) => this._onUpdaterEvent(ev));
+        // 打包版主进程已延迟静默检查;这里再兜底一次,确保横幅就绪(仅 idle 时触发,防重复)
+        setTimeout(() => {
+            if (this._updater && this._updater.state === 'idle' && api.checkForUpdates) this.checkUpdates(true);
+        }, 5000);
+    },
+    _onUpdaterEvent(ev) {
+        if (!this._updater) this._updater = {};
+        this._updater.state = ev.type;
+        const $ = this.$;
+        const b = $('updateBanner'), t = $('updateBannerText');
+        if (!b || !t) return;
+        const bar = $('updateProgressBar'), barWrap = $('updateProgressWrap'), act = $('btnUpdateAction');
+        if (ev.type === 'available') {
+            t.textContent = '发现新版本 v' + (ev.version || '') + '，点击更新';
+            if (barWrap) barWrap.style.display = 'none';
+            if (act) { act.textContent = '立即更新'; act.disabled = false; }
+            b.style.display = 'flex';
+        } else if (ev.type === 'not-available') {
+            if (this._checking) { this.setStatus('已是最新版本'); this._checking = false; }
+        } else if (ev.type === 'progress') {
+            const p = Math.max(0, Math.min(100, Math.round((ev.percent || 0) * 10) / 10));
+            if (barWrap) barWrap.style.display = '';
+            if (bar) bar.style.width = p + '%';
+            t.textContent = '正在下载更新 ' + p + '%';
+            if (act) { act.textContent = '下载中…'; act.disabled = true; }
+            b.style.display = 'flex';
+        } else if (ev.type === 'downloaded') {
+            t.textContent = '更新已下载完成，重启即可生效';
+            if (barWrap) barWrap.style.display = 'none';
+            if (act) { act.textContent = '立即重启'; act.disabled = false; }
+            b.style.display = 'flex';
+        } else if (ev.type === 'error') {
+            t.textContent = '检查更新失败：' + (ev.message || '网络异常');
+            if (barWrap) barWrap.style.display = 'none';
+            if (act) { act.textContent = '重试'; act.disabled = false; }
+            b.style.display = 'flex';
+        }
+    },
+    async checkUpdates(silent) {
+        const api = window.qingframe;
+        if (!api || !api.checkForUpdates) { this.setStatus('当前为开发模式，不检查更新'); return; }
+        this._checking = true;
+        const r = await api.checkForUpdates().catch(() => ({ ok: false, message: '检查失败' }));
+        this._checking = false;
+        if (!silent && r && !r.ok) this.setStatus('检查更新失败：' + ((r && r.message) || '网络异常'));
+    },
+    updateAction() {
+        const st = this._updater && this._updater.state;
+        const api = window.qingframe;
+        if (!api) return;
+        if (st === 'downloaded') { if (api.quitAndInstall) api.quitAndInstall(); return; }
+        // available / error / idle → 开始下载(或重试);主进程 downloadUpdate 会推送 progress 事件
+        if (api.startUpdateDownload) api.startUpdateDownload();
+        else this.checkUpdates(true);
+    },
+    hideUpdateBanner() {
+        const b = this.$ && this.$('updateBanner');
+        if (b) b.style.display = 'none';
+    },
+
     // 导出时元素尺寸/锚点偏移要乘的倍数。抽成纯函数便于单测(见 tools/test-engine-invariants.js ⑥):
     //   beforeW  = 该图在导出通道(uiDprOverride=1)下按默认显示尺寸试渲染的画布宽度
     //   pathDpr  = 预览画布宽度 / 同模板试渲染宽度 —— 同一会话内恒定的通道比例(图层/卡片 = dpr,相框 = 1)

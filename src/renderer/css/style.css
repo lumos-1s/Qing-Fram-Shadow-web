@@ -129,6 +129,21 @@ body {
     white-space: nowrap;
 }
 .tbtn svg { flex: 0 0 auto; }
+#updateBanner {
+    position: fixed; top: 56px; left: 50%; transform: translateX(-50%); z-index: 999;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface-alt); border: 1px solid var(--border-strong); border-radius: 12px;
+    padding: 9px 12px; box-shadow: 0 10px 28px rgba(0,0,0,.28);
+    font-size: 12.5px; color: var(--text-1);
+}
+.ub-ico { flex: 0 0 auto; color: var(--primary); }
+.ub-text { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ub-progress { width: 130px; height: 6px; border-radius: 4px; background: var(--surface); overflow: hidden; }
+.ub-bar { height: 100%; background: var(--primary); border-radius: 4px; transition: width .2s; }
+.ub-btn { border: none; border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text-1); transition: opacity .15s; }
+.ub-btn.primary { background: var(--primary); color: #fff; }
+.ub-btn.ghost { background: transparent; color: var(--text-2); padding: 5px 8px; }
+.ub-btn:disabled { opacity: .55; cursor: default; }
 .tbtn:hover { background: var(--surface-alt); color: var(--text); }
 .tbtn.icon { font-size: 12px; }
 .tbtn:active { transform: scale(.95); }

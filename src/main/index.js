@@ -70,18 +70,43 @@ app.whenReady().then(() => {
     });
     createWindow();
 
-    // ── 自动更新：仅打包后(app.isPackaged)生效，开发模式跳过；任何异常都不阻塞启动 ──
+    // ── 自动更新:仅打包后(app.isPackaged)生效;启动静默检查,事件经 webContents 推给渲染进程做 UI ──
+    //    updater 为 null 时(check-for-updates 等 IPC)一律返回"开发模式",避免 dev 下调用报错
+    let updater = null;
     if (app.isPackaged) {
         try {
             const { autoUpdater } = require('electron-updater');
-            autoUpdater.autoDownload = true;
-            autoUpdater.checkForUpdatesAndNotify().catch(err => {
-                console.warn('[updater] 检查更新失败:', err && err.message);
-            });
+            updater = autoUpdater;
+            autoUpdater.autoDownload = false; // 发现新版后由用户点按钮再下载
+            const pushUpdater = (type, payload) => {
+                const w = BrowserWindow.getAllWindows()[0];
+                if (w && !w.isDestroyed()) w.webContents.send('updater:event', Object.assign({ type }, payload || {}));
+            };
+            autoUpdater.on('update-available', (info) => pushUpdater('available', { version: info && info.version }));
+            autoUpdater.on('update-not-available', () => pushUpdater('not-available'));
+            autoUpdater.on('download-progress', (p) => pushUpdater('progress', { percent: p && p.percent, speed: p && p.bytesPerSecond }));
+            autoUpdater.on('update-downloaded', () => pushUpdater('downloaded'));
+            autoUpdater.on('error', (err) => { console.warn('[updater]', err && err.message); pushUpdater('error', { message: err && err.message }); });
+            // 启动后延迟静默检查,避免拖慢首屏
+            setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 3000);
         } catch (e) {
             console.warn('[updater] 初始化失败:', e && e.message);
         }
     }
+    ipcMain.handle('check-for-updates', async () => {
+        if (!updater) return { ok: false, message: '开发模式不检查更新' };
+        try { await updater.checkForUpdates(); return { ok: true }; }
+        catch (e) { return { ok: false, message: e && e.message }; }
+    });
+    ipcMain.handle('start-update-download', async () => {
+        if (!updater) return { ok: false, message: '开发模式不检查更新' };
+        try { await updater.downloadUpdate(); return { ok: true }; }
+        catch (e) { return { ok: false, message: e && e.message }; }
+    });
+    ipcMain.handle('quit-and-install', () => {
+        if (updater) { try { updater.quitAndInstall(); } catch (e) { console.warn('[updater] quitAndInstall:', e && e.message); } }
+        return { ok: true };
+    });
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

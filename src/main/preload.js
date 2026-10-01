@@ -29,5 +29,13 @@ contextBridge.exposeInMainWorld('qingframe', {
     getPrefs: () => ipcRenderer.invoke('get-prefs'),
     savePrefs: (prefs) => ipcRenderer.invoke('save-prefs', prefs),
     readExif: (filePath) => ipcRenderer.invoke('read-exif', filePath),
-    openStickerImage: () => ipcRenderer.invoke('open-sticker-image')
+    openStickerImage: () => ipcRenderer.invoke('open-sticker-image'),
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    startUpdateDownload: () => ipcRenderer.invoke('start-update-download'),
+    quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+    onUpdaterEvent: (cb) => {
+        const l = (_e, payload) => cb(payload);
+        ipcRenderer.on('updater:event', l);
+        return () => ipcRenderer.removeListener('updater:event', l);
+    }
 });

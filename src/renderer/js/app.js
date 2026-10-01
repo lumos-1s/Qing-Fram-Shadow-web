@@ -1805,6 +1805,11 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 bindBtn('btnPuzzleClearSlots', () => this.clearPuzzleSlots());
         bindBtn('btnPuzzleDisable', () => this.disablePuzzle());
         bindBtn('btnExportPuzzle', () => this.exportPuzzle());
+        bindBtn('btnGridCrop', () => this.exportGridCrop());
+        bindBtn('btnCheckUpdate', () => this.checkUpdates());
+        bindBtn('btnUpdateAction', () => this.updateAction());
+        bindBtn('btnUpdateClose', () => this.hideUpdateBanner());
+        this.initUpdater();
         bindBtn('btnPuzzleAddImg', () => this.openImage());
         bindBtn('btnPuzzleRepuzzle', () => this.rePuzzleFill());
 
