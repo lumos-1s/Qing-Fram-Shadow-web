@@ -423,8 +423,10 @@ window.App = {
             }, { passive: false });
         };
         hscrollWheel(this.dom.thumbStrip);
-        hscrollWheel(this.$('brandIconBox'));
-        hscrollWheel(this.$('customIconBox'));
+        // 三个图标池(内置标记/品牌Logo/自定义图标)已改为网格+垂直滚动,
+        // 滚轮原生垂直滑动;不能再劫持成水平滚动,否则会阻止原生滚动。
+        // hscrollWheel(this.$('brandIconBox'));
+        // hscrollWheel(this.$('customIconBox'));
         pane.addEventListener('wheel', e => {
             const pk = this.tplPuzzle();
             if (pk) {
@@ -1133,7 +1135,12 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
 
     updateLabel(id, text) {
         const el = this.$(id);
-        if (el) el.textContent = String(text);
+        if (el) {
+            // 高频路径(每帧的滑块/边距/EXIF 标签)会反复进来,值没变就不碰 DOM:
+            // 同值写 textContent 虽不触发重排,但每次都要走字符串化与样式失效检查,累起来不划算。
+            const s = String(text);
+            if (el.textContent !== s) el.textContent = s;
+        }
     },
 
     // 字号标签只报「档位」,不报像素。
@@ -1521,11 +1528,19 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if (!this.template) return;
             window.__render(this, false);
             im.thumb = cv.toDataURL('image/jpeg', 0.8);
-            const strip = this.dom.thumbStrip ? this.dom.thumbStrip.querySelectorAll('img.thumb') : [];
-            strip.forEach(t => {
-                const ti = t.dataset.idx != null ? parseInt(t.dataset.idx, 10) : -1;
-                if (ti >= 0 && this.images[ti] === im) t.src = im.thumb;
-            });
+            // 直接按图对象取缩略图节点:原来每次都 querySelectorAll('img.thumb') 扫全条再逐个比对
+            // dataset.idx,导入 50 张时是 O(n²)(2500 次节点访问 + 属性读)。
+            // 映射缺失时(例如缩略图条还没建)回退到原来的扫描,行为不变。
+            const hit = this._thumbEls && this._thumbEls.get(im);
+            if (hit && hit.isConnected) {
+                if (hit.src !== im.thumb) hit.src = im.thumb;
+            } else {
+                const strip = this.dom.thumbStrip ? this.dom.thumbStrip.querySelectorAll('img.thumb') : [];
+                strip.forEach(t => {
+                    const ti = t.dataset.idx != null ? parseInt(t.dataset.idx, 10) : -1;
+                    if (ti >= 0 && this.images[ti] === im && t.src !== im.thumb) t.src = im.thumb;
+                });
+            }
         } catch (_) { /* 装框缩略图失败:保留原图占位 */ }
         finally {
             this.image = prevImg;
@@ -1539,6 +1554,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     buildThumbnails() {
         const strip = this.dom.thumbStrip;
         strip.innerHTML = '';
+        // 图对象 → 缩略图节点 的映射,供 renderFramedThumb 直接定位(见那里的注释)
+        const elMap = new Map();
         this.images.forEach((im, i) => {
             const wrap = document.createElement('div');
             wrap.className = 'thumb-item';
@@ -1552,8 +1569,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             if (this.image && this.images.indexOf(this.image) === i) cls.push('main');
             t.className = cls.join(' ');
             t.draggable = false;
-            t.src = im.thumb || im.el.src;
+            // 同值不重赋:赋 src 会让浏览器重新解码同一张图
+            const wantSrc = im.thumb || im.el.src;
+            if (t.src !== wantSrc) t.src = wantSrc;
             t.dataset.idx = i;
+            elMap.set(im, t);
             t.title = im.name;
             t.addEventListener('click', e => {
                 // 单击 = 选中并切换为当前主图(恢复该图自己的边框模板);Ctrl/Shift+单击 = 追加/取消多选
@@ -1587,6 +1607,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             }
             strip.appendChild(wrap);
         });
+        this._thumbEls = elMap;
         strip.style.display = this.images.length > 1 ? 'flex' : 'none';
     },
 
@@ -2013,8 +2034,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
     /* ══ Logo 页签 ══ */
     renderLogoPools() {
         const $ = this.$;
-        const pools = ['brandIconBox', 'customIconBox'];
-        const cats = { brandIconBox: [], customIconBox: [] };
+        // 三个池子:内置标记(随包自绘,开箱即有)/ 品牌 Logo(用户导入)/ 自定义图标
+        const pools = ['markIconBox', 'brandIconBox', 'customIconBox'];
+        const cats = { markIconBox: [], brandIconBox: [], customIconBox: [] };
+        cats.markIconBox = this.marks || [];
         this.logos.forEach(l => {
             // 自定义图标归到自定义图标池
             if (l.custom) { cats.customIconBox.push(l); return; }
@@ -2022,6 +2045,19 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             cats.brandIconBox.push(l);
         });
         cats.brandIconBox.sort((a,b) => this._brandRank(b.name) - this._brandRank(a.name));
+        // 图标池内容没变、DOM 也还在 → 直接返回。
+        // 本方法每次切到「Logo」页签都会被调(app-view.js:51),而重建要造上百个 div + img,
+        // 给 img 赋 src 还会触发一次解码。三个池子的来源只在启动加载与导入/删除/重命名时才变,
+        // 那几处都会改到签名(数量/名称/体积),所以这里跳过不会漏更新。
+        const sigOf = (arr) => arr.length + '|' + arr.map(l => (l.name || '') + ':' + (l.dataUrl ? l.dataUrl.length : 0)).join('\u0000');
+        const poolSig = sigOf(cats.markIconBox) + '#' + sigOf(this.logos);
+        const markBox = $('markIconBox'), brandBox = $('brandIconBox'), customBox = $('customIconBox');
+        const poolDomIntact = markBox && brandBox && customBox
+            && markBox.children.length === cats.markIconBox.length
+            && brandBox.children.length === cats.brandIconBox.length
+            && customBox.children.length === cats.customIconBox.length;
+        if (this._logoPoolSig === poolSig && poolDomIntact) return;
+        this._logoPoolSig = poolSig;
         // 发行版不再内置品牌 Logo 包,新用户进这个页签会看到"整组被隐藏、只剩一个按钮"。
         // 空池时给出引导,说明可以自己导入、以及文件名按品牌命名可自动匹配。
         const hint = $('logoPoolHint');
@@ -2032,6 +2068,24 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             box.innerHTML = '';
             const list = cats[boxId];
             if (!list.length) {
+                // 内置标记是随包分发的:它空了就说明打包漏了 / 主进程是旧的 / 目录读不到 ——
+                // 不能像另外两个池子那样整组藏起来,否则界面看起来和"根本没有这个功能"一模一样,
+                // 排查时完全看不出是哪一层的问题(这次就踩了)。给一格明确的"缺失"。
+                if (boxId === 'markIconBox') {
+                    const title = box.previousElementSibling;
+                    if (title) title.style.display = '';
+                    box.style.display = '';
+                    const cell = document.createElement('div');
+                    cell.className = 'icon-cell empty';
+                    cell.textContent = '内置标记缺失';
+                    cell.title = 'shared/marks 读不到。若刚改过 src/main 或 preload,请完全退出应用后重启。';
+                    box.appendChild(cell);
+                    // 把原因写到标题后面:截图/一眼就能看出是"preload 未提供"、"调用失败"
+                    // 还是"主进程返回空" —— 这三种要修的地方完全不同。
+                    const cntEl = this.$('markCnt');
+                    if (cntEl) cntEl.textContent = this._marksDiag ? '(' + this._marksDiag + ')' : '';
+                    return;
+                }
                 // 空池隐藏整个组
                 const title = box.previousElementSibling;
                 if (title) title.style.display = 'none';
@@ -2085,7 +2139,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 }
                 box.appendChild(c);
             });
-            const cnt = this.$({ brandIconBox: 'brandCnt', customIconBox: 'customIconCnt' }[boxId]);
+            const cnt = this.$({ markIconBox: 'markCnt', brandIconBox: 'brandCnt', customIconBox: 'customIconCnt' }[boxId]);
             if (cnt) cnt.textContent = `(${list.length})`;
         });
     },

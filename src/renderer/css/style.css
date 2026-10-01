@@ -564,6 +564,14 @@ html.dark .mini-btn.primary { color: #0c1914; }
     background: var(--surface-alt); border: 1px dashed var(--border-strong);
     border-radius: 10px; padding: 8px 10px; margin: 8px 4px;
 }
+/* 图标池下方的常驻命名提示。
+   不复用 .hint-box:那个是"整块说明"的形态(虚线框 + 8px 外边距 + 圆角),常驻会显得像警告;
+   这里只要它的字号与弱化色,并且与池子左缘对齐。 */
+.pool-note {
+    font-size: 11px; color: var(--text-3); line-height: 1.6;
+    padding: 6px 4px 0;
+}
+.pool-note b { color: var(--text-2); font-weight: 600; }
 .mode-status {
     display: flex; align-items: center; gap: 6px;
     margin: 2px 2px 8px; padding: 6px 10px;
@@ -608,12 +616,14 @@ html.dark .mini-btn.primary { color: #0c1914; }
 .pool-title { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; display: flex; align-items: center; gap: 6px; }
 .pool-title .cnt { font-size: 10px; color: var(--text-3); }
 .icon-pool {
-    display: flex; gap: 8px; padding: 8px; overflow-x: auto;
+    display: grid; gap: 8px; padding: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    max-height: 200px; overflow-y: auto; overflow-x: hidden;
     background: var(--surface-alt); border: 1px solid var(--border); border-radius: 11px;
     min-height: 64px;
 }
 .icon-pool .icon-cell {
-    width: 52px; height: 56px; flex: 0 0 auto; border-radius: 9px; cursor: pointer;
+    height: 56px; border-radius: 9px; cursor: pointer;
     background: var(--surface); border: 1px solid var(--border);
     display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;
     transition: border-color .15s, transform .1s;
@@ -805,4 +815,4 @@ button.tbtn:focus-visible, .mini-btn:focus-visible, .st-btn:focus-visible { outl
 .pg-title.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
 .pg-title.collapsible::before { content: '▾'; font-size: 10px; color: var(--text-3); transition: transform .15s; }
 .param-group.collapsed .pg-title.collapsible::before { transform: rotate(-90deg); }
-.param-group.collapsed > .param-row, .param-group.collapsed > .hint-box { display: none; }
+.param-group.collapsed > .param-row, .param-group.collapsed > .hint-box, .param-group.collapsed > .pool-note { display: none; }
