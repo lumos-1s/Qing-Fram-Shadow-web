@@ -32,6 +32,9 @@
 //   ④ 尺寸换算守 exportScale 路径:选了 2048 时引擎上采样,成品长边必须真的等于 2048。
 const path = require('path');
 const { app, BrowserWindow } = require('electron');
+// 主进程 stdout/stderr 在管道调用方(CI/npm/PowerShell)关闭后,残留日志会触发 EPIPE 弹窗;吞掉它。
+process.stdout.on('error', () => {});
+process.stderr.on('error', () => {});
 
 const ROOT = path.resolve(__dirname, '..');
 const PAGE = path.join(ROOT, 'design', 'regress.html');

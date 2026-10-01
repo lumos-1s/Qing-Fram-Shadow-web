@@ -22,6 +22,9 @@
 const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow } = require('electron');
+// 主进程 stdout/stderr 在管道调用方(CI/npm/PowerShell)关闭后,残留日志会触发 EPIPE 弹窗;吞掉它。
+process.stdout.on('error', () => {});
+process.stderr.on('error', () => {});
 
 const ROOT = path.resolve(__dirname, '..');
 const PAGE = path.join(ROOT, 'src', 'renderer', 'index.html');
