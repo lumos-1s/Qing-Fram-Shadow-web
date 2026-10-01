@@ -9,25 +9,28 @@ protocol.registerSchemesAsPrivileged([
     { scheme: 'qflocal', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
 ]);
 
-// 主进程侧 EXIF 解析(渲染进程 exif.js 以 CommonJS 导出)
-const exifUtil = require(path.join(__dirname, '..', 'renderer', 'js', 'exif.js'));
-async function readExif(filePath) {
-    try {
-        if (!filePath || !fs.existsSync(filePath)) return {};
-        const buf = await fs.promises.readFile(filePath);
-        if (!buf || !buf.length) return {};
-        const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-        const raw = exifUtil.parseExif(ab);
-        return exifUtil.exifSummary(raw) || {};
-    } catch (e) { return {}; }
-}
+// EXIF 解析:独立模块(src/main/exif-read.js)。只读文件头部而不整读照片,
+// 拆出来是为了能用纯 node 直接验证"头部解析 == 整文件解析"。
+const { readExif } = require('./exif-read');
 
 if (!app.requestSingleInstanceLock()) {
+    // 静默退出会把"我明明重启了却还是旧代码"变成一个查不出来的谜:
+    // 单实例锁会让新进程直接自杀、只把旧窗口聚焦到前台 —— 而旧的**主进程**代码换不掉。
+    // 踩过:改了 src/main 后 `npm start`,窗口照常出现,于是以为重启成功,实际跑的还是旧进程。
+    // 这一行是纯 ASCII 副本,别删:start.bat 必须靠它判断"到底有没有启动"。
+    // 它无法用中文那句来匹配 —— cmd 按控制台代码页解析 .bat(GBK),中文匹配串不可靠;
+    // 而 Chromium 的 process_singleton 报错只在"锁文件建不出来"时才有,真的"已有实例"
+    // 走的是静默退出分支,日志里一个 ASCII 标记都没有,只有下面这三行中文。
+    console.warn('[qingframe] single-instance lock refused this launch.');
+    console.warn('[清框影] 已有实例在运行,本次启动被忽略(单实例锁)。');
+    console.warn('         要加载 src/main 的改动,必须先完全退出已有实例:');
+    console.warn('         任务管理器里结束所有 Electron / 清框影 进程,再执行 npm start。');
     app.quit();
 } else {
     const PRESETS_DIR = path.join(__dirname, '..', '..', 'shared', 'presets');
     const LOGOS_DIR = path.join(__dirname, '..', '..', 'shared', 'brandlogos');
     const TEXTURES_DIR = path.join(__dirname, '..', '..', 'shared', 'textures');
+    const MARKS_DIR = path.join(__dirname, '..', '..', 'shared', 'marks');
     const TEMPLATES_DIR = path.join(app.getPath('userData'), 'templates');
     const { loadState, saveState, validDir, freeFilePath } = createStateStore(path.join(app.getPath('userData'), 'state.json'));
 
@@ -106,6 +109,26 @@ ipcMain.handle('load-preset', (_e, name) => {
     } catch (e) { return null; }
 });
 
+// 启动时要读全部预设:原来 list-presets + 逐个 load-preset = 78 次 IPC 往返,每次都在主进程
+// 做一次 existsSync + readFileSync 且串行。合并成一次往返,盘上并发读。
+ipcMain.handle('load-all-presets', async () => {
+    try {
+        if (!fs.existsSync(PRESETS_DIR)) return [];
+        const names = fs.readdirSync(PRESETS_DIR)
+            .filter(f => f.endsWith('.json'))
+            .map(f => f.replace(/\.json$/, ''));
+        const list = await Promise.all(names.map(async (name) => {
+            try {
+                const txt = await fs.promises.readFile(path.join(PRESETS_DIR, name + '.json'), 'utf-8');
+                return { name, data: JSON.parse(txt) };
+            } catch (e) { return null; }
+        }));
+        return list.filter(Boolean);
+    } catch (e) { return []; }
+});
+
+// 扩展名 → MIME(src/main/image-mime.js,独立成模块便于纯 node 验证)
+const { imageMimeOf } = require('./image-mime');
 const readImagesAsDataUrls = (dir, exts) => {
     try {
         if (!fs.existsSync(dir)) return [];
@@ -114,8 +137,7 @@ const readImagesAsDataUrls = (dir, exts) => {
             .map(f => {
                 const full = path.join(dir, f);
                 const buf = fs.readFileSync(full);
-                const mime = f.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-                return { name: f.replace(/\.\w+$/, ''), dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
+                return { name: f.replace(/\.\w+$/, ''), dataUrl: `data:${imageMimeOf(f)};base64,${buf.toString('base64')}` };
             });
     } catch (e) { return []; }
 };
@@ -135,6 +157,12 @@ ipcMain.handle('list-custom-icons', () => {
 
 ipcMain.handle('list-textures', () => {
     return readImagesAsDataUrls(TEXTURES_DIR, ['.png', '.jpg', '.jpeg']);
+});
+
+// 内置原创标记(shared/marks,随包分发)。全部是项目自绘的几何/排版图形,
+// 不含任何第三方品牌素材 —— 品牌 logo 因商标/著作权原因不随发行版分发,见 OPTIMIZATIONS.md。
+ipcMain.handle('list-marks', () => {
+    return readImagesAsDataUrls(MARKS_DIR, ['.svg', '.png']);
 });
 
 const ensureTemplatesDir = () => {
@@ -312,8 +340,10 @@ ipcMain.handle('open-images', async () => {
     });
     if (canceled || !filePaths.length) return null;
     saveState({ lastOpenDir: path.dirname(filePaths[0]) });
-    const items = [];
-    for (const fp of filePaths) items.push({ name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: await readExif(fp) });
+    // 并发解析 EXIF:头部读取后单张约 1ms,但串行 await 会线性累加(Promise.all 保序)
+    const items = await Promise.all(filePaths.map(async (fp) => ({
+        name: path.basename(fp), path: fp, size: fs.statSync(fp).size, exif: await readExif(fp)
+    })));
     return items;
 });
 

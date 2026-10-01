@@ -80,7 +80,7 @@ npm run dist:portable
 ### 发布前自检 · Pre-release checks
 
 ```bash
-npm run check         # ESLint + 预设与引擎风格表一致性校验
+npm run check         # ESLint + 预设与引擎风格表一致性 + 主进程与引擎的不变量回归(纯 Node,不需要 GUI)
 npm run release       # 先产出未压缩目录 → 校验无品牌 Logo → 再打安装包
 ```
 
@@ -92,7 +92,10 @@ npm run app:dir       # 只产出未压缩目录(供校验用)
 npm run verify:dist   # 检查 dist/ 下所有 app.asar:无品牌 Logo、预设 70、纹理 10
 ```
 
-`verify:dist` 的退出码：`0` 通过 / `1` 发现 Logo 泄漏 / `2` 无法判定（没有产物，或产物早于源码改动）。
+`verify:dist` 的退出码：`0` 通过 / `1` 已确定的失败（Logo 泄漏、预设或纹理数量与源码不符、
+或没有任何可读产物）/ `2` 无法判定（仅产物早于源码改动这种拿不准的情况）。
+
+> 预设与纹理的**期望数量从 `shared/` 实测**，不写死在脚本里——加了预设就不必再改校验脚本。
 
 > **它同时检查产物新鲜度**：若 `app.asar` 比 `src/`、`shared/presets/`、`package.json`
 > 还旧，说明那是上一次构建的残留，会以退出码 2 拒绝通过——避免"改了配置但校验的是旧包"。

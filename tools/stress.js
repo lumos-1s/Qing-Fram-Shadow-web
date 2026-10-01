@@ -202,7 +202,13 @@ async function startSampling(wc) {
             if (!state.aborted && mb > MEM_CAP) {
                 state.aborted = true;
                 console.log('  [mem] 超过熔断阈值,中止当前用例');
-                try { await wc.executeJavaScript('window.__stress.setAbort()'); } catch (e) { }
+                // 必须用 executeJavaScript 在主世界置位:
+                //   · contextBridge 暴露的函数,函数体跑在 preload 的**隔离世界**,
+                //     写 window.__stressAbort 只写到隔离世界,主世界的 RUNNER 读不到(setAbort 因此形同虚设);
+                //   · executeJavaScript 默认在主世界求值,这里写的两个标记才是 RUNNER 与导出循环真正读的:
+                //     window.__stressAbort  → RUNNER 的导入循环(107/118)与收尾判定(149)
+                //     App._exportAbort      → in-flight 的 exportImage 逐张循环(app-export.js:86)
+                try { await wc.executeJavaScript('window.__stressAbort = true; if (window.App) window.App._exportAbort = true;'); } catch (e) { }
             }
         } catch (e) { }
     }, 300);

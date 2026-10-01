@@ -3,6 +3,8 @@ window.App = Object.assign(window.App || {}, {
     /* ── 导出:先选保存位置,再渲染导出画面,最后写盘 ── */
     async exportImage() {
         if (!this.image) { this.setStatus('请先导入照片'); return; }
+        // 每次导出重新求通道比例(画布/显示尺寸可能在两次导出之间变过)
+        delete this._exportPathDpr;
         const fmt = this.dom.selFormat.value;
         const mime = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[fmt] || 'image/jpeg';
         const lossy = fmt === 'jpeg' || fmt === 'webp';
@@ -116,7 +118,23 @@ window.App = Object.assign(window.App || {}, {
                         res();
                     }));
                     const afterW = Math.max(1, this.dom.canvas.width || 1);
-                    const k = afterW / beforeW;
+                    // 元素尺寸/锚点偏移的换算基准:试渲染宽度 × 本通道的 dpr 比例。
+                    // 为什么必须补这个比例 —— 元素几何是以「设备像素」存的(engine.js drawLogoElements
+                    // 在 ctx.restore() 之后按 canvas.width 口径绘制),而预览与导出的画布宽度差一个 dpr:
+                    //   · 预览:engine setupCanvas 走 scale = uiScale * devicePixelRatio → canvas.width = _logW × dpr
+                    //   · 导出:uiDprOverride=1 → canvas.width = _logW × 1
+                    // 同一个 size 在两种画布上占图片的比例因此差 dpr 倍,不补就会让导出的 logo
+                    // 正好大 dpr 倍(贴边的锚点 Logo 还会离边更远)。
+                    // beforeW 是在导出通道里测的(dpr 恒 1),自己看不见这个差异,所以要单独求通道比例:
+                    // 用第 1 张(用户正在看的那张)的真实画布宽度 uiMaxSave 与其试渲染宽度 beforeW 之比。
+                    // 该比例同一会话内恒定(图层/卡片通道 = devicePixelRatio,相框通道 = 1),
+                    // 之后每张沿用 —— 这样 beforeW 仍是**逐张**测的,保留了原作者"每张各自以默认预览
+                    // 尺寸为基准"的口径(批量导出时各图长宽比不同,不能用第 1 张的宽度顶替)。
+                    // DPR=1 或相框通道时 pathDpr = 1,行为与改动前完全一致。
+                    if (!(this._exportPathDpr > 0)) {
+                        this._exportPathDpr = (uiMaxSave > 0) ? (uiMaxSave / beforeW) : 1;
+                    }
+                    const k = this.exportSizeScale(afterW, beforeW, this._exportPathDpr);
                     // 元素坐标为基准画布像素:导出画布变大时等比放大,避免缩到角落
                     // (this.template 是导出专用拷贝,副本随本循环丢弃,无需再按 1/k 还原)
                     if (!puzzle && k !== 1 && scaleElPix(this.template, k)) {
@@ -177,6 +195,15 @@ window.App = Object.assign(window.App || {}, {
         this.updateStatusBar();
     },
 
+    // 导出时元素尺寸/锚点偏移要乘的倍数。抽成纯函数便于单测(见 tools/test-engine-invariants.js ⑥):
+    //   beforeW  = 该图在导出通道(uiDprOverride=1)下按默认显示尺寸试渲染的画布宽度
+    //   pathDpr  = 预览画布宽度 / 同模板试渲染宽度 —— 同一会话内恒定的通道比例(图层/卡片 = dpr,相框 = 1)
+    // 返回 1 表示"预览与导出口径一致,不必再渲一次"。
+    exportSizeScale(afterW, beforeW, pathDpr) {
+        const p = (typeof pathDpr === 'number' && pathDpr > 0) ? pathDpr : 1;
+        return afterW / Math.max(1, beforeW * p);
+    },
+
     // 导出文件名:按图片原有名称命名;同一名称重复时,首张保留原名,后续追加 _1、_2…
     dedupeExportNames(files) {
         const counts = new Map();
@@ -226,7 +253,12 @@ window.App = Object.assign(window.App || {}, {
     updateExportSizeNote() {
         const note = this.dom.exportSizeNote;
         if (!note) return;
-        const hide = () => { note.style.display = 'none'; note.textContent = ''; };
+        const hide = () => {
+            // 这是每次 input 都会走到的路径(经 onSettingChanged):已经是隐藏且无文字时别再写 DOM
+            if (note.style.display === 'none' && !note.textContent) return;
+            note.style.display = 'none';
+            note.textContent = '';
+        };
         const sizeOpt = parseInt(this.dom.selExportSize.value, 10) || 0;
         const tpl = this.template;
         // 原图直出(NONE)读 exportScale,行为与所选值一致,无需提示

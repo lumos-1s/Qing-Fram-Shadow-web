@@ -1,0 +1,91 @@
+// EXIF 读取:只读文件头部,不整读照片(主进程用,独立于 electron 便于用纯 node 验证)
+//
+// 为什么能只读头部:解析器(../renderer/js/exif.js)只认 JPEG 的段结构(FF xx + 2 字节长度),
+// 而**单个 JPEG 段的长度上限是 65535 字节**,所以 EXIF 的 APP1 段必然落在文件很靠前的位置。
+// 原来 fs.readFile 把整张照片读进内存只为解析这几十 KB:批量导入 20 张 40MB 照片 = 白白搬运 800MB。
+//
+// 正确性策略(结果必须与整读逐字段一致):
+//   1. 文件 ≤ 头部窗口        → 直接整读(没有收益差,也无需判断)
+//   2. 窗口内找到完整 APP1/Exif → 用窗口解析
+//   3. 找到了但段尾超出窗口 / 是 JPEG 却没找到 → 回退整读
+//   4. 非 JPEG 容器           → 只解析窗口
+//      (PNG/WebP 的 eXIf chunk 本解析器读不到,整读也只会得到 {}
+//       —— 不为了一个必然为空的结果去搬整个文件)
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const exifUtil = require(path.join(__dirname, '..', 'renderer', 'js', 'exif.js'));
+
+const EXIF_HEAD_BYTES = 256 * 1024;
+const JPEG_EXTS = ['.jpg', '.jpeg'];
+
+async function readHead(filePath, bytes) {
+    const fh = await fs.promises.open(filePath, 'r');
+    try {
+        const buf = Buffer.allocUnsafe(bytes);
+        const { bytesRead } = await fh.read(buf, 0, bytes, 0);
+        return buf.subarray(0, bytesRead);
+    } finally {
+        await fh.close().catch(() => {});
+    }
+}
+
+// 在 buf 里找 APP1/Exif 段。返回:
+//   'full'   整段都在窗口内(可安全解析)
+//   'beyond' 找到了,但段尾超出窗口
+//   'absent' 扫到窗口末尾也没找到(可能不是 JPEG,也可能头部没有 EXIF)
+function exifSegmentState(buf) {
+    let off = 2;
+    while (off + 4 <= buf.byteLength) {
+        if (buf[off] !== 0xFF) { off++; continue; }
+        const marker = buf[off + 1];
+        if (marker === 0xD8 || marker === 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) { off += 2; continue; }
+        const len = buf.readUInt16BE(off + 2);
+        if (marker === 0xE1 && len >= 10) {
+            let isExif = true;
+            const sig = 'Exif\0\0';
+            for (let i = 0; i < 6; i++) if (buf[off + 4 + i] !== sig.charCodeAt(i)) { isExif = false; break; }
+            if (isExif) return (off + 2 + len <= buf.byteLength) ? 'full' : 'beyond';
+        }
+        off += 2 + len;
+    }
+    return 'absent';
+}
+
+function parseBuf(buf) {
+    if (!buf || !buf.length) return {};
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    return exifUtil.parseExif(ab);
+}
+
+async function readExif(filePath) {
+    try {
+        if (!filePath) return {};
+        const st = await fs.promises.stat(filePath).catch(() => null);
+        if (!st || !st.isFile() || !st.size) return {};
+
+        let raw;
+        if (st.size <= EXIF_HEAD_BYTES) {
+            raw = parseBuf(await fs.promises.readFile(filePath));
+        } else {
+            const isJpeg = JPEG_EXTS.includes(path.extname(filePath).toLowerCase());
+            try {
+                const head = await readHead(filePath, EXIF_HEAD_BYTES);
+                const state = exifSegmentState(head);
+                if (state === 'beyond' || (state === 'absent' && isJpeg)) {
+                    raw = parseBuf(await fs.promises.readFile(filePath));  // 头部没覆盖到 → 整读
+                } else {
+                    raw = parseBuf(head);
+                }
+            } catch (e) {
+                // 头部窗口里碰到越界偏移(畸形/异形 EXIF)会抛 RangeError —— 整读兜底,
+                // 宁可多读一次也不能丢字段(丢了 orientation 会让照片错误旋转)。
+                raw = parseBuf(await fs.promises.readFile(filePath));
+            }
+        }
+        return exifUtil.exifSummary(raw) || {};
+    } catch (e) { return {}; }
+}
+
+module.exports = { readExif, exifSegmentState, EXIF_HEAD_BYTES };

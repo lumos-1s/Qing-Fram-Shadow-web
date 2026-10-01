@@ -162,8 +162,20 @@
     // 覆盖后落到同一个值,故折叠无差异)。差异只有一处,且是有意的:pf / bi / cr / gm / isc
     // 这五行改由 MEASURED 实测决定,见 tools/test-panel-visibility.js 的收紧登记。
     // ────────────────────────────────────────────────────────────────────────
+    // 面板行显隐是**纯函数**(输入只有风格名),而每次 refreshUI 都会问一次。
+    // 结果按大写风格名缓存:返回的对象只被读取(updatePersonalVisibility 只取 rows[id]),
+    // 所以复用同一份不会串味。键用大写名,保证 'signature' 与 'SIGNATURE' 共享一条。
+    const _visibleRowsCache = new Map();
     function visibleRows(style) {
         const s = String(style || '').toUpperCase();
+        const cached = _visibleRowsCache.get(s);
+        if (cached) return cached;
+        const v = computeVisibleRows(s);
+        if (_visibleRowsCache.size > 256) _visibleRowsCache.clear();
+        _visibleRowsCache.set(s, v);
+        return v;
+    }
+    function computeVisibleRows(s) {
         const isPersonal = PERSONAL_STYLES.indexOf(s) >= 0;
         const isOverlay = OVERLAY_STYLES.indexOf(s) >= 0;
         const isBlur = BLUR_STYLES.indexOf(s) >= 0;

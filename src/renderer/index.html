@@ -525,14 +525,29 @@
                     <div class="tab-panel" id="panel-logo">
                         <div class="param-group">
                             <div class="pg-title collapsible">图标库</div>
+                            <div class="pool-title">内置标记 <span class="cnt" id="markCnt"></span></div>
+                            <div class="icon-pool" id="markIconBox"></div>
                             <div class="pool-title">品牌 Logo <span class="cnt" id="brandCnt"></span></div>
                             <div class="icon-pool" id="brandIconBox"></div>
                             <div class="pool-title">自定义图标 <span class="cnt" id="customIconCnt"></span></div>
                             <div class="icon-pool" id="customIconBox"></div>
+                            <!-- 空池时的完整引导。放在命名提示之前:空池时两个池子连同标题都会被隐藏
+                                 (renderLogoPools 里 list.length 为 0 就 display:none),首屏只剩这两块,
+                                 所以必须先讲"为什么是空的、该怎么办",再讲命名细则。
+                                 两块都不要放进 #customIconBox/#brandIconBox 内部 ——
+                                 renderLogoPools 用子元素数量做「DOM 是否还在」的守卫,混进去会让守卫判错。 -->
                             <div class="hint-box" id="logoPoolHint" style="display:none;">
-                                图标库为空。点下方按钮导入你自己的 PNG 图标即可使用；<br />
-                                若把文件命名为 <b>Canon.png</b>、<b>SONY.png</b>、<b>FUJIFILM.png</b> 等相机品牌名，
-                                软件会按照片 EXIF 识别出的品牌自动选用对应图标（文件名带机型如 <b>Canon EOS R5.png</b> 也可以）。
+                                <b>品牌 Logo 需要你自己添加。</b>本软件不随包分发任何品牌的图形素材（商标与著作权原因），
+                                所以这里是空的 —— 是有意为之，不是坏了。<br />
+                                <b>①</b> 到品牌官网下载官方 PNG（相机说明书、包装上的图也可以）；<br />
+                                <b>②</b> 点下方「+ 添加自定义图标」导入，或直接把图片文件拖进来；<br />
+                                <b>③</b> 用品牌名给文件命名，之后软件会按照片 EXIF 自动匹配对应图标。
+                            </div>
+                            <!-- 常驻的命名提示:池子非空时才是它最有用的时刻(用户正要导入或已导入) -->
+                            <div class="pool-note" id="logoNameTip">
+                                命名规则：文件名写成品牌名，软件就会按照片 EXIF 自动选用 ——
+                                <b>Canon.png</b>、<b>SONY_White.png</b>、<b>FUJIFILM_Color.png</b>；
+                                带机型也行（<b>Canon EOS R5.png</b>）。导入后双击图标可重命名。
                             </div>
                             <div class="btn-row">
                                 <button class="mini-btn" id="btnAddCustomIcon">+ 添加自定义图标</button>

@@ -123,9 +123,25 @@ window.App = Object.assign(window.App || {}, {
     },
 
     _thumbsPending: [],
+    // 模板缩略图缓存:键 = 名称 + 内容指纹(见 _tplThumbKey),值 = dataURL。
+    // 每个缩略图是一次完整引擎渲染 + 一次 toDataURL,而模板内容多数时候没变。
+    _tplThumbCache: new Map(),
+
+    _tplThumbKey(r) {
+        // 模板对象每次 refreshTemplates 都是重新读盘的新对象,不能用对象身份当键;
+        // 用 JSON 文本 + 长度当内容指纹,内容一改自然换键。
+        let s;
+        try { s = JSON.stringify(r.tpl); } catch (e) { s = 'x'; }
+        return (r.name || '') + '#' + s.length + '#' + s;
+    },
 
     async _renderTplThumbs() {
         if (!window.__render || !this._thumbsPending.length) return;
+        // 面板不在前台就不渲染:每个缩略图是一次完整引擎渲染 + toDataURL(约 5~25ms),
+        // 而 refreshTemplates 还会被保存/重命名/删除等路径调用。切到「模板」页签时
+        // switchTab 会重新 refreshTemplates,那时再渲染;此处保留 _thumbsPending 不动。
+        const panel = this.$('panel-template');
+        if (panel && !panel.classList.contains('active')) return;
         const prevCanvas = this.dom.canvas;
         const prevMax = this.displayMax;
         const prevImg = this.image;
@@ -135,6 +151,9 @@ window.App = Object.assign(window.App || {}, {
             for (const r of this._thumbsPending.slice()) {
                 const thumb = r._thumb;
                 if (!thumb || !r.tpl) continue;
+                const tkey = this._tplThumbKey(r);
+                const cached = this._tplThumbCache.get(tkey);
+                if (cached) { thumb.src = cached; continue; }   // 内容没变,直接复用上次的图
                 if (!sample.complete) await new Promise(res => { sample.onload = res; sample.onerror = res; });
                 const cv = document.createElement('canvas');
                 cv.width = 1; cv.height = 1;
@@ -147,6 +166,8 @@ window.App = Object.assign(window.App || {}, {
                     if (r.tpl.puzzle && window.__renderPuzzle) window.__renderPuzzle(this, false, true);
                     else window.__render(this, false);
                     thumb.src = cv.toDataURL('image/jpeg', 0.75);
+                    if (this._tplThumbCache.size > 200) this._tplThumbCache.clear();
+                    this._tplThumbCache.set(tkey, thumb.src);
                 } catch (_) { thumb.style.display = 'none'; }
             }
         } finally {
@@ -277,6 +298,29 @@ window.App = Object.assign(window.App || {}, {
             const saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
             saved.forEach(c => { if (c && c.dataUrl && !this.logos.some(l => l.dataUrl === c.dataUrl)) this.logos.push(c); });
         } catch(e) {}
+        // 内置原创标记:单独放 this.marks,不进 this.logos —— 后者要参与品牌那套逻辑
+        // (_brandRank 热度排序、brandLogoEntry 按文件名匹配 EXIF 品牌),标记混进去会被当成品牌。
+        // 测试用的 preload-measure.js 没有 listMarks,所以先判存在性再调。
+        try {
+            const q = window.qingframe;
+            if (q && typeof q.listMarks === 'function') {
+                this.marks = ((await q.listMarks()) || []).filter(m => m && m.dataUrl);
+                // 诊断信息会显示在「内置标记」标题后面 —— 空池时必须能一眼看出是哪一层的问题,
+                // 否则界面只显示"缺失",排查得靠猜(这个坑已经踩过两次了)。
+                this._marksDiag = this.marks.length === 0 ? '主进程返回空' : '';
+            } else {
+                // 测试用的 preload-measure.js 本来就没有这个方法(属正常),
+                // 但正式版走到这里说明主进程/preload 是旧的(改了 main 或 preload 却没完全重启)。
+                this.marks = [];
+                this._marksDiag = 'preload 未提供';
+                console.warn('[清框影] preload 未提供 listMarks:内置标记不可用。' +
+                    '若刚改过 src/main 或 preload,请完全退出应用后重新启动(渲染进程刷新不够)。');
+            }
+        } catch (e) {
+            this.marks = [];
+            this._marksDiag = '调用失败';
+            console.warn('[清框影] listMarks 调用失败(主进程可能还是旧的):', e && e.message);
+        }
         this.splashTick();
         if (this.dom.stRes) this.renderLogoPools();
     },

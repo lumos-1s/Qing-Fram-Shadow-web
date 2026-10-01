@@ -3,8 +3,21 @@
 // ── 工具 ──
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// parseColor：hex + opacity(0-100) ??{r,g,b,a}，与原版 parseColor 一??空透明度按 100 处理)
+// parseColor：hex + opacity(0-100) → {r,g,b,a}，与原版 parseColor 一致(空透明度按 100 处理)
+// 记忆化:一帧里它会被调上百次(每个图层/描边/阴影/文字各一次),而输入组合很有限。
+// 返回对象只被读取(调用方一律是 rgba(c) 或读字段,没有任何地方写它),复用安全。
+const PARSE_COLOR_CACHE = new Map();
+const PARSE_COLOR_MAX = 4096;
 function parseColor(hex, opacity) {
+    const key = hex + '\u0000' + (opacity == null ? 100 : opacity);
+    const hit = PARSE_COLOR_CACHE.get(key);
+    if (hit !== undefined) return hit;
+    const v = parseColorUncached(hex, opacity);
+    if (PARSE_COLOR_CACHE.size >= PARSE_COLOR_MAX) PARSE_COLOR_CACHE.clear();
+    PARSE_COLOR_CACHE.set(key, v);
+    return v;
+}
+function parseColorUncached(hex, opacity) {
     try {
         hex = String(hex || '#000000').replace('#', '');
         if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
@@ -637,6 +650,13 @@ function drawFilmPerforations(ctx, config, cw, ch, margin) {
 // 噪声砖缓存:key = 砖边长(强度不进 key,同一张砖用不同 alpha 复用)。
 // 之所以要缓存:一帧 4000×3455 的画布若每帧重算 1400 万个随机数,拖滑块会直接卡死。
 const GRAIN_TILE_CACHE = {};
+// 砖尺寸的键空间是 96..1408 的整数(约 1300 档),而单块最大 1408²×4 ≈ 7.9MB。
+// 不设上限时:拖动留白/缩放会让画布尺寸每帧微变 → 每帧生成一块新砖 → 一次拖拽就能涨到 GB 级。
+// 保留最近 8 块(预览尺寸下每块约 1-2MB)即可覆盖"预览 + 导出"的常用档位。
+// 砖由固定盐的 LCG 确定性生成(见 GRAIN_SALT),淘汰后重算的像素完全一致 ——
+// 这是纯内存回收,不改变任何输出。
+const GRAIN_TILE_ORDER = [];
+const GRAIN_TILE_MAX = 8;
 // 固定盐值:同一张图 + 同一个尺寸永远得到同一张颗粒图。
 // 绝不能用 Math.random() —— 否则每帧颗粒都在跳(预览"沙沙"响),
 // 而且视觉回归基线永远对不上。
@@ -660,6 +680,11 @@ function grainTile(size) {
     }
     g.putImageData(img, 0, 0);
     GRAIN_TILE_CACHE[size] = c;
+    GRAIN_TILE_ORDER.push(size);
+    while (GRAIN_TILE_ORDER.length > GRAIN_TILE_MAX) {
+        const old = GRAIN_TILE_ORDER.shift();
+        if (old !== size) delete GRAIN_TILE_CACHE[old];
+    }
     return c;
 }
 

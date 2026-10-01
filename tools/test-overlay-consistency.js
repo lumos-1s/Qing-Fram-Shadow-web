@@ -124,6 +124,10 @@ async () => {
 }
 `;
 
+// 退出码收尾:Electron 主进程完全忽略 process.exitCode(app.quit() 之后设 1 实测仍得 0),
+// 只有 app.exit(code) 能带出非 0。此前本文件只调 app.quit(),断言失败也返回 0。
+function finish(code) { app.exit(code || 0); }
+
 app.whenReady().then(async () => {
     protocol.handle('qflocal', (req) => {
         try { const u = new URL(req.url); const p = u.searchParams.get('p');
@@ -153,5 +157,5 @@ app.whenReady().then(async () => {
     }
     console.log('─'.repeat(88));
     console.log(fail ? `✖ ${fail}/${cases.length} 项不一致` : `✓ 全部 ${cases.length} 项一致`);
-    app.quit();
-}).catch(e => { console.error(e); process.exit(1); });
+    finish(fail ? 1 : 0);
+}).catch(e => { console.error(e); finish(1); });

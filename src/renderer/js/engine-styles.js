@@ -953,10 +953,29 @@ AV_OVERLAY_BC2:67 };
     function setFont(g, px, mono, bold, family) {
         g.font = (bold ? 'bold ' : '') + px + 'px ' + (mono ? 'monospace' : (family || 'sans-serif'));
     }
+    // 字符宽度记忆化:charW 每个字符都要一次 measureText,而一条参数条/水印一帧要量上千次
+    // (fitFont 还会从 startFs 每次 -1 重试整串)。同一 (字号, 粗体, 字距, 字符) 的 measureText
+    // 必然返回同一个浮点,所以缓存与直接调用逐比特等价。
+    // 两个要点:
+    //   ① 键必须含 letterSpacing —— Chromium 的 measureText 会把它计入宽度(见 :3273 的注释),
+    //      漏掉就会在设了字距的风格里量出错值,那等于改像素;
+    //   ② setFont 照旧每次都调,不改变 ctx.font 的既有副作用(有些调用方紧接着就 fillText)。
+    const _charWCache = new Map();
+    const _charWFCache = new Map();
+    const CHARW_CACHE_MAX = 8192;
+    function memoCharW(cache, key, compute) {
+        const hit = cache.get(key);
+        if (hit !== undefined) return hit;
+        const v = compute();
+        if (cache.size >= CHARW_CACHE_MAX) cache.clear();
+        cache.set(key, v);
+        return v;
+    }
     function charW(g, ch, px, mono, bold) {
         if (mono) return Math.round(px * 0.60);
         setFont(g, px, mono, bold);
-        return g.measureText(ch).width;
+        return memoCharW(_charWCache, px + '|' + (bold ? 1 : 0) + '|' + (g.letterSpacing || '0px') + '|' + ch,
+            () => g.measureText(ch).width);
     }
     function textMetrics(g, text, px, mono, bold, track) {
         const ascent = Math.round(px * 0.78), descent = Math.round(px * 0.22);
@@ -1317,8 +1336,10 @@ AV_OVERLAY_BC2:67 };
     function textMetricsF(g, text, px, mono, bold, track, family) {
         const ascent = Math.round(px * 0.78), descent = Math.round(px * 0.22);
         setFont(g, px, mono, bold, family);
+        // 字体在循环外设好一次(与原实现一致),循环内只把 measureText 的结果缓存起来
+        const keyPrefix = px + '|' + (mono ? 1 : 0) + '|' + (bold ? 1 : 0) + '|' + (g.letterSpacing || '0px') + '|' + family + '|';
         let w = 0;
-        for (const ch of text) w += g.measureText(ch).width;
+        for (const ch of text) w += memoCharW(_charWFCache, keyPrefix + ch, () => g.measureText(ch).width);
         w += (track || 0) * Math.max(0, text.length - 1);
         return { w, ascent, descent, height: ascent + descent, maxDescent: descent };
     }

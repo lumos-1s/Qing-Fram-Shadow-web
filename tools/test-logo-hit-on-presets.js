@@ -146,6 +146,10 @@ async function clickAt(dbg, x, y) {
     await new Promise(r => setTimeout(r, 260));
 }
 
+// 退出码收尾:Electron 主进程完全忽略 process.exitCode(app.quit() 之后设 1 实测仍得 0),
+// 只有 app.exit(code) 能带出非 0。此前本文件设了 process.exitCode,断言失败仍返回 0。
+function finish(code) { app.exit(code || 0); }
+
 app.whenReady().then(async () => {
     protocol.handle('qflocal', (req) => {
         try {
@@ -221,7 +225,6 @@ app.whenReady().then(async () => {
     }
     console.log('─'.repeat(104));
     dbg.detach();
-    app.quit();
     const fail = notSelected + notScaled;
-    process.exitCode = fail ? 1 : 0;
-}).catch(e => { console.error(e); process.exit(1); });
+    finish(fail ? 1 : 0);
+}).catch(e => { console.error(e); finish(1); });

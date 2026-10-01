@@ -1,6 +1,7 @@
 // 打包产物校验:确认发行版里没有第三方品牌 Logo
 // 用法: node tools/verify-dist.js        (npm run verify:dist)
-// 退出码: 0 = 干净, 1 = 发现泄漏, 2 = 无法判定(没有可检查的产物)
+// 退出码: 0 = 干净, 1 = 已确定的失败(Logo 泄漏 / 关键内容缺失 / 没有可读产物),
+//         2 = 无法判定(仅产物早于源码改动这种拿不准的情况)
 //
 // 为什么需要这个:build.files 里的 `!shared/brandlogos/**` 是唯一的真相源,但它只影响
 // 「下次打包」。一旦有人改了 files 配置、或用了旧配置打出来的产物,Logo 就会静默进包。
@@ -19,6 +20,19 @@ const EXPECTED = [
     { label: '渲染引擎', match: /src[\\/]renderer[\\/]js[\\/]engine\.js$/ },
     { label: '预设目录', match: /shared[\\/]presets$/ },
 ];
+
+// 期望的预设/纹理数量从源码目录实测,不再硬编码。
+// 原先写死 70,而预设已经加到 78 —— 那条断言会一直亮红,把一个「配置漂移」问题
+// 稀释成噪音;更糟的是它和「产物过期」共用一个退出码,真缺失会被当成「无法判定」。
+function countSource(relDir, re) {
+    try {
+        return fs.readdirSync(path.join(ROOT, relDir)).filter(f => re.test(f)).length;
+    } catch (e) {
+        return 0;
+    }
+}
+const EXPECT_PRESETS = countSource(path.join('shared', 'presets'), /\.json$/i);
+const EXPECT_TEXTURES = countSource(path.join('shared', 'textures'), /\.(png|jpe?g)$/i);
 
 function findAsar(dir, out = [], depth = 0) {
     if (depth > 4) return out;
@@ -111,14 +125,14 @@ for (const asarPath of asars) {
     console.log(`  条目总数            : ${files.length}`);
     console.log(`  品牌 Logo 文件      : ${logos.length}${logos.length ? '   ← 泄漏!' : '   ✓'}`);
     console.log(`  brandlogos 目录条目 : ${logoDirs.length}${logoDirs.length ? '   ← 泄漏!' : '   ✓'}`);
-    console.log(`  shared/presets 预设 : ${presets.length}${presets.length === 70 ? '   ✓' : '   ← 数量异常(应为 70)'}`);
-    console.log(`  shared/textures 纹理: ${textures.length}${textures.length === 10 ? '   ✓' : '   ← 数量异常(应为 10)'}`);
+    console.log(`  shared/presets 预设 : ${presets.length}${presets.length === EXPECT_PRESETS ? '   ✓' : `   ← 数量异常(源码现有 ${EXPECT_PRESETS})`}`);
+    console.log(`  shared/textures 纹理: ${textures.length}${textures.length === EXPECT_TEXTURES ? '   ✓' : `   ← 数量异常(源码现有 ${EXPECT_TEXTURES})`}`);
 
     if (logos.length) {
         console.log('  泄漏样例:');
         logos.slice(0, 5).forEach(f => console.log(`    ${f}`));
     }
-    if (presets.length !== 70 || textures.length !== 10) missingExpected++;
+    if (presets.length !== EXPECT_PRESETS || textures.length !== EXPECT_TEXTURES) missingExpected++;
 
     for (const exp of EXPECTED) {
         if (!files.some(f => exp.match.test(f))) {
@@ -165,6 +179,8 @@ if (problems.length) {
     if (stale && !leaked) {
         console.log('  → 删除 dist/ 后重新打包,否则校验的是旧产物。');
     }
-    process.exit(leaked || !checked ? 1 : 2);
+    // 1 = 已确定的失败(Logo 泄漏 / 关键内容缺失 / 没有任何产物可读);
+    // 2 = 无法判定(仅"产物比源码旧"这种拿不准的情况)。内容缺失是确定结论,不能算 2。
+    process.exit(leaked || !checked || missingExpected ? 1 : 2);
 }
 console.log(`✓ 通过:检查了 ${checked} 个 app.asar,产物新鲜、无品牌 Logo,预设与纹理齐全。`);
