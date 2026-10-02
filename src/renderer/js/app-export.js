@@ -195,25 +195,17 @@ window.App = Object.assign(window.App || {}, {
         this.updateStatusBar();
     },
 
-    // ── 九宫格切图:当前画布(含边框/水印/元素,所见即所得)按 3×3 切成 9 张,适配小红书九宫格 ──
-    async exportGridCrop() {
-        if (!this.image) { this.setStatus('请先导入照片'); return; }
-        const fmt = this.dom.selFormat.value;
-        const mime = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[fmt] || 'image/jpeg';
-        const ext = fmt === 'jpeg' ? 'jpg' : fmt;
-        const quality = (fmt === 'jpeg' || fmt === 'webp') ? Math.min(1, Math.max(0.6, (parseInt(this.dom.slExportQuality.value, 10) || 92) / 100)) : 1;
-        const needsBg = fmt === 'jpeg';
+    // ── 九宫格切图:当前画布(含边框/水印/元素,所见即所得)按 n×n 切成 n² 张 ──
+    gridSize() { return parseInt((document.getElementById('selGridSize') && document.getElementById('selGridSize').value) || '3', 10) || 3; },
 
-        // 高分辨率渲染一帧:长边限制 3000,切块后每块约 1000px,小红书发图足够清晰
-        const prevMax = this.displayMax;
-        const prevDpr = this.uiDprOverride;
+    // 渲染一帧切图用画布(长边 3000,每块约 1000px;JPG 垫白底防透明区转黑)
+    async _renderGridFrame() {
+        const prevMax = this.displayMax, prevDpr = this.uiDprOverride;
         this.displayMax = 3000;
         this.uiDprOverride = 1;
-        this.setStatus('正在渲染九宫格…');
         await new Promise(res => requestAnimationFrame(() => { window.__render(this, false); res(); }));
-
         let src = this.dom.canvas;
-        if (needsBg) { // JPG 无透明:垫白底,避免无边框预设时透明区转黑
+        if (this.dom.selFormat.value === 'jpeg') {
             const bg = document.createElement('canvas');
             bg.width = src.width; bg.height = src.height;
             const bx = bg.getContext('2d');
@@ -223,29 +215,149 @@ window.App = Object.assign(window.App || {}, {
         }
         if (prevMax === undefined) delete this.displayMax; else this.displayMax = prevMax;
         if (prevDpr === undefined) delete this.uiDprOverride; else this.uiDprOverride = prevDpr;
+        return src;
+    },
 
-        // 3×3 等分,行优先编号 1..9(左→右、上→下),第 3 列/行取剩余尺寸避免漏缝
+    // 把 src 切成 n×n,返回每块 canvas(行优先 1..n²;最后一行/列取剩余尺寸防漏缝)
+    _sliceGrid(src, n) {
         const cw = src.width, ch = src.height;
-        const baseName = (this.image.name || 'photo').replace(/\.[^.]+$/, '');
-        const files = [];
-        for (let r = 0; r < 3; r++) {
-            for (let c = 0; c < 3; c++) {
-                const x = Math.round(c * cw / 3), y = Math.round(r * ch / 3);
-                const w = Math.round((c + 1) * cw / 3) - x, h = Math.round((r + 1) * ch / 3) - y;
+        const out = [];
+        for (let r = 0; r < n; r++) {
+            for (let c = 0; c < n; c++) {
+                const x = Math.round(c * cw / n), y = Math.round(r * ch / n);
+                const w = Math.round((c + 1) * cw / n) - x, h = Math.round((r + 1) * ch / n) - y;
                 const cv = document.createElement('canvas');
                 cv.width = w; cv.height = h;
                 cv.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
-                files.push({ data: cv.toDataURL(mime, quality).split(',')[1], filename: baseName + '_九宫格_' + (r * 3 + c + 1) + '.' + ext, stem: baseName + '_九宫格_' + (r * 3 + c + 1), ext });
+                out.push(cv);
             }
         }
+        return out;
+    },
 
-        // 选目录并批量写盘(9 张一次性提交)
-        const loc = await window.qingframe.pickExportLocation({ count: 9, hintName: baseName + '_九宫格' });
-        if (!loc || loc.canceled) { this.setStatus('已取消切图'); this.scheduleRender(true); return; }
-        const wr = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
-        this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') : '切图导出失败');
-        this.resetProgress();
-        this.updateStatusBar();
+    _gridExt() { return (this.dom.selFormat.value === 'jpeg') ? 'jpg' : this.dom.selFormat.value; },
+
+    // 按当前导出格式/质量把缓存切块转成可写盘文件
+    _gridFiles(baseName) {
+        const fmt = this.dom.selFormat.value;
+        const mime = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[fmt] || 'image/jpeg';
+        const quality = (fmt === 'jpeg' || fmt === 'webp') ? Math.min(1, Math.max(0.6, (parseInt(this.dom.slExportQuality.value, 10) || 92) / 100)) : 1;
+        return this._gridBlocks.map((cv, i) => ({
+            data: cv.toDataURL(mime, quality).split(',')[1],
+            filename: baseName + '_九宫格_' + (i + 1) + '.' + this._gridExt(),
+            stem: baseName + '_九宫格_' + (i + 1),
+            ext: this._gridExt()
+        }));
+    },
+
+    // 预览:渲染一帧 → 切块 → 弹缩略图 modal(缓存供导出复用)
+    async renderGridPreview() {
+        if (!this.image) { this.setStatus('请先导入照片'); return; }
+        if (this._gridBusy) return;
+        this._gridBusy = true;
+        const n = this.gridSize();
+        this.setStatus('正在渲染九宫格…');
+        try {
+            const src = await this._renderGridFrame();
+            const blocks = this._sliceGrid(src, n);
+            const box = document.getElementById('gridPreviewGrid');
+            if (!box) { return; }
+            box.className = 'grid-preview-grid n' + n;
+            box.innerHTML = '';
+            const ext = this._gridExt();
+            const baseName = (this.image.name || 'photo').replace(/\.[^.]+$/, '');
+            blocks.forEach((cv, i) => {
+                const cell = document.createElement('div');
+                cell.className = 'grid-preview-cell';
+                const img = document.createElement('img');
+                img.src = cv.toDataURL('image/jpeg', 0.8);
+                const cap = document.createElement('div');
+                cap.className = 'grid-preview-cap';
+                cap.textContent = '#' + (i + 1) + ' · ' + cv.width + '×' + cv.height;
+                cell.appendChild(img); cell.appendChild(cap);
+                box.appendChild(cell);
+            });
+            const hint = document.getElementById('gridPreviewHint');
+            if (hint) hint.textContent = '共 ' + blocks.length + ' 格 · 每格约 ' + blocks[0].width + '×' + blocks[0].height + 'px · 导出文件名 ' + baseName + '_九宫格_1..' + blocks.length + '.' + ext;
+            this._gridBlocks = blocks;
+            document.getElementById('gridPreviewModal').style.display = 'flex';
+            this.setStatus('已生成九宫格预览,确认后导出');
+        } catch (e) {
+            console.warn('九宫格预览失败:', e);
+            this.setStatus('九宫格预览失败');
+        } finally { this._gridBusy = false; }
+        this.resetProgress(); this.updateStatusBar();
+    },
+
+    hideGridPreview() {
+        const m = document.getElementById('gridPreviewModal'); if (m) m.style.display = 'none';
+        this._gridBlocks = null;
+        if (this.image) this.scheduleRender(true);
+        this.resetProgress(); this.updateStatusBar();
+    },
+
+    // 导出:单张(预览已生成则直接导出);胶片条 Ctrl/Shift 多选则批量每张切 n² 张
+    async exportGridCrop() {
+        if (!this.image) { this.setStatus('请先导入照片'); return; }
+        if (this._gridBusy) return;
+        this._gridBusy = true;
+        const targets = (this.selectedIdx && this.selectedIdx.length > 1) ? this.selectedIdx.slice() : [this.currentIdx];
+        const n = this.gridSize();
+        try {
+            if (targets.length > 1) {
+                this.setStatus('正在批量切图 0/' + targets.length + '…');
+                const allFiles = [];
+                const originalIdx = this.currentIdx;
+                const baseTemplate = this.template;
+                for (let k = 0; k < targets.length; k++) {
+                    const idx = targets[k];
+                    const im = this.images[idx];
+                    if (!im) continue;
+                    this.currentIdx = idx; this.image = im;
+                    this.invalidateStyleCaches && this.invalidateStyleCaches();
+                    const srcTpl = (im.customSettings) || this.exportTemplateFor(im, idx, originalIdx, baseTemplate);
+                    this.template = srcTpl ? JSON.parse(JSON.stringify(srcTpl)) : baseTemplate;
+                    this.normalizeTemplate && this.normalizeTemplate();
+                    const src = await this._renderGridFrame();
+                    const blocks = this._sliceGrid(src, n);
+                    this._gridBlocks = blocks;
+                    const baseName = (im.name || ('photo' + (idx + 1))).replace(/\.[^.]+$/, '');
+                    allFiles.push.apply(allFiles, this._gridFiles(baseName));
+                    this.setStatus('正在批量切图 ' + (k + 1) + '/' + targets.length + '…');
+                }
+                this.currentIdx = originalIdx; this.image = this.images[originalIdx];
+                this.invalidateStyleCaches && this.invalidateStyleCaches();
+                this.template = baseTemplate;
+                this._gridBlocks = null;
+                if (!allFiles.length) { this.setStatus('请先导入照片'); return; }
+                const loc = await window.qingframe.pickExportLocation({ count: allFiles.length, hintName: '九宫格批量' });
+                if (!loc || loc.canceled) { this.setStatus('已取消切图'); return; }
+                const wr = await window.qingframe.writeExportFiles({ location: loc, files: allFiles }) || {};
+                const total = allFiles.length;
+                this.setStatus(wr.ok ? '批量九宫格完成:' + targets.filter(i => this.images[i]).length + '张×' + n * n + '=' + total + '张,成功 ' + wr.ok + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(3000 / n) + 'px' : '切图导出失败');
+                return;
+            }
+            // 单张:预览已生成则用缓存,否则现渲染
+            let blocks = this._gridBlocks;
+            if (!blocks) {
+                this.setStatus('正在渲染九宫格…');
+                const src = await this._renderGridFrame();
+                blocks = this._sliceGrid(src, n);
+                this._gridBlocks = blocks;
+            }
+
+            const baseName = (this.image.name || 'photo').replace(/\.[^.]+$/, '');
+            const files = this._gridFiles(baseName);
+            const loc = await window.qingframe.pickExportLocation({ count: files.length, hintName: baseName + '_九宫格' });
+            if (!loc || loc.canceled) { this.setStatus('已取消切图'); this.scheduleRender(true); return; }
+            const wr = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
+            this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(3000 / n) + 'px' : '切图导出失败');
+            this.hideGridPreview();
+        } catch (e) {
+            console.warn('九宫格导出失败:', e, (e && e.stack || ''));
+            this.setStatus('切图导出失败:' + (e && e.message || ''));
+        } finally { this._gridBusy = false; }
+        this.resetProgress(); this.updateStatusBar();
         if (this.scheduleRender) this.scheduleRender(true);
     },
 
@@ -311,7 +423,7 @@ window.App = Object.assign(window.App || {}, {
         else this.checkUpdates(true);
     },
     hideUpdateBanner() {
-        const b = this.$ && this.$('updateBanner');
+        const b = document.getElementById('updateBanner');
         if (b) b.style.display = 'none';
     },
 

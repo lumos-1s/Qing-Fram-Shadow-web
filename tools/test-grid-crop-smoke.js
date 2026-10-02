@@ -51,10 +51,16 @@ async () => {
     App.images = [im]; App.currentIdx = 0; App.image = im;
     App.template = App.defaultTemplate ? App.defaultTemplate() : { style: 'NONE', exif: { brand: 'TEST' } };
 
-    // 先验证按钮存在
-    const btn = document.getElementById('btnGridCrop');
-    if (!btn) { console.log('FAIL: btnGridCrop 不存在'); return; }
-    console.log('btnGridCrop 存在 ✓');
+    // 先验证右侧栏新按钮与预览 modal 存在(九宫格已从工具栏迁入右侧栏)
+    const btn = document.getElementById('btnGridExport');
+    if (!btn) { console.log('FAIL: btnGridExport 不存在'); return; }
+    const prev = document.getElementById('btnGridPreview');
+    if (!prev) { console.log('FAIL: btnGridPreview 不存在'); return; }
+    const modal = document.getElementById('gridPreviewModal');
+    if (!modal) { console.log('FAIL: gridPreviewModal 不存在'); return; }
+    const sel = document.getElementById('selGridSize');
+    if (!sel) { console.log('FAIL: selGridSize 不存在'); return; }
+    console.log('btnGridExport/btnGridPreview/gridPreviewModal/selGridSize 存在 ✓');
 
     // 调用切图(不走真实点击,直接调方法,捕获异常)
     let err = null;
@@ -80,9 +86,10 @@ app.whenReady().then(async () => {
         } catch (e) { return new Response('Not Found', { status: 404 }); }
     });
     const win = new BrowserWindow({ show: false, width: 1000, height: 700, webPreferences: { preload: path.join(ROOT, 'src', 'main', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false } });
-    win.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) console.log('[page]', msg); });
+    win.webContents.on('console-message', (_e, level, msg) => { console.log('[page:' + level + ']', msg); });
+    win.webContents.on('did-fail-load', (_e, code, desc) => { console.log('[did-fail-load]', code, desc); });
     await win.loadFile(path.join(ROOT, 'src', 'renderer', 'index.html'));
-    const r = await win.webContents.executeJavaScript('(' + CHECK + ')()');
-    console.log(r || '');
-    setTimeout(() => { app.quit(); }, 800);
+    const r = await win.webContents.executeJavaScript('(' + CHECK + ')()').catch(e => 'EXEC-ERR: ' + (e && e.message));
+    console.log('EXEC-RESULT:', typeof r === 'string' ? r : (r || '(undefined)'));
+    setTimeout(() => { app.quit(); }, 2500);
 });

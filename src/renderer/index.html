@@ -44,7 +44,6 @@
                 <button id="btnOpen" class="tbtn" title="打开图片 (Ctrl+O)">导入照片</button>
                 <div class="sep"></div>
                 <button id="btnSave" class="tbtn primary" title="导出当前图片">导出</button>
-                <button id="btnGridCrop" class="tbtn" title="把当前图片按 3×3 切成 9 张,适配小红书九宫格发图">九宫格</button>
                 <div class="export-settings-wrap" id="exportSettingsWrap">
                     <button id="btnExportSettings" class="tbtn" title="导出格式 / 质量 / 尺寸">设置</button>
                     <div class="export-pop" id="exportPop" style="display:none">
@@ -347,6 +346,23 @@
                                 <label>EXIF 参数条</label>
                                 <input type="checkbox" id="cbExifText" class="ctl-chk" checked="checked" />
                             </div>
+                        </div>
+
+                        <div class="param-group">
+                            <div class="pg-title collapsible">九宫格切图</div>
+                            <div class="param-row">
+                                <label>切分规格</label>
+                                <select id="selGridSize" class="ctl-sel">
+                                    <option value="3">3×3 · 小红书</option>
+                                    <option value="2">2×2 · 四格</option>
+                                    <option value="4">4×4 · 十六格</option>
+                                </select>
+                            </div>
+                            <div class="btn-row btn-2">
+                                <button class="mini-btn" id="btnGridPreview">切分预览</button>
+                                <button class="mini-btn primary" id="btnGridExport">导出九宫格</button>
+                            </div>
+                            <div class="hint-box">单张：先预览 n² 格缩略图再导出；胶片条 Ctrl/Shift 多选：跳过预览，批量每张切 n² 张。</div>
                         </div>
                     </div>
 
@@ -798,6 +814,24 @@
             <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
                 <button id="cropCancel" style="padding:8px 16px;background:#333;border:none;border-radius:6px;color:#eee;cursor:pointer;">取消</button>
                 <button id="cropOk" style="padding:8px 16px;background:#10b981;border:none;border-radius:6px;color:#fff;cursor:pointer;">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 九宫格切分预览弹窗 -->
+    <div id="gridPreviewModal" class="modal-overlay" style="display:none">
+        <div class="modal-card grid-preview-card">
+            <div class="modal-header">
+                <span class="modal-title">九宫格切分预览</span>
+                <button id="gridPreviewClose" class="modal-close" title="关闭">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="grid-preview-hint" id="gridPreviewHint"></div>
+                <div class="grid-preview-grid" id="gridPreviewGrid"></div>
+                <div class="modal-actions">
+                    <button id="btnGridPreviewCancel" class="mini-btn">取消</button>
+                    <button id="btnGridPreviewExport" class="mini-btn primary">导出这 n² 张</button>
+                </div>
             </div>
         </div>
     </div>

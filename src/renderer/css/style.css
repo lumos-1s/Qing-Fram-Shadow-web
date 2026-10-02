@@ -831,3 +831,15 @@ button.tbtn:focus-visible, .mini-btn:focus-visible, .st-btn:focus-visible { outl
 .pg-title.collapsible::before { content: '▾'; font-size: 10px; color: var(--text-3); transition: transform .15s; }
 .param-group.collapsed .pg-title.collapsible::before { transform: rotate(-90deg); }
 .param-group.collapsed > .param-row, .param-group.collapsed > .hint-box, .param-group.collapsed > .pool-note { display: none; }
+
+/* ── 九宫格切分预览 ── */
+.grid-preview-card { width: 560px; max-width: 92vw; max-height: 86vh; overflow: auto; }
+.grid-preview-hint { color: #999; font-size: 12px; margin-bottom: 10px; }
+.grid-preview-grid { display: grid; gap: 8px; }
+.grid-preview-grid.n2 { grid-template-columns: repeat(2, 1fr); }
+.grid-preview-grid.n3 { grid-template-columns: repeat(3, 1fr); }
+.grid-preview-grid.n4 { grid-template-columns: repeat(4, 1fr); }
+.grid-preview-cell { background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.grid-preview-cell img { width: 100%; display: block; }
+.grid-preview-cap { padding: 5px 6px; font-size: 11px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
