@@ -333,6 +333,12 @@ window.App = Object.assign(window.App || {}, {
                 if (!allFiles.length) { this.setStatus('请先导入照片'); return; }
                 const loc = await window.qingframe.pickExportLocation({ count: allFiles.length, hintName: '九宫格批量' });
                 if (!loc || loc.canceled) { this.setStatus('已取消切图'); return; }
+                {
+                    const bar0 = document.getElementById('progressBar');
+                    if (bar0) bar0.style.width = '2%';
+                    const label0 = document.getElementById('exportProgressText');
+                    if (label0) { label0.style.display = ''; label0.textContent = '写盘 0/' + allFiles.length + ' · 九宫格'; }
+                }
                 const offWrite = window.qingframe.onExportProgress((d) => {
                     const bar = document.getElementById('progressBar');
                     if (bar) bar.style.width = Math.round((d.done / d.total) * 100) + '%';
@@ -359,6 +365,12 @@ window.App = Object.assign(window.App || {}, {
             const files = this._gridFiles(baseName);
             const loc = await window.qingframe.pickExportLocation({ count: files.length, hintName: baseName + '_九宫格' });
             if (!loc || loc.canceled) { this.setStatus('已取消切图'); this.scheduleRender(true); return; }
+            {
+                const bar0 = document.getElementById('progressBar');
+                if (bar0) bar0.style.width = '2%';
+                const label0 = document.getElementById('exportProgressText');
+                if (label0) { label0.style.display = ''; label0.textContent = '写盘 0/' + files.length + ' · 九宫格'; }
+            }
             const offWriteS = window.qingframe.onExportProgress((d) => {
                 const bar = document.getElementById('progressBar');
                 if (bar) bar.style.width = Math.round((d.done / d.total) * 100) + '%';
