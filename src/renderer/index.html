@@ -171,6 +171,7 @@
                     <button class="tab" data-tab="logo">Logo</button>
                     <button class="tab" data-tab="template">模板</button>
                     <button class="tab" data-tab="puzzle">拼图</button>
+                    <button class="tab" data-tab="grid">切图</button>
                 </div>
                 <div class="insp-body">
                     <div id="modeStatus" class="mode-status" style="display:none"></div>
@@ -347,24 +348,6 @@
                                 <input type="checkbox" id="cbExifText" class="ctl-chk" checked="checked" />
                             </div>
                         </div>
-
-                        <div class="param-group">
-                            <div class="pg-title collapsible">九宫格切图</div>
-                            <div class="param-row">
-                                <label>切分规格</label>
-                                <select id="selGridSize" class="ctl-sel">
-                                    <option value="3">3×3 · 小红书</option>
-                                    <option value="2">2×2 · 四格</option>
-                                    <option value="4">4×4 · 十六格</option>
-                                </select>
-                            </div>
-                            <div class="btn-row btn-2">
-                                <button class="mini-btn" id="btnGridPreview">切分预览</button>
-                                <button class="mini-btn primary" id="btnGridExport">导出九宫格</button>
-                            </div>
-                            <div class="hint-box">单张：先预览 n² 格缩略图再导出；胶片条 Ctrl/Shift 多选：跳过预览，批量每张切 n² 张。</div>
-                        </div>
-                    </div>
 
                     <!-- ══ Tab2 边框 ══ -->
                     <div class="tab-panel" id="panel-border">
@@ -736,6 +719,26 @@
                             <button class="mini-btn danger" id="btnPuzzleClearSlots">清空全部格子图片</button>
                             <button class="mini-btn" id="btnPuzzleDisable">退出拼图</button>
                             <button class="mini-btn primary" id="btnExportPuzzle">导出拼图</button>
+                        </div>
+                    </div>
+
+                    <!-- ══ Tab8 切图 ══ -->
+                    <div class="tab-panel" id="panel-grid">
+                        <div class="param-group">
+                            <div class="pg-title collapsible">九宫格切图</div>
+                            <div class="param-row">
+                                <label>切分规格</label>
+                                <select id="selGridSize" class="ctl-sel">
+                                    <option value="3">3×3 · 小红书</option>
+                                    <option value="2">2×2 · 四格</option>
+                                    <option value="4">4×4 · 十六格</option>
+                                </select>
+                            </div>
+                            <div class="btn-row btn-2">
+                                <button class="mini-btn" id="btnGridPreview">切分预览</button>
+                                <button class="mini-btn primary" id="btnGridExport">导出九宫格</button>
+                            </div>
+                            <div class="hint-box">单张：先预览 n² 格缩略图再导出；胶片条 Ctrl/Shift 多选：跳过预览，批量每张切 n² 张。</div>
                         </div>
                     </div>
 
