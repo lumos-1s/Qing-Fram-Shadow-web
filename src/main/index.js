@@ -493,7 +493,7 @@ ipcMain.handle('write-export-files', async (_e, { location, files }) => {
         for (const f of files) {
             if (!f || !f.data) { fail++; continue; }
             try {
-                const dest = freeFilePath(location.dir, f.filename, written);
+                const dest = freeFilePath(location.dir, f.filename || (f.stem + '.' + f.ext), written);
                 fs.writeFileSync(dest, Buffer.from(f.data, 'base64'));
                 written.add(path.basename(dest));
                 ok++;

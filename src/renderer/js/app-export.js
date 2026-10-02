@@ -235,7 +235,7 @@ window.App = Object.assign(window.App || {}, {
                 const cv = document.createElement('canvas');
                 cv.width = w; cv.height = h;
                 cv.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
-                files.push({ data: cv.toDataURL(mime, quality).split(',')[1], stem: baseName + '_九宫格_' + (r * 3 + c + 1), ext });
+                files.push({ data: cv.toDataURL(mime, quality).split(',')[1], filename: baseName + '_九宫格_' + (r * 3 + c + 1) + '.' + ext, stem: baseName + '_九宫格_' + (r * 3 + c + 1), ext });
             }
         }
 
