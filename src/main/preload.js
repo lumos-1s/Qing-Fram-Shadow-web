@@ -37,5 +37,10 @@ contextBridge.exposeInMainWorld('qingframe', {
         const l = (_e, payload) => cb(payload);
         ipcRenderer.on('updater:event', l);
         return () => ipcRenderer.removeListener('updater:event', l);
+    },
+    onExportProgress: (cb) => {
+        const l = (_e, payload) => cb(payload);
+        ipcRenderer.on('export-progress', l);
+        return () => ipcRenderer.removeListener('export-progress', l);
     }
 });

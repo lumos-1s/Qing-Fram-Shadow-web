@@ -318,6 +318,7 @@ window.App = Object.assign(window.App || {}, {
                     const srcTpl = (im.customSettings) || this.exportTemplateFor(im, idx, originalIdx, baseTemplate);
                     this.template = srcTpl ? JSON.parse(JSON.stringify(srcTpl)) : baseTemplate;
                     this.normalizeTemplate && this.normalizeTemplate();
+                    this.showExportProgress(k, targets.length, im.name);
                     const src = await this._renderGridFrame();
                     const blocks = this._sliceGrid(src, n);
                     this._gridBlocks = blocks;
@@ -332,7 +333,14 @@ window.App = Object.assign(window.App || {}, {
                 if (!allFiles.length) { this.setStatus('请先导入照片'); return; }
                 const loc = await window.qingframe.pickExportLocation({ count: allFiles.length, hintName: '九宫格批量' });
                 if (!loc || loc.canceled) { this.setStatus('已取消切图'); return; }
+                const offWrite = window.qingframe.onExportProgress((d) => {
+                    const bar = document.getElementById('progressBar');
+                    if (bar) bar.style.width = Math.round((d.done / d.total) * 100) + '%';
+                    const label = document.getElementById('exportProgressText');
+                    if (label) { label.style.display = ''; label.textContent = '写盘 ' + d.done + '/' + d.total + ' · 九宫格'; }
+                });
                 const wr = await window.qingframe.writeExportFiles({ location: loc, files: allFiles }) || {};
+                if (offWrite) offWrite();
                 const total = allFiles.length;
                 this.setStatus(wr.ok ? '批量九宫格完成:' + targets.filter(i => this.images[i]).length + '张×' + n * n + '=' + total + '张,成功 ' + wr.ok + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(3000 / n) + 'px' : '切图导出失败');
                 return;
@@ -341,6 +349,7 @@ window.App = Object.assign(window.App || {}, {
             let blocks = this._gridBlocks;
             if (!blocks) {
                 this.setStatus('正在渲染九宫格…');
+                this.showExportProgress(0, 1, this.image.name);
                 const src = await this._renderGridFrame();
                 blocks = this._sliceGrid(src, n);
                 this._gridBlocks = blocks;
@@ -350,7 +359,14 @@ window.App = Object.assign(window.App || {}, {
             const files = this._gridFiles(baseName);
             const loc = await window.qingframe.pickExportLocation({ count: files.length, hintName: baseName + '_九宫格' });
             if (!loc || loc.canceled) { this.setStatus('已取消切图'); this.scheduleRender(true); return; }
+            const offWriteS = window.qingframe.onExportProgress((d) => {
+                const bar = document.getElementById('progressBar');
+                if (bar) bar.style.width = Math.round((d.done / d.total) * 100) + '%';
+                const label = document.getElementById('exportProgressText');
+                if (label) { label.style.display = ''; label.textContent = '写盘 ' + d.done + '/' + d.total + ' · 九宫格'; }
+            });
             const wr = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
+            if (offWriteS) offWriteS();
             this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(3000 / n) + 'px' : '切图导出失败');
             this.hideGridPreview();
         } catch (e) {

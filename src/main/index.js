@@ -435,6 +435,7 @@ ipcMain.handle('save-images-batch', async (_e, files) => {
                 written.add(path.basename(dest));
                 ok++;
             } catch (e) { fail++; }
+        event.sender.send('export-progress', { done: ok + fail, total: files.length });
         }
     } catch (e) { return { ok, fail, error: String(e) }; }
     return { ok, fail, dir };
@@ -477,12 +478,13 @@ ipcMain.handle('pick-export-location', async (_e, { count, hintName }) => {
 });
 
 // 把已渲染好的导出数据写入选好的位置
-ipcMain.handle('write-export-files', async (_e, { location, files }) => {
+ipcMain.handle('write-export-files', async (event, { location, files }) => {
     if (!location || !files || !files.length) return { ok: 0, fail: files ? files.length : 0 };
     if (location.mode === 'file') {
         try {
             fs.writeFileSync(location.filePath, Buffer.from(files[0].data, 'base64'));
-            return { ok: 1, fail: 0 };
+            event.sender.send('export-progress', { done: 1, total: 1 });
+return { ok: 1, fail: 0 };
         } catch (e) {
             return { ok: 0, fail: 1, error: String(e) };
         }
