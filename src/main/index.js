@@ -180,6 +180,29 @@ ipcMain.handle('list-custom-icons', () => {
     } catch (e) { return []; }
 });
 
+// 删除/重命名自定义图标:同步写回 shared/custom-icons.json,否则初始库图标重启后复活
+ipcMain.handle('delete-custom-icon', (_e, dataUrl) => {
+    try {
+        const p = path.join(__dirname, '..', '..', 'shared', 'custom-icons.json');
+        if (!fs.existsSync(p)) return { ok: true, removed: 0 };
+        const arr = JSON.parse(fs.readFileSync(p, 'utf-8'));
+        const next = arr.filter(c => c.dataUrl !== dataUrl);
+        if (next.length !== arr.length) fs.writeFileSync(p, JSON.stringify(next, null, 2), 'utf-8');
+        return { ok: true, removed: arr.length - next.length };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+ipcMain.handle('rename-custom-icon', (_e, dataUrl, name) => {
+    try {
+        const p = path.join(__dirname, '..', '..', 'shared', 'custom-icons.json');
+        if (!fs.existsSync(p)) return { ok: true, changed: 0 };
+        const arr = JSON.parse(fs.readFileSync(p, 'utf-8'));
+        let changed = 0;
+        arr.forEach(c => { if (c.dataUrl === dataUrl) { c.name = name; changed++; } });
+        if (changed) fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf-8');
+        return { ok: true, changed };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('list-textures', () => {
     return readImagesAsDataUrls(TEXTURES_DIR, ['.png', '.jpg', '.jpeg']);
 });

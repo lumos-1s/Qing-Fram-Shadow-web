@@ -2163,6 +2163,12 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                             saved.forEach(s => { if (s.dataUrl === l.dataUrl) s.name = l.name; });
                             localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
                         } catch(e) {}
+                        // 初始库条目同步改名,否则重启还原
+                        try {
+                            if (window.qingframe && typeof window.qingframe.renameCustomIcon === 'function') {
+                                await window.qingframe.renameCustomIcon(l.dataUrl, l.name);
+                            }
+                        } catch(e) { console.warn('[清框影] renameCustomIcon:', e); }
                         this.renderLogoPools();
                         this.setStatus('已重命名');
                     });
@@ -2171,10 +2177,10 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                     const del = document.createElement('span');
                     del.textContent = '×';
                     del.style.cssText = 'position:absolute;top:2px;right:4px;font-size:14px;line-height:1;color:#ea6668;cursor:pointer;font-weight:bold;';
-                    del.addEventListener('click', (e) => {
+                    del.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         if (confirm('删除自定义图标「' + l.name + '」?')) {
-                            this.deleteCustomIcon(l);
+                            await this.deleteCustomIcon(l);
                             this.logos = this.logos.filter(x => x !== l);
                             this.renderLogoPools();
                             this.setStatus('已删除');

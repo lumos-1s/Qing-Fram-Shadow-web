@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('qingframe', {
     writeExportFiles: (payload) => ipcRenderer.invoke('write-export-files', payload),
     listLogos: () => ipcRenderer.invoke('list-logos'),
     listCustomIcons: () => ipcRenderer.invoke('list-custom-icons'),
+    deleteCustomIcon: (dataUrl) => ipcRenderer.invoke('delete-custom-icon', dataUrl),
+    renameCustomIcon: (dataUrl, name) => ipcRenderer.invoke('rename-custom-icon', dataUrl, name),
     listTextures: () => ipcRenderer.invoke('list-textures'),
     listMarks: () => ipcRenderer.invoke('list-marks'),
     saveTemplate: (name, data) => ipcRenderer.invoke('save-template', { name, data }),

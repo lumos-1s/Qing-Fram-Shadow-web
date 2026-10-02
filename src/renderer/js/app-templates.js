@@ -331,12 +331,19 @@ window.App = Object.assign(window.App || {}, {
             localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
         } catch(e) {}
     },
-    deleteCustomIcon(logo) {
+    async deleteCustomIcon(logo) {
         try {
             let saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
             saved = saved.filter(c => c.dataUrl !== logo.dataUrl);
             localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
         } catch(e) {}
+        // 同步删除 shared/custom-icons.json 里的初始库条目,否则重启后复活
+        try {
+            if (window.qingframe && typeof window.qingframe.deleteCustomIcon === 'function') {
+                const r = await window.qingframe.deleteCustomIcon(logo.dataUrl);
+                if (r && r.ok === false) console.warn('[清框影] 删除初始库图标写盘失败:', r.error);
+            }
+        } catch(e) { console.warn('[清框影] deleteCustomIcon:', e); }
     },
 
     async loadTextures() {
