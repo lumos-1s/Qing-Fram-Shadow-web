@@ -735,11 +735,26 @@
                                     <option value="4">4×4 · 十六格</option>
                                 </select>
                             </div>
+                            <div class="param-row">
+                                <label>渲染长边</label>
+                                <select id="selGridRender" class="ctl-sel">
+                                    <option value="3000">3000px · 快</option>
+                                    <option value="4000">4000px</option>
+                                    <option value="6000">6000px</option>
+                                    <option value="original">原图分辨率</option>
+                                </select>
+                            </div>
+                            <div class="param-row"><label>块间留白</label><input type="range" id="slGridPad" class="ctl-rng" min="0" max="12" value="0" /><span class="pval" id="lblGridPad"></span></div>
+                            <div class="param-row chk-row">
+                                <label>分文件夹导出</label>
+                                <input type="checkbox" id="cbGridSubdir" class="ctl-chk" />
+                                <span class="chk-hint">每张原图一个子文件夹</span>
+                            </div>
                             <div class="btn-row btn-2">
                                 <button class="mini-btn" id="btnGridPreview">切分预览</button>
                                 <button class="mini-btn primary" id="btnGridExport">导出九宫格</button>
                             </div>
-                            <div class="hint-box">单张：先预览 n² 格缩略图再导出；胶片条 Ctrl/Shift 多选：跳过预览，批量每张切 n² 张。</div>
+                            <div class="hint-box">单张：先预览 n² 格缩略图再导出；胶片条 Ctrl/Shift 多选：跳过预览，批量每张切 n² 张。留白让每块自带白边，适合直接发拼图。</div>
                         </div>
                     </div>
 
@@ -832,6 +847,11 @@
             <div class="modal-body">
                 <div class="grid-preview-hint" id="gridPreviewHint"></div>
                 <div class="grid-preview-grid" id="gridPreviewGrid"></div>
+                <div class="grid-preview-zoom" id="gridPreviewZoom" style="display:none">
+                    <img id="gridPreviewZoomImg" alt="放大查看" />
+                    <div class="grid-preview-zoom-cap" id="gridPreviewZoomCap"></div>
+                    <button class="mini-btn" id="btnGridZoomBack">← 返回缩略图</button>
+                </div>
                 <div class="modal-actions">
                     <button id="btnGridPreviewCancel" class="mini-btn">取消</button>
                     <button id="btnGridPreviewExport" class="mini-btn primary">导出这 n² 张</button>

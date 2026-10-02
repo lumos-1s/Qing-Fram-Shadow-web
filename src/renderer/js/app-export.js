@@ -198,10 +198,28 @@ window.App = Object.assign(window.App || {}, {
     // ── 九宫格切图:当前画布(含边框/水印/元素,所见即所得)按 n×n 切成 n² 张 ──
     gridSize() { return parseInt((document.getElementById('selGridSize') && document.getElementById('selGridSize').value) || '3', 10) || 3; },
 
-    // 渲染一帧切图用画布(长边 3000,每块约 1000px;JPG 垫白底防透明区转黑)
+    // 切图渲染长边:3000/4000/6000/原图(封顶 12000 防爆内存)
+    gridRenderMax() {
+        const el = document.getElementById('selGridRender');
+        const v = (el && el.value) || '3000';
+        if (v === 'original') {
+            const im = this.image;
+            const len = im && im.el ? Math.max(im.el.naturalWidth || 0, im.el.naturalHeight || 0) : 3000;
+            return Math.max(3000, Math.min(len, 12000));
+        }
+        return Math.max(1000, Math.min(parseInt(v, 10) || 3000, 12000));
+    },
+
+    // 块间留白 px(每块四周白边,拼贴无缝)
+    gridPad() { return parseInt((document.getElementById('slGridPad') && document.getElementById('slGridPad').value) || '0', 10) || 0; },
+
+    // 分文件夹导出开关
+    gridSubdir() { const cb = document.getElementById('cbGridSubdir'); return !!(cb && cb.checked); },
+
+    // 渲染一帧切图用画布(长边由 gridRenderMax 决定;JPG 垫白底防透明区转黑)
     async _renderGridFrame() {
         const prevMax = this.displayMax, prevDpr = this.uiDprOverride;
-        this.displayMax = 3000;
+        this.displayMax = this.gridRenderMax();
         this.uiDprOverride = 1;
         await new Promise(res => requestAnimationFrame(() => { window.__render(this, false); res(); }));
         let src = this.dom.canvas;
@@ -218,17 +236,26 @@ window.App = Object.assign(window.App || {}, {
         return src;
     },
 
-    // 把 src 切成 n×n,返回每块 canvas(行优先 1..n²;最后一行/列取剩余尺寸防漏缝)
-    _sliceGrid(src, n) {
+    // 把 src 切成 n×n,返回每块 canvas(行优先 1..n²;最后一行/列取剩余尺寸防漏缝;
+    // pad>0 时每块四周加 pad px 白边,拼贴无缝)
+    _sliceGrid(src, n, pad) {
         const cw = src.width, ch = src.height;
+        const p = pad || 0;
         const out = [];
         for (let r = 0; r < n; r++) {
             for (let c = 0; c < n; c++) {
                 const x = Math.round(c * cw / n), y = Math.round(r * ch / n);
                 const w = Math.round((c + 1) * cw / n) - x, h = Math.round((r + 1) * ch / n) - y;
                 const cv = document.createElement('canvas');
-                cv.width = w; cv.height = h;
-                cv.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
+                const g = cv.getContext('2d');
+                if (p > 0) {
+                    cv.width = w + p * 2; cv.height = h + p * 2;
+                    g.fillStyle = '#ffffff'; g.fillRect(0, 0, cv.width, cv.height);
+                    g.drawImage(src, x, y, w, h, p, p, w, h);
+                } else {
+                    cv.width = w; cv.height = h;
+                    g.drawImage(src, x, y, w, h, 0, 0, w, h);
+                }
                 out.push(cv);
             }
         }
@@ -238,7 +265,7 @@ window.App = Object.assign(window.App || {}, {
     _gridExt() { return (this.dom.selFormat.value === 'jpeg') ? 'jpg' : this.dom.selFormat.value; },
 
     // 按当前导出格式/质量把缓存切块转成可写盘文件
-    _gridFiles(baseName) {
+    _gridFiles(baseName, subdir) {
         const fmt = this.dom.selFormat.value;
         const mime = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[fmt] || 'image/jpeg';
         const quality = (fmt === 'jpeg' || fmt === 'webp') ? Math.min(1, Math.max(0.6, (parseInt(this.dom.slExportQuality.value, 10) || 92) / 100)) : 1;
@@ -246,7 +273,8 @@ window.App = Object.assign(window.App || {}, {
             data: cv.toDataURL(mime, quality).split(',')[1],
             filename: baseName + '_九宫格_' + (i + 1) + '.' + this._gridExt(),
             stem: baseName + '_九宫格_' + (i + 1),
-            ext: this._gridExt()
+            ext: this._gridExt(),
+            subdir: subdir || ''
         }));
     },
 
@@ -259,7 +287,7 @@ window.App = Object.assign(window.App || {}, {
         this.setStatus('正在渲染九宫格…');
         try {
             const src = await this._renderGridFrame();
-            const blocks = this._sliceGrid(src, n);
+            const blocks = this._sliceGrid(src, n, this.gridPad());
             const box = document.getElementById('gridPreviewGrid');
             if (!box) { return; }
             box.className = 'grid-preview-grid n' + n;
@@ -269,11 +297,12 @@ window.App = Object.assign(window.App || {}, {
             blocks.forEach((cv, i) => {
                 const cell = document.createElement('div');
                 cell.className = 'grid-preview-cell';
+                cell._cv = cv; cell._idx = i + 1;
                 const img = document.createElement('img');
                 img.src = cv.toDataURL('image/jpeg', 0.8);
                 const cap = document.createElement('div');
                 cap.className = 'grid-preview-cap';
-                cap.textContent = '#' + (i + 1) + ' · ' + cv.width + '×' + cv.height;
+                cap.textContent = '#' + (i + 1) + ' · ' + cv.width + '×' + cv.height + ' · 点击放大';
                 cell.appendChild(img); cell.appendChild(cap);
                 box.appendChild(cell);
             });
@@ -320,10 +349,10 @@ window.App = Object.assign(window.App || {}, {
                     this.normalizeTemplate && this.normalizeTemplate();
                     this.showExportProgress(k, targets.length, im.name);
                     const src = await this._renderGridFrame();
-                    const blocks = this._sliceGrid(src, n);
+                    const blocks = this._sliceGrid(src, n, this.gridPad());
                     this._gridBlocks = blocks;
                     const baseName = (im.name || ('photo' + (idx + 1))).replace(/\.[^.]+$/, '');
-                    allFiles.push.apply(allFiles, this._gridFiles(baseName));
+                    allFiles.push.apply(allFiles, this._gridFiles(baseName, this.gridSubdir() ? baseName : ''));
                     this.setStatus('正在批量切图 ' + (k + 1) + '/' + targets.length + '…');
                 }
                 this.currentIdx = originalIdx; this.image = this.images[originalIdx];
@@ -348,7 +377,7 @@ window.App = Object.assign(window.App || {}, {
                 const wr = await window.qingframe.writeExportFiles({ location: loc, files: allFiles }) || {};
                 if (offWrite) offWrite();
                 const total = allFiles.length;
-                this.setStatus(wr.ok ? '批量九宫格完成:' + targets.filter(i => this.images[i]).length + '张×' + n * n + '=' + total + '张,成功 ' + wr.ok + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(3000 / n) + 'px' : '切图导出失败');
+                this.setStatus(wr.ok ? '批量九宫格完成:' + targets.filter(i => this.images[i]).length + '张×' + n * n + '=' + total + '张,成功 ' + wr.ok + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(this.gridRenderMax() / n) + 'px' : '切图导出失败');
                 return;
             }
             // 单张:预览已生成则用缓存,否则现渲染
@@ -357,12 +386,12 @@ window.App = Object.assign(window.App || {}, {
                 this.setStatus('正在渲染九宫格…');
                 this.showExportProgress(0, 1, this.image.name);
                 const src = await this._renderGridFrame();
-                blocks = this._sliceGrid(src, n);
+                blocks = this._sliceGrid(src, n, this.gridPad());
                 this._gridBlocks = blocks;
             }
 
             const baseName = (this.image.name || 'photo').replace(/\.[^.]+$/, '');
-            const files = this._gridFiles(baseName);
+            const files = this._gridFiles(baseName, this.gridSubdir() ? baseName : '');
             const loc = await window.qingframe.pickExportLocation({ count: files.length, hintName: baseName + '_九宫格' });
             if (!loc || loc.canceled) { this.setStatus('已取消切图'); this.scheduleRender(true); return; }
             {
@@ -379,7 +408,7 @@ window.App = Object.assign(window.App || {}, {
             });
             const wr = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
             if (offWriteS) offWriteS();
-            this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(3000 / n) + 'px' : '切图导出失败');
+            this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(this.gridRenderMax() / n) + 'px' : '切图导出失败');
             this.hideGridPreview();
         } catch (e) {
             console.warn('九宫格导出失败:', e, (e && e.stack || ''));
@@ -387,6 +416,28 @@ window.App = Object.assign(window.App || {}, {
         } finally { this._gridBusy = false; }
         this.resetProgress(); this.updateStatusBar();
         if (this.scheduleRender) this.scheduleRender(true);
+    },
+
+    // 切图设置记忆:规格/渲染长边/留白/分文件夹 存 localStorage
+    loadGridPrefs() {
+        try {
+            const raw = localStorage.getItem('qfs-grid-prefs');
+            if (!raw) return;
+            const p = JSON.parse(raw);
+            const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.value = v; };
+            const chk = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.checked = !!v; };
+            set('selGridSize', p.size); set('selGridRender', p.render); set('slGridPad', p.pad); chk('cbGridSubdir', p.subdir);
+            const lbl = document.getElementById('lblGridPad');
+            if (lbl) lbl.textContent = (document.getElementById('slGridPad') && document.getElementById('slGridPad').value) || '0';
+        } catch (e) { console.warn('loadGridPrefs:', e); }
+    },
+
+    saveGridPrefs() {
+        try {
+            const g = (id) => { const el = document.getElementById(id); return el ? el.value : undefined; };
+            const chk = (id) => { const el = document.getElementById(id); return el ? el.checked : undefined; };
+            localStorage.setItem('qfs-grid-prefs', JSON.stringify({ size: g('selGridSize'), render: g('selGridRender'), pad: g('slGridPad'), subdir: chk('cbGridSubdir') }));
+        } catch (e) { console.warn('saveGridPrefs:', e); }
     },
 
     // ── 自动更新 UI:渲染层横幅处理(主进程 electron-updater 事件经 preload 推送) ──

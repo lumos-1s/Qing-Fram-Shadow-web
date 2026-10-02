@@ -495,7 +495,9 @@ return { ok: 1, fail: 0 };
         for (const f of files) {
             if (!f || !f.data) { fail++; continue; }
             try {
-                const dest = freeFilePath(location.dir, f.filename || (f.stem + '.' + f.ext), written);
+                const destDir = (f.subdir && String(f.subdir).trim()) ? path.join(location.dir, String(f.subdir).trim()) : location.dir;
+                if (destDir !== location.dir) fs.mkdirSync(destDir, { recursive: true });
+                const dest = freeFilePath(destDir, f.filename || (f.stem + '.' + f.ext), written);
                 fs.writeFileSync(dest, Buffer.from(f.data, 'base64'));
                 written.add(path.basename(dest));
                 ok++;

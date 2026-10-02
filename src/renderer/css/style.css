@@ -843,3 +843,8 @@ button.tbtn:focus-visible, .mini-btn:focus-visible, .st-btn:focus-visible { outl
 .grid-preview-cell img { width: 100%; display: block; }
 .grid-preview-cap { padding: 5px 6px; font-size: 11px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.grid-preview-cell { cursor: zoom-in; }
+.grid-preview-zoom { text-align: center; }
+.grid-preview-zoom img { max-width: 100%; max-height: 60vh; border-radius: 6px; border: 1px solid var(--border-strong); }
+.grid-preview-zoom-cap { font-size: 12px; color: #bbb; margin: 8px 0; }
+.grid-preview-zoom .mini-btn { margin-top: 4px; }

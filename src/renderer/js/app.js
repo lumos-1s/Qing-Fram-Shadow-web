@@ -1810,6 +1810,43 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         bindBtn('btnGridPreviewExport', () => this.exportGridCrop());
         bindBtn('btnGridPreviewCancel', () => this.hideGridPreview());
         bindBtn('gridPreviewClose', () => this.hideGridPreview());
+        bindBtn('btnGridZoomBack', () => {
+            const zoom = document.getElementById('gridPreviewZoom');
+            if (zoom) zoom.style.display = 'none';
+            const hint = document.getElementById('gridPreviewHint');
+            if (hint) hint.style.display = '';
+            const box = document.getElementById('gridPreviewGrid');
+            if (box) box.style.display = '';
+        });
+        // 切图设置记忆
+        if (typeof this.loadGridPrefs === 'function') this.loadGridPrefs();
+        ['selGridSize', 'selGridRender'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => { if (typeof this.saveGridPrefs === 'function') this.saveGridPrefs(); });
+        });
+        const padEl = document.getElementById('slGridPad');
+        if (padEl) padEl.addEventListener('input', () => {
+            const lbl = document.getElementById('lblGridPad');
+            if (lbl) lbl.textContent = padEl.value;
+            if (typeof this.saveGridPrefs === 'function') this.saveGridPrefs();
+        });
+        const subEl = document.getElementById('cbGridSubdir');
+        if (subEl) subEl.addEventListener('change', () => { if (typeof this.saveGridPrefs === 'function') this.saveGridPrefs(); });
+        // 预览单块放大
+        const gbox = document.getElementById('gridPreviewGrid');
+        if (gbox) gbox.addEventListener('click', (e) => {
+            const cell = e.target.closest('.grid-preview-cell');
+            if (!cell || !cell._cv) return;
+            const img = document.getElementById('gridPreviewZoomImg');
+            img.src = cell._cv.toDataURL('image/jpeg', 0.92);
+            const cap = document.getElementById('gridPreviewZoomCap');
+            if (cap) cap.textContent = '第 ' + cell._idx + ' 块 · ' + cell._cv.width + '×' + cell._cv.height + 'px';
+            const zoom = document.getElementById('gridPreviewZoom');
+            if (zoom) zoom.style.display = 'block';
+            const hint = document.getElementById('gridPreviewHint');
+            if (hint) hint.style.display = 'none';
+            gbox.style.display = 'none';
+        });
         bindBtn('btnCheckUpdate', () => this.checkUpdates());
         bindBtn('btnUpdateAction', () => this.updateAction());
         bindBtn('btnUpdateClose', () => this.hideUpdateBanner());
