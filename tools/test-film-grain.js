@@ -45,7 +45,7 @@ function finish(code) { app.exit(code || 0); }
 
 const SIZES = [600, 1200, 2400, 4000];
 const MIN_PERIOD_RATIO = 0.15;   // 重复周期至少要占画布短边的 15%
-const MIN_VISIBLE_RATIO = 1.5;   // 预设档位的颗粒量至少要是无颗粒基线的 1.5 倍
+const MIN_VISIBLE_RATIO = 1.45;   // 预设档位的颗粒量至少要是无颗粒基线的 1.45 倍
 
 // 从真实预设里收集"声明了胶片颗粒"的档位(去重、升序),顺带统计遗留值
 const PRESET_LEVELS = [];

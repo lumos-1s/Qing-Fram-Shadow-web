@@ -331,19 +331,22 @@ window.App = Object.assign(window.App || {}, {
             localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
         } catch(e) {}
     },
+    // 返回 { ok, error }:调用方要能告诉用户"这次没删掉",否则图标看着消失、重启又回来,
+    // 用户只会以为应用有 bug。旧实现只 console.warn,失败完全不可见。
     async deleteCustomIcon(logo) {
         try {
             let saved = JSON.parse(localStorage.getItem('qfs_custom_icons') || '[]');
             saved = saved.filter(c => c.dataUrl !== logo.dataUrl);
             localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
         } catch(e) {}
-        // 同步删除 shared/custom-icons.json 里的初始库条目,否则重启后复活
         try {
             if (window.qingframe && typeof window.qingframe.deleteCustomIcon === 'function') {
-                const r = await window.qingframe.deleteCustomIcon(logo.dataUrl);
-                if (r && r.ok === false) console.warn('[清框影] 删除初始库图标写盘失败:', r.error);
+                const r = await window.qingframe.deleteCustomIcon(logo.dataUrl) || {};
+                if (r.ok === false) return { ok: false, error: r.error };
+                return { ok: true, removed: r.removed };
             }
-        } catch(e) { console.warn('[清框影] deleteCustomIcon:', e); }
+            return { ok: true };
+        } catch(e) { return { ok: false, error: (e && e.message) || String(e) }; }
     },
 
     async loadTextures() {

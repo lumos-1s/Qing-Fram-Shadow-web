@@ -28,12 +28,22 @@ let batchNames = [];
 ipcMain.handle('write-export-files', (_e, payload) => {
     const files = (payload && payload.files) || [];
     const names = files.map(f => f.filename);
-    for (const n of names) { if (!n) throw new Error('FAIL: f.filename 缺失'); }
+    // 原来这里 throw,异常被渲染层 exportGridCrop 的 catch 吃掉 → 只在状态栏留一句"失败",
+    // 而本测试仍然 exit 0。改成记账,由 finish() 决定退出码。
+    for (const n of names) { if (!n) fails.push('write-export-files 收到缺 filename 的条目'); }
     const sizes = files.map(f => f.data ? f.data.length : 0);
-    if (sizes.some(s => s <= 0)) throw new Error('存在空 data');
+    if (sizes.some(s => s <= 0)) fails.push('write-export-files 收到空 data');
     batchNames = batchNames.concat(names);
     return { ok: files.length, fail: 0 };
 });
+
+// 退出码账本。Electron 主进程忽略 process.exitCode,只有 app.exit(code) 能带出非 0。
+const fails = [];
+function finish(extra) {
+    if (extra) fails.push(extra);
+    console.log(fails.length ? '✗ ' + fails.length + ' 项不通过:\n  - ' + fails.join('\n  - ') : '✓ 全部通过');
+    app.exit(fails.length ? 1 : 0);
+}
 
 const CHECK = `
 async () => {
@@ -57,6 +67,11 @@ async () => {
     ];
     App.currentIdx = 0; App.image = App.images[0];
     App.template = App.defaultTemplate ? App.defaultTemplate() : { style: 'NONE', exif: { brand: 'TEST' } };
+    // 测试之间会串味(localStorage 是同一个 file:// 源),把"分文件夹导出"关掉,
+    // 否则命名断言要跟着子目录走,反而把真正要测的东西盖掉。
+    const sub = document.getElementById('cbGridSubdir'); if (sub) sub.checked = false;
+    const size = document.getElementById('selGridSize'); if (size) size.value = '3';
+    if (App.saveGridPrefs) App.saveGridPrefs();
 
     // ① 预览路径
     await App.renderGridPreview();
@@ -64,10 +79,10 @@ async () => {
     const modal = document.getElementById('gridPreviewModal');
     const grid = document.getElementById('gridPreviewGrid');
     const cells = grid.querySelectorAll('.grid-preview-cell');
-    if (modal.style.display !== 'flex') { console.log('FAIL①: 预览 modal 未显示'); return; }
-    if (cells.length !== 9) { console.log('FAIL①: 预览格数=' + cells.length + '(期望9)'); return; }
+    if (modal.style.display !== 'flex') return 'FAIL① 预览 modal 未显示';
+    if (cells.length !== 9) return 'FAIL① 预览格数=' + cells.length + '(期望9)';
     const cap0 = cells[0].querySelector('.grid-preview-cap');
-    if (!/\\d+×\\d+/.test(cap0.textContent)) { console.log('FAIL①: 格尺寸提示缺失'); return; }
+    if (!/\\d+×\\d+/.test(cap0.textContent)) return 'FAIL① 格尺寸提示缺失';
     console.log('PASS① 预览 modal: 9 格缩略图 + 每格尺寸提示 ✓');
     console.log('STEP:1');
 
@@ -81,6 +96,7 @@ async () => {
     await App.exportGridCrop();
     await new Promise(r => setTimeout(r, 500));
     console.log('STEP:3');
+    return 'PASS-RENDER';
 }
 `;
 
@@ -103,22 +119,29 @@ app.whenReady().then(async () => {
         } else if (msg === 'STEP:2') {
             checked++;
             const ex = batchNames.slice(0, 9);
-            if (ex.length !== 9) { console.log('FAIL②: 预览导出张数=' + ex.length); return; }
-            if (ex[0] !== '图A_九宫格_1.jpg' || ex[8] !== '图A_九宫格_9.jpg') { console.log('FAIL②: 命名错误: ' + ex[0] + '..' + ex[8]); return; }
+            if (ex.length !== 9) { fails.push('② 预览导出张数=' + ex.length + '(期望9)'); return; }
+            if (ex[0] !== '图A_九宫格_1.jpg' || ex[8] !== '图A_九宫格_9.jpg') { fails.push('② 命名错误: ' + ex[0] + '..' + ex[8]); return; }
             console.log('PASS② 预览导出: 复用缓存 9 张命名正确 ✓');
         } else if (msg === 'STEP:3') {
             checked++;
             const batch = batchNames.slice(9); // 本次批量增量(此前 STEP:2 已导出 9 张)
-            if (batch.length !== 18) { console.log('FAIL③: 批量张数=' + batch.length + '(期望18)'); return; }
+            if (batch.length !== 18) { fails.push('③ 批量张数=' + batch.length + '(期望18)'); return; }
             const aN = batch.filter(n => n.indexOf('图A_') === 0).length;
             const bN = batch.filter(n => n.indexOf('图B_') === 0).length;
-            if (aN !== 9 || bN !== 9) { console.log('FAIL③: 图A=' + aN + ' 图B=' + bN + '(期望各9)'); return; }
+            if (aN !== 9 || bN !== 9) { fails.push('③ 图A=' + aN + ' 图B=' + bN + '(期望各9)'); return; }
             console.log('PASS③ 批量切图: 2张×9=18 张,图A/图B 各 9 张命名正确 ✓');
-            console.log('SMOKE-DONE');
         }
     });
     await win.loadFile(path.join(ROOT, 'src', 'renderer', 'index.html'));
     const r = await win.webContents.executeJavaScript('(' + CHECK + ')()').catch(e => 'EXEC-ERR: ' + (e && e.message));
+    if (typeof r === 'string' && r.startsWith('FAIL')) fails.push(r);
+    else if (r !== 'PASS-RENDER') fails.push('渲染层未给出结论:' + String(r));
     console.log('EXEC-RESULT:', typeof r === 'string' ? r : (r || '(undefined)'));
-    setTimeout(() => { app.quit(); }, 2500);
+    // STEP 的主进程侧断言是异步的,等它们跑完再收尾(原来只是 setTimeout 后 app.quit(),退出码恒 0)
+    await new Promise(res => {
+        const iv = setInterval(() => { if (checked >= 3) { clearInterval(iv); res(); } }, 100);
+        setTimeout(() => { clearInterval(iv); res(); }, 10000);
+    });
+    if (checked < 3) fails.push('主进程侧断言未跑完(checked=' + checked + '/3)');
+    finish();
 });

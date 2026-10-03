@@ -171,37 +171,19 @@ ipcMain.handle('list-logos', () => {
     return readImagesAsDataUrls(LOGOS_DIR, ['.png', '.jpg', '.jpeg']);
 });
 
-// 内置自定义图标库(随包分发,作者本地导入的图标固化为初始库)
-ipcMain.handle('list-custom-icons', () => {
-    try {
-        const p = path.join(__dirname, '..', '..', 'shared', 'custom-icons.json');
-        if (!fs.existsSync(p)) return [];
-        return JSON.parse(fs.readFileSync(p, 'utf-8'));
-    } catch (e) { return []; }
-});
+// 内置自定义图标库。种子 shared/custom-icons.json 只读,实际读写走 userData 下的副本 ——
+// 打包后种子在 app.asar 里是只读的,就地改必然失败(见 custom-icons.js 顶部注释)。
+const { createCustomIconStore } = require('./custom-icons');
+const customIcons = createCustomIconStore(
+    path.join(app.getPath('userData'), 'custom-icons.json'),
+    path.join(__dirname, '..', '..', 'shared', 'custom-icons.json')
+);
 
-// 删除/重命名自定义图标:同步写回 shared/custom-icons.json,否则初始库图标重启后复活
-ipcMain.handle('delete-custom-icon', (_e, dataUrl) => {
-    try {
-        const p = path.join(__dirname, '..', '..', 'shared', 'custom-icons.json');
-        if (!fs.existsSync(p)) return { ok: true, removed: 0 };
-        const arr = JSON.parse(fs.readFileSync(p, 'utf-8'));
-        const next = arr.filter(c => c.dataUrl !== dataUrl);
-        if (next.length !== arr.length) fs.writeFileSync(p, JSON.stringify(next, null, 2), 'utf-8');
-        return { ok: true, removed: arr.length - next.length };
-    } catch (e) { return { ok: false, error: e.message }; }
-});
-ipcMain.handle('rename-custom-icon', (_e, dataUrl, name) => {
-    try {
-        const p = path.join(__dirname, '..', '..', 'shared', 'custom-icons.json');
-        if (!fs.existsSync(p)) return { ok: true, changed: 0 };
-        const arr = JSON.parse(fs.readFileSync(p, 'utf-8'));
-        let changed = 0;
-        arr.forEach(c => { if (c.dataUrl === dataUrl) { c.name = name; changed++; } });
-        if (changed) fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf-8');
-        return { ok: true, changed };
-    } catch (e) { return { ok: false, error: e.message }; }
-});
+ipcMain.handle('list-custom-icons', () => customIcons.list());
+
+// 删除/重命名自定义图标:同步写盘,否则初始库图标重启后复活
+ipcMain.handle('delete-custom-icon', (_e, dataUrl) => customIcons.remove(dataUrl));
+ipcMain.handle('rename-custom-icon', (_e, dataUrl, name) => customIcons.rename(dataUrl, name));
 
 ipcMain.handle('list-textures', () => {
     return readImagesAsDataUrls(TEXTURES_DIR, ['.png', '.jpg', '.jpeg']);
@@ -458,7 +440,9 @@ ipcMain.handle('save-images-batch', async (_e, files) => {
                 written.add(path.basename(dest));
                 ok++;
             } catch (e) { fail++; }
-        event.sender.send('export-progress', { done: ok + fail, total: files.length });
+            // 必须用 handler 的形参(_e);这里原来写的是不存在的 `event`,
+            // 一进循环就抛 ReferenceError 并被外层 catch 吞掉 → 只写完第 1 个文件。
+            _e.sender.send('export-progress', { done: ok + fail, total: files.length });
         }
     } catch (e) { return { ok, fail, error: String(e) }; }
     return { ok, fail, dir };
@@ -507,7 +491,7 @@ ipcMain.handle('write-export-files', async (event, { location, files }) => {
         try {
             fs.writeFileSync(location.filePath, Buffer.from(files[0].data, 'base64'));
             event.sender.send('export-progress', { done: 1, total: 1 });
-return { ok: 1, fail: 0 };
+            return { ok: 1, fail: 0 };
         } catch (e) {
             return { ok: 0, fail: 1, error: String(e) };
         }
@@ -516,15 +500,21 @@ return { ok: 1, fail: 0 };
     const written = new Set();
     try {
         for (const f of files) {
-            if (!f || !f.data) { fail++; continue; }
-            try {
-                const destDir = (f.subdir && String(f.subdir).trim()) ? path.join(location.dir, String(f.subdir).trim()) : location.dir;
-                if (destDir !== location.dir) fs.mkdirSync(destDir, { recursive: true });
-                const dest = freeFilePath(destDir, f.filename || (f.stem + '.' + f.ext), written);
-                fs.writeFileSync(dest, Buffer.from(f.data, 'base64'));
-                written.add(path.basename(dest));
-                ok++;
-            } catch (e) { fail++; }
+            // 空 data 也算一格并上报,否则 done 会卡在倒数一格不动
+            if (!f || !f.data) { fail++; }
+            else {
+                try {
+                    const destDir = (f.subdir && String(f.subdir).trim()) ? path.join(location.dir, String(f.subdir).trim()) : location.dir;
+                    if (destDir !== location.dir) fs.mkdirSync(destDir, { recursive: true });
+                    const dest = freeFilePath(destDir, f.filename || (f.stem + '.' + f.ext), written);
+                    fs.writeFileSync(dest, Buffer.from(f.data, 'base64'));
+                    written.add(path.basename(dest));
+                    ok++;
+                } catch (e) { fail++; }
+            }
+            // 目录分支原来不发这个事件,渲染层 onExportProgress 永远收不到 →
+            // 九宫格批量导出的进度条永远停在 2% / 「写盘 0/N」。逐张上报。
+            event.sender.send('export-progress', { done: ok + fail, total: files.length });
         }
     } catch (e) { return { ok, fail, error: String(e) }; }
     return { ok, fail };

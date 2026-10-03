@@ -332,6 +332,7 @@ window.App = Object.assign(window.App || {}, {
         this._gridBusy = true;
         const targets = (this.selectedIdx && this.selectedIdx.length > 1) ? this.selectedIdx.slice() : [this.currentIdx];
         const n = this.gridSize();
+        let offWrite = null;
         try {
             if (targets.length > 1) {
                 this.setStatus('正在批量切图 0/' + targets.length + '…');
@@ -368,14 +369,16 @@ window.App = Object.assign(window.App || {}, {
                     const label0 = document.getElementById('exportProgressText');
                     if (label0) { label0.style.display = ''; label0.textContent = '写盘 0/' + allFiles.length + ' · 九宫格'; }
                 }
-                const offWrite = window.qingframe.onExportProgress((d) => {
+                offWrite = window.qingframe.onExportProgress((d) => {
                     const bar = document.getElementById('progressBar');
                     if (bar) bar.style.width = Math.round((d.done / d.total) * 100) + '%';
                     const label = document.getElementById('exportProgressText');
                     if (label) { label.style.display = ''; label.textContent = '写盘 ' + d.done + '/' + d.total + ' · 九宫格'; }
+                    // 收到最后一张就摘监听。原先是在 invoke 的 .then 里摘,
+                    // 而 send 与 invoke 的回复没有严格的先后保证 —— 实测进度条有时停在 8/9、89%。
+                    if (d.done >= d.total && offWrite) { offWrite(); offWrite = null; }
                 });
                 const wr = await window.qingframe.writeExportFiles({ location: loc, files: allFiles }) || {};
-                if (offWrite) offWrite();
                 const total = allFiles.length;
                 this.setStatus(wr.ok ? '批量九宫格完成:' + targets.filter(i => this.images[i]).length + '张×' + n * n + '=' + total + '张,成功 ' + wr.ok + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(this.gridRenderMax() / n) + 'px' : '切图导出失败');
                 return;
@@ -400,22 +403,27 @@ window.App = Object.assign(window.App || {}, {
                 const label0 = document.getElementById('exportProgressText');
                 if (label0) { label0.style.display = ''; label0.textContent = '写盘 0/' + files.length + ' · 九宫格'; }
             }
-            const offWriteS = window.qingframe.onExportProgress((d) => {
+            offWrite = window.qingframe.onExportProgress((d) => {
                 const bar = document.getElementById('progressBar');
                 if (bar) bar.style.width = Math.round((d.done / d.total) * 100) + '%';
                 const label = document.getElementById('exportProgressText');
                 if (label) { label.style.display = ''; label.textContent = '写盘 ' + d.done + '/' + d.total + ' · 九宫格'; }
+                if (d.done >= d.total && offWrite) { offWrite(); offWrite = null; }
             });
             const wr = await window.qingframe.writeExportFiles({ location: loc, files }) || {};
-            if (offWriteS) offWriteS();
             this.setStatus(wr.ok ? '九宫格切图完成:成功 ' + wr.ok + ' 张' + (wr.fail ? ',失败 ' + wr.fail : '') + ' · 每块约 ' + Math.round(this.gridRenderMax() / n) + 'px' : '切图导出失败');
             this.hideGridPreview();
         } catch (e) {
             console.warn('九宫格导出失败:', e, (e && e.stack || ''));
             this.setStatus('切图导出失败:' + (e && e.message || ''));
-        } finally { this._gridBusy = false; }
-        this.resetProgress(); this.updateStatusBar();
-        if (this.scheduleRender) this.scheduleRender(true);
+        } finally {
+            this._gridBusy = false;
+            // 收尾必须放在 finally:批量/单张各有 4 处提前 return(空结果、取消目录…),
+            // 放在 try 之后会被全部绕过 —— 导出成功后状态栏仍留着「写盘 n/N」和取消按钮。
+            if (offWrite) { offWrite(); offWrite = null; }
+            this.resetProgress(); this.updateStatusBar();
+            if (this.scheduleRender) this.scheduleRender(true);
+        }
     },
 
     // 切图设置记忆:规格/渲染长边/留白/分文件夹 存 localStorage

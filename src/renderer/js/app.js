@@ -2163,14 +2163,17 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                             saved.forEach(s => { if (s.dataUrl === l.dataUrl) s.name = l.name; });
                             localStorage.setItem('qfs_custom_icons', JSON.stringify(saved));
                         } catch(e) {}
-                        // 初始库条目同步改名,否则重启还原
+                        // 初始库条目同步改名,否则重启还原。写盘失败必须说出来 ——
+                        // 界面上已经叫新名字了,不报的话重启就悄悄变回去。
+                        let renameOk = true;
                         try {
                             if (window.qingframe && typeof window.qingframe.renameCustomIcon === 'function') {
-                                await window.qingframe.renameCustomIcon(l.dataUrl, l.name);
+                                const rr = await window.qingframe.renameCustomIcon(l.dataUrl, l.name) || {};
+                                renameOk = rr.ok !== false;
                             }
-                        } catch(e) { console.warn('[清框影] renameCustomIcon:', e); }
+                        } catch(e) { renameOk = false; }
                         this.renderLogoPools();
-                        this.setStatus('已重命名');
+                        this.setStatus(renameOk ? '已重命名' : '已改名,但未能写盘(重启后会还原)');
                     });
                 }
                 if (l.custom) {
@@ -2180,7 +2183,13 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                     del.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         if (confirm('删除自定义图标「' + l.name + '」?')) {
-                            await this.deleteCustomIcon(l);
+                            const r = await this.deleteCustomIcon(l);
+                            // 写盘失败时不要把它从列表里抹掉 —— 那样等于骗用户,
+                            // 重启后图标原样回来,看起来就是"删不掉"。
+                            if (r && r.ok === false) {
+                                this.setStatus('删除失败(未能写盘):' + (r.error || '未知原因'));
+                                return;
+                            }
                             this.logos = this.logos.filter(x => x !== l);
                             this.renderLogoPools();
                             this.setStatus('已删除');

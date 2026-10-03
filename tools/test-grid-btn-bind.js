@@ -28,20 +28,23 @@ async () => {
     await new Promise(r => setTimeout(r, 300));
 
     const btn = document.getElementById('btnGridExport');
-    if (!btn) { console.log('RESULT: FAIL btnGridExport 不存在'); return; }
+    if (!btn) return 'FAIL btnGridExport 不存在';
 
     // 打桩计数:点击后 exportGridCrop 是否被调用
     let called = 0;
     const orig = App.exportGridCrop;
-    if (typeof orig !== 'function') { console.log('RESULT: FAIL App.exportGridCrop 不是函数'); return; }
+    if (typeof orig !== 'function') return 'FAIL App.exportGridCrop 不是函数';
     App.exportGridCrop = function () { called++; return orig.apply(this, arguments); };
     btn.click();
     await new Promise(r => setTimeout(r, 200));
     App.exportGridCrop = orig;
-    console.log('RESULT: ' + (called > 0 ? 'PASS 点击触发 exportGridCrop (' + called + '次)' : 'FAIL 点击未触发 exportGridCrop'));
+    if (called === 0) return 'FAIL 点击未触发 exportGridCrop';
+    return 'PASS 点击触发 exportGridCrop (' + called + '次)';
 }
 `;
 
+// 退出码账本:上一版把 RESULT 打进控制台就 app.quit(),点没绑上都 exit 0。
+const fails = [];
 app.whenReady().then(async () => {
     protocol.handle('qflocal', (request) => {
         try { const u = new URL(request.url); const fp = u.searchParams.get('p'); if (!fp || !fs.existsSync(fp)) return new Response('Not Found', { status: 404 }); return net.fetch(pathToFileURL(fp).href); }
@@ -52,7 +55,9 @@ app.whenReady().then(async () => {
     await win.loadFile(path.join(ROOT, 'src', 'renderer', 'index.html'));
     let r;
     try { r = await win.webContents.executeJavaScript('(' + CHECK + ')()'); }
-    catch (e) { console.log('[main] executeJavaScript error:', e && e.message); }
-    console.log(r || '');
-    setTimeout(() => { app.quit(); }, 400);
+    catch (e) { r = 'FAIL executeJavaScript 抛错: ' + (e && e.message); }
+    console.log('RESULT:', r);
+    if (typeof r !== 'string' || !r.startsWith('PASS')) fails.push(String(r));
+    console.log(fails.length ? '✗ ' + fails.length + ' 项不通过:\n  - ' + fails.join('\n  - ') : '✓ 全部通过');
+    app.exit(fails.length ? 1 : 0);
 });
