@@ -1,0 +1,155 @@
+{
+  "templateTag": "票根",
+  "exportDpi": 300,
+  "baseMargin": {
+    "marginLock": 0,
+    "marginTop": 380,
+    "marginBottom": 380,
+    "marginLeft": 700,
+    "marginRight": 700,
+    "imgScale": 0.97,
+    "imgOffsetX": 0,
+    "imgOffsetY": 0,
+    "bgBlurEnable": 0,
+    "bgBlurRadius": 30,
+    "bgBlurWhiteOverlay": 0
+  },
+  "layerList": [
+    {
+      "visible": true,
+      "marginTop": -380,
+      "marginBottom": -380,
+      "marginLeft": -700,
+      "marginRight": -700,
+      "fillConfig": {
+        "fillType": "gradient",
+        "fillHex": "#efe2b4",
+        "fillOpacity": 100,
+        "gradientType": "linear",
+        "gradientAngle": 180,
+        "gradientStops": [
+          {
+            "position": 0,
+            "color": "#efe2b4"
+          },
+          {
+            "position": 0.55,
+            "color": "#e0cd93"
+          },
+          {
+            "position": 1,
+            "color": "#c9ad6a"
+          }
+        ],
+        "gradientOpacity": 100,
+        "textureSrc": "",
+        "textureScale": 1,
+        "textureOffsetX": 0,
+        "textureOffsetY": 0,
+        "textureOpacity": 100,
+        "textureBlend": "normal"
+      },
+      "strokeConfig": {
+        "strokeWidth": 0,
+        "strokePos": "inside",
+        "strokeColorHex": "#777777",
+        "strokeOpacity": 100,
+        "strokeDashArray": [],
+        "strokeDashOffset": 0,
+        "strokeFillType": "solid",
+        "strokeGradientType": "linear",
+        "strokeGradientAngle": 0,
+        "strokeGradientStops": []
+      },
+      "shadowGlowConfig": {
+        "shadowEnable": 0,
+        "shadowOffsetX": 2,
+        "shadowOffsetY": 2,
+        "shadowBlur": 8,
+        "shadowSpread": 0,
+        "shadowColorHex": "#000000",
+        "shadowOpacity": 25,
+        "glowEnable": 0,
+        "glowColorHex": "#ffffff",
+        "glowBlur": 10,
+        "glowSpread": 0,
+        "glowOpacity": 50,
+        "glowType": "outer"
+      }
+    }
+  ],
+  "cornerConfig": {
+    "cornerLock": 0,
+    "cornerRadiusAll": 0,
+    "cornerRadiusTL": 16,
+    "cornerRadiusTR": 16,
+    "cornerRadiusBL": 0,
+    "cornerRadiusBR": 0,
+    "shapeType": "round",
+    "customShapeSvg": ""
+  },
+  "filmTearConfig": {
+    "tearEnable": 0,
+    "tearStrength": 10,
+    "tearDensity": 50,
+    "filmPerforationEnable": 1,
+    "filmPerforationType": "round",
+    "filmPerforationSize": 22,
+    "filmPerforationSpacing": 60,
+    "dustScratchEnable": 1,
+    "dustScratchIntensity": 10,
+    "yellowingEnable": 1,
+    "yellowingStrength": 5
+  },
+  "lightEffect": {
+    "vignetteEnable": 1,
+    "vignetteStrength": 18,
+    "vignetteFeather": 60,
+    "lightLeakEnable": 0,
+    "lightLeakType": "warm",
+    "lightLeakOpacity": 20,
+    "lightLeakAngle": 45,
+    "filmGrainEnable": 0,
+    "filmGrainIntensity": 10
+  },
+  "decorConfig": {
+    "textLines": [
+      {
+        "text": "硬座 · HARD SEAT",
+        "fontFamily": "SimSun",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "letterSpacing": 4,
+        "colorHex": "#8b2e2e",
+        "opacity": 100,
+        "x": 0,
+        "y": 0,
+        "align": "top",
+        "enableShadow": 0
+      },
+      {
+        "text": "检票口 3 · 2026.10",
+        "fontFamily": "Microsoft YaHei",
+        "fontSize": 20,
+        "fontWeight": 600,
+        "letterSpacing": 2,
+        "colorHex": "#5c3a1e",
+        "opacity": 100,
+        "x": 0,
+        "y": 0,
+        "align": "bottom",
+        "enableShadow": 0
+      }
+    ],
+    "stickers": [],
+    "cornerDecorEnable": 0,
+    "cornerDecorType": "none",
+    "cornerDecorSize": 30,
+    "exifAutoText": 0
+  },
+  "logoElements": [],
+  "paramFontSize": 12,
+  "paramType": 0,
+  "paramPosition": "CENTER",
+  "templateName": "绿皮火车票"
+}
