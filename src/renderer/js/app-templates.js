@@ -385,7 +385,7 @@ window.App = Object.assign(window.App || {}, {
         const groupIcons = {
             潮流: '🪩', 高级感: '💎', 艺术: '🎨', 极简: '⚪', 胶片: '🎞️', 质感: '🪵', 手作: '✂️',
             复古: '📻', 杂志: '📰', 水印: '💧', 氛围: '🌙', 光影: '✨', 比例: '📐', 个性: '🪪',
-            票根: '🎫', 通用: '🖼️'
+            票根: '🎫', 其他: '🖼️'
         };
         const iconFor = name => {
             const kw = [
@@ -409,7 +409,7 @@ window.App = Object.assign(window.App || {}, {
         const groups = new Map();
         for (const p of this.presets) {
             if (f && !p.templateName.toLowerCase().includes(f) && !(p.templateTag || '').toLowerCase().includes(f)) continue;
-            const grp = merge[p.templateTag] || p.templateTag || '通用';
+            const grp = merge[p.templateTag] || p.templateTag || '其他';
             if (!groups.has(grp)) groups.set(grp, []);
             groups.get(grp).push(p);
         }
