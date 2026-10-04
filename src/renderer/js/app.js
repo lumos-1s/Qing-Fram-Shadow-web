@@ -201,20 +201,21 @@ window.App = {
             const btn = e.target.closest('.tab');
             if (btn) this.switchTab(btn.dataset.tab);
         });
-        // 对比原图:Pointer 统一鼠标/触屏;另支持 Shift 按住短按。
+        // 对比原图:Pointer 统一鼠标/触屏;另支持 空格 按住短按。
         // (不用 Alt:窗口是 autoHideMenuBar,Windows 上 Alt 会唤出菜单栏并抢走按键)
         d.btnCompare.addEventListener('pointerdown', e => { e.preventDefault(); this.setCompare(true); });
         d.btnCompare.addEventListener('pointerup', () => this.setCompare(false));
         d.btnCompare.addEventListener('pointercancel', () => this.setCompare(false));
         d.btnCompare.addEventListener('pointerleave', () => this.setCompare(false));
         document.addEventListener('keydown', e => {
-            if (e.key !== 'Shift' || e.ctrlKey || e.altKey) return;
+            if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey) return;
             const el = document.activeElement;
             const tag = (el && el.tagName) || '';
             if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
+            e.preventDefault();
             this.setCompare(true);
         });
-        document.addEventListener('keyup', e => { if (e.key === 'Shift') this.setCompare(false); });
+        document.addEventListener('keyup', e => { if (e.code === 'Space') this.setCompare(false); });
         window.addEventListener('blur', () => { if (this.draggingCompare) this.setCompare(false); });
         const btnCancel = document.getElementById('btnExportCancel');
         if (btnCancel) btnCancel.addEventListener('click', () => { this._exportAbort = true; });
@@ -641,7 +642,7 @@ window.App = {
             this.openCtx(e.clientX, e.clientY, [
                 ['适应窗口', () => this.fitZoom && this.fitZoom()],
                 ['1:1 实际大小', () => this.zoomActual && this.zoomActual()],
-                ['对比原图', () => this.toggleCompare && this.toggleCompare()],
+                ['对比原图 (空格按住)', () => this.toggleCompare && this.toggleCompare()],
                 ['—', null],
                 ['撤销 (Ctrl+Z)', () => this.undo()],
                 ['重做 (Ctrl+Y)', () => this.redo()],
