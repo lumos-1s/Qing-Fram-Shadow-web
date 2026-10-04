@@ -2739,7 +2739,7 @@ const w = natW;
             case 'COLOR_PALETTE': {
                 const pad = Math.max(30, Math.round(iw * 0.03));
                 const barH = Math.max(88, Math.round(iw * 0.10));
-                return { w: iw + pad * 2, h: ih + pad * 2 + barH };
+                return { w: iw + pad * 2, h: pad + ih + barH };
             }
             case 'SIGNATURE': {
                 const p = Math.max(30, Math.round(iw * 0.04));
@@ -3273,7 +3273,7 @@ const w = natW;
     function styleColorPalette(img, size, g, iw, ih) {
         const pad = Math.max(30, Math.round(iw * 0.03));
         const barH = Math.max(88, Math.round(iw * 0.10));
-        const w = iw + pad * 2, h = ih + pad * 2 + barH;
+        const w = iw + pad * 2, h = pad + ih + barH;
         g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad, iw, ih);
         const by = pad + ih;
