@@ -2733,7 +2733,8 @@ const w = natW;
             case 'NEWSPAPER': {
                 const pad = Math.max(40, Math.round(iw * 0.04));
                 const headH = Math.round(iw * 0.12);
-                return { w: iw + pad * 2, h: ih + pad * 2 + headH + 50 };
+                const capFs = Math.max(12, Math.round(headH * 0.18)); // 底部说明字号
+                return { w: iw + pad * 2, h: ih + pad * 2 + headH + Math.round(capFs * 1.8) + 24 };
             }
             case 'SIGNATURE': {
                 const p = Math.max(30, Math.round(iw * 0.04));
@@ -3154,7 +3155,9 @@ const w = natW;
     function styleNewspaper(img, size, g, iw, ih) {
         const pad = Math.max(40, Math.round(iw * 0.04));
         const headH = Math.round(iw * 0.12);
-        const w = iw + pad * 2, h = ih + pad * 2 + headH + 50;
+        const capFs = Math.max(12, Math.round(headH * 0.18)); // 底部说明字号
+        const bottomH = Math.round(capFs * 1.8) + 24;
+        const w = iw + pad * 2, h = ih + pad * 2 + headH + bottomH;
         // 报纸米黄底
         g.fillStyle = '#f0e9d6'; g.fillRect(0, 0, w, h);
         // 报头
@@ -3169,8 +3172,8 @@ const w = natW;
         // 照片
         g.drawImage(img, pad, pad + headH, iw, ih);
         // 照片说明
-        g.font = 'italic ' + Math.max(12, Math.round(headH * 0.18)) + 'px serif';
-        g.fillText('— A captured moment in time', w / 2, pad + headH + ih + 25);
+        g.font = 'italic ' + capFs + 'px serif';
+        g.fillText('— A captured moment in time', w / 2, pad + headH + ih + Math.round(bottomH * 0.62));
     }
 
 
