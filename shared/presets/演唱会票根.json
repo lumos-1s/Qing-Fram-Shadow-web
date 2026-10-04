@@ -3,10 +3,10 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 380,
-    "marginBottom": 380,
-    "marginLeft": 700,
-    "marginRight": 700,
+    "marginTop": 820,
+    "marginBottom": 820,
+    "marginLeft": 140,
+    "marginRight": 140,
     "imgScale": 0.97,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
@@ -17,32 +17,32 @@
   "layerList": [
     {
       "visible": true,
-      "marginTop": -380,
-      "marginBottom": -380,
-      "marginLeft": -700,
-      "marginRight": -700,
+      "marginTop": -820,
+      "marginBottom": -820,
+      "marginLeft": -140,
+      "marginRight": -140,
       "fillConfig": {
         "fillType": "gradient",
         "fillHex": "#1e1033",
         "fillOpacity": 100,
         "gradientType": "linear",
-        "gradientAngle": 180,
+        "gradientAngle": 135,
         "gradientStops": [
           {
             "position": 0,
-            "color": "#1e1033"
+            "color": "#ff5f6d"
           },
           {
-            "position": 0.4,
+            "position": 0.35,
+            "color": "#c4256f"
+          },
+          {
+            "position": 0.7,
             "color": "#4a1268"
           },
           {
-            "position": 0.72,
-            "color": "#8a1f6e"
-          },
-          {
             "position": 1,
-            "color": "#c4256f"
+            "color": "#1e1033"
           }
         ],
         "gradientOpacity": 100,
@@ -85,10 +85,10 @@
   "cornerConfig": {
     "cornerLock": 0,
     "cornerRadiusAll": 0,
-    "cornerRadiusTL": 16,
-    "cornerRadiusTR": 16,
+    "cornerRadiusTL": 18,
+    "cornerRadiusTR": 0,
     "cornerRadiusBL": 0,
-    "cornerRadiusBR": 0,
+    "cornerRadiusBR": 18,
     "shapeType": "round",
     "customShapeSvg": ""
   },
@@ -97,9 +97,9 @@
     "tearStrength": 10,
     "tearDensity": 50,
     "filmPerforationEnable": 1,
-    "filmPerforationType": "round",
-    "filmPerforationSize": 26,
-    "filmPerforationSpacing": 60,
+    "filmPerforationType": "square",
+    "filmPerforationSize": 20,
+    "filmPerforationSpacing": 34,
     "dustScratchEnable": 1,
     "dustScratchIntensity": 10,
     "yellowingEnable": 1,
@@ -121,7 +121,7 @@
       {
         "text": "LIVE · CONCERT",
         "fontFamily": "Arial Black",
-        "fontSize": 30,
+        "fontSize": 26,
         "fontWeight": 800,
         "letterSpacing": 6,
         "colorHex": "#ffd7ec",
@@ -132,9 +132,9 @@
         "enableShadow": 0
       },
       {
-        "text": "ADMIT ONE  ✦  SEAT A-12",
+        "text": "ADMIT ONE ✦ SEAT A-12",
         "fontFamily": "Microsoft YaHei",
-        "fontSize": 22,
+        "fontSize": 18,
         "fontWeight": 700,
         "letterSpacing": 2,
         "colorHex": "#ff8ac2",

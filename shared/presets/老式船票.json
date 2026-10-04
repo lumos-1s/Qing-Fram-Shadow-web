@@ -26,7 +26,7 @@
         "fillHex": "#3a6ea5",
         "fillOpacity": 100,
         "gradientType": "linear",
-        "gradientAngle": 180,
+        "gradientAngle": 90,
         "gradientStops": [
           {
             "position": 0,
@@ -81,10 +81,10 @@
   "cornerConfig": {
     "cornerLock": 0,
     "cornerRadiusAll": 0,
-    "cornerRadiusTL": 16,
-    "cornerRadiusTR": 16,
-    "cornerRadiusBL": 16,
-    "cornerRadiusBR": 16,
+    "cornerRadiusTL": 22,
+    "cornerRadiusTR": 22,
+    "cornerRadiusBL": 22,
+    "cornerRadiusBR": 22,
     "shapeType": "round",
     "customShapeSvg": ""
   },
@@ -94,8 +94,8 @@
     "tearDensity": 50,
     "filmPerforationEnable": 1,
     "filmPerforationType": "round",
-    "filmPerforationSize": 26,
-    "filmPerforationSpacing": 60,
+    "filmPerforationSize": 32,
+    "filmPerforationSpacing": 90,
     "dustScratchEnable": 1,
     "dustScratchIntensity": 10,
     "yellowingEnable": 1,
@@ -105,9 +105,9 @@
     "vignetteEnable": 1,
     "vignetteStrength": 18,
     "vignetteFeather": 60,
-    "lightLeakEnable": 0,
+    "lightLeakEnable": 1,
     "lightLeakType": "warm",
-    "lightLeakOpacity": 20,
+    "lightLeakOpacity": 22,
     "lightLeakAngle": 45,
     "filmGrainEnable": 0,
     "filmGrainIntensity": 10
