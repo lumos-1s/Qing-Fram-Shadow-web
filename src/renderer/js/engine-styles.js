@@ -2738,7 +2738,7 @@ const w = natW;
             }
             case 'COLOR_PALETTE': {
                 const pad = Math.max(30, Math.round(iw * 0.03));
-                const barH = Math.max(88, Math.round(iw * 0.10));
+                const barH = Math.max(104, Math.round(iw * 0.12));
                 return { w: iw + pad * 2, h: pad + ih + barH };
             }
             case 'SIGNATURE': {
@@ -3272,16 +3272,16 @@ const w = natW;
     }
     function styleColorPalette(img, size, g, iw, ih) {
         const pad = Math.max(30, Math.round(iw * 0.03));
-        const barH = Math.max(88, Math.round(iw * 0.10));
+        const barH = Math.max(104, Math.round(iw * 0.12));
         const w = iw + pad * 2, h = pad + ih + barH;
         g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, w, h);
         g.drawImage(img, pad, pad, iw, ih);
         const by = pad + ih;
         g.fillStyle = '#ffffff'; g.fillRect(0, by, w, barH);
         const colors = extractPalette(img, 5);
-        const dotD = Math.round(barH * 0.36);
-        const cy = by + Math.round(barH * 0.38);
-        const gap = Math.max(18, Math.round(iw * 0.045));
+        const dotD = Math.round(barH * 0.44);
+        const cy = by + Math.round(barH * 0.36);
+        const gap = Math.max(24, Math.round(iw * 0.075));
         const totalW = colors.length * dotD + (colors.length - 1) * gap;
         let x = (w - totalW) / 2 + dotD / 2;
         g.textAlign = 'center';
@@ -3290,8 +3290,8 @@ const w = natW;
             g.fillStyle = c; g.fill();
             g.lineWidth = 1; g.strokeStyle = 'rgba(0,0,0,0.18)'; g.stroke();
             g.fillStyle = '#1a1a1a';
-            g.font = Math.max(10, Math.round(dotD * 0.32)) + 'px Consolas, monospace';
-            g.fillText('#FF' + c.slice(1).toUpperCase(), x, cy + Math.round(dotD * 0.72));
+            g.font = Math.max(12, Math.round(dotD * 0.36)) + 'px Consolas, monospace';
+            g.fillText('#FF' + c.slice(1).toUpperCase(), x, cy + Math.round(dotD * 0.78));
             x += dotD + gap;
         }
     }
