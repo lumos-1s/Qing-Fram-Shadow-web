@@ -74,6 +74,12 @@ app.whenReady().then(() => {
     //    updater 为 null 时(check-for-updates 等 IPC)一律返回"开发模式",避免 dev 下调用报错
     let updater = null;
     if (app.isPackaged) {
+        // portable 单文件版不生成 app-update.yml,electron-updater 读取时会抛
+        // ENOENT 导致启动后弹"检查更新失败";没有该文件就直接跳过自动更新。
+        const updateYml = path.join(process.resourcesPath, 'app-update.yml');
+        if (!fs.existsSync(updateYml)) {
+            console.warn('[updater] 未发现 app-update.yml(portable 版),自动更新已跳过');
+        } else {
         try {
             const { autoUpdater } = require('electron-updater');
             updater = autoUpdater;
@@ -91,6 +97,7 @@ app.whenReady().then(() => {
             setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 3000);
         } catch (e) {
             console.warn('[updater] 初始化失败:', e && e.message);
+        }
         }
     }
     ipcMain.handle('check-for-updates', async () => {
