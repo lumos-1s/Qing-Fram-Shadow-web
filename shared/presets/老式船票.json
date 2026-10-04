@@ -94,8 +94,8 @@
     "tearDensity": 50,
     "filmPerforationEnable": 1,
     "filmPerforationType": "round",
-    "filmPerforationSize": 32,
-    "filmPerforationSpacing": 90,
+    "filmPerforationSize": 34,
+    "filmPerforationSpacing": 95,
     "dustScratchEnable": 1,
     "dustScratchIntensity": 10,
     "yellowingEnable": 1,
@@ -142,9 +142,9 @@
       }
     ],
     "stickers": [],
-    "cornerDecorEnable": 0,
-    "cornerDecorType": "none",
-    "cornerDecorSize": 30,
+    "cornerDecorEnable": 1,
+    "cornerDecorType": "line",
+    "cornerDecorSize": 28,
     "exifAutoText": 0
   },
   "logoElements": [],

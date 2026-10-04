@@ -94,8 +94,8 @@
     "tearDensity": 50,
     "filmPerforationEnable": 1,
     "filmPerforationType": "hstrip",
-    "filmPerforationSize": 16,
-    "filmPerforationSpacing": 18,
+    "filmPerforationSize": 24,
+    "filmPerforationSpacing": 22,
     "dustScratchEnable": 1,
     "dustScratchIntensity": 10,
     "yellowingEnable": 1,
@@ -117,7 +117,7 @@
       {
         "text": "硬座 · HARD SEAT",
         "fontFamily": "SimSun",
-        "fontSize": 28,
+        "fontSize": 34,
         "fontWeight": 700,
         "letterSpacing": 4,
         "colorHex": "#8b2e2e",
@@ -128,9 +128,9 @@
         "enableShadow": 0
       },
       {
-        "text": "检票口 3 · 2026.10",
+        "text": "检票口 3 · 2026.10 · 硬座车厢",
         "fontFamily": "Microsoft YaHei",
-        "fontSize": 20,
+        "fontSize": 22,
         "fontWeight": 600,
         "letterSpacing": 2,
         "colorHex": "#5c3a1e",

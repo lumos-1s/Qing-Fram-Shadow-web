@@ -3,10 +3,10 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 820,
-    "marginBottom": 820,
-    "marginLeft": 140,
-    "marginRight": 140,
+    "marginTop": 1150,
+    "marginBottom": 1150,
+    "marginLeft": 90,
+    "marginRight": 90,
     "imgScale": 0.97,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
@@ -17,10 +17,10 @@
   "layerList": [
     {
       "visible": true,
-      "marginTop": -820,
-      "marginBottom": -820,
-      "marginLeft": -140,
-      "marginRight": -140,
+      "marginTop": -1150,
+      "marginBottom": -1150,
+      "marginLeft": -90,
+      "marginRight": -90,
       "fillConfig": {
         "fillType": "gradient",
         "fillHex": "#1e1033",
@@ -30,19 +30,19 @@
         "gradientStops": [
           {
             "position": 0,
-            "color": "#ff5f6d"
+            "color": "#ff3d81"
           },
           {
-            "position": 0.35,
-            "color": "#c4256f"
+            "position": 0.4,
+            "color": "#b01f6e"
           },
           {
-            "position": 0.7,
-            "color": "#4a1268"
+            "position": 0.72,
+            "color": "#5c1268"
           },
           {
             "position": 1,
-            "color": "#1e1033"
+            "color": "#180a2e"
           }
         ],
         "gradientOpacity": 100,
@@ -85,10 +85,10 @@
   "cornerConfig": {
     "cornerLock": 0,
     "cornerRadiusAll": 0,
-    "cornerRadiusTL": 18,
+    "cornerRadiusTL": 20,
     "cornerRadiusTR": 0,
     "cornerRadiusBL": 0,
-    "cornerRadiusBR": 18,
+    "cornerRadiusBR": 20,
     "shapeType": "round",
     "customShapeSvg": ""
   },
@@ -98,8 +98,8 @@
     "tearDensity": 50,
     "filmPerforationEnable": 1,
     "filmPerforationType": "square",
-    "filmPerforationSize": 20,
-    "filmPerforationSpacing": 34,
+    "filmPerforationSize": 22,
+    "filmPerforationSpacing": 36,
     "dustScratchEnable": 1,
     "dustScratchIntensity": 10,
     "yellowingEnable": 1,
@@ -146,8 +146,8 @@
       }
     ],
     "stickers": [],
-    "cornerDecorEnable": 0,
-    "cornerDecorType": "none",
+    "cornerDecorEnable": 1,
+    "cornerDecorType": "round",
     "cornerDecorSize": 30,
     "exifAutoText": 0
   },
