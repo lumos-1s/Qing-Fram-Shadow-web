@@ -101,12 +101,12 @@ app.whenReady().then(() => {
         }
     }
     ipcMain.handle('check-for-updates', async () => {
-        if (!updater) return { ok: false, message: '开发模式不检查更新' };
+        if (!updater) return { ok: false, message: '当前为便携版,不支持在线自动更新,请到 GitHub Releases 下载新版' };
         try { await updater.checkForUpdates(); return { ok: true }; }
         catch (e) { return { ok: false, message: e && e.message }; }
     });
     ipcMain.handle('start-update-download', async () => {
-        if (!updater) return { ok: false, message: '开发模式不检查更新' };
+        if (!updater) return { ok: false, message: '当前为便携版,不支持在线自动更新,请到 GitHub Releases 下载新版' };
         try { await updater.downloadUpdate(); return { ok: true }; }
         catch (e) { return { ok: false, message: e && e.message }; }
     });
