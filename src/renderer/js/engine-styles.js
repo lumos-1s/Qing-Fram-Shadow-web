@@ -598,6 +598,126 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         drawTextL(g, 'SEAT 08', sx + r + 10, topBot + Math.floor(ih * 0.45), '#555', fs, true, false, 0);
         drawTextL(g, 'SCREEN 7', sx + r + 10, topBot + Math.floor(ih * 0.60), '#555', fs, true, false, 0);
     }
+
+    // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
+    function styleTicket(img, size, g, iw, ih, S, variant) {
+        const headH = Math.max(58, Math.round(size * 2.2));
+        const footH = Math.max(50, Math.round(size * 2.0));
+        const side = Math.max(22, Math.round(size * 1.2));
+        const stubW = variant === 'concert' ? Math.max(108, Math.round(iw * 0.15)) : 0;
+        const w = iw + side * 2 + stubW, h = ih + headH + footH;
+        const pal = {
+            vintage: { paper: '#f4eedd', ink: '#3a2b1a', sub: '#8a744f', title: '#5b4128', line: 'rgba(90,70,40,0.45)' },
+            concert: { paper: '#0e1b30', ink: '#e8f0ff', sub: '#6fd0ff', title: '#ffd27d', line: 'rgba(110,160,220,0.5)' },
+            scrap: { paper: '#ece3cf', ink: '#4a3a2a', sub: '#9a7f5f', title: '#7a4f3a', line: 'rgba(120,90,50,0.45)' }
+        }[variant] || { paper: '#f4eedd', ink: '#3a2b1a', sub: '#8a744f', title: '#5b4128', line: 'rgba(90,70,40,0.45)' };
+        const rnd = styleNoise(iw, ih, 20261004);
+        // 底纸
+        g.fillStyle = pal.paper;
+        g.fillRect(0, 0, w, h);
+        // 纸张颗粒(做旧)
+        g.fillStyle = 'rgba(60,50,30,0.10)';
+        for (let i = 0; i < Math.round(w * h / 9000); i++) {
+            const px = rnd(w), py = rnd(h);
+            g.fillRect(px, py, 1, 1);
+        }
+        // 泛黄(非演唱会):上下淡黄
+        if (variant !== 'concert') {
+            const yg = g.createLinearGradient(0, 0, 0, h);
+            yg.addColorStop(0, 'rgba(150,110,50,0.10)');
+            yg.addColorStop(0.15, 'rgba(150,110,50,0)');
+            yg.addColorStop(0.85, 'rgba(150,110,50,0)');
+            yg.addColorStop(1, 'rgba(150,110,50,0.10)');
+            g.fillStyle = yg;
+            g.fillRect(0, 0, w, h);
+        }
+        // 票券外框 + 照片区细框
+        g.strokeStyle = pal.line;
+        g.lineWidth = 2;
+        g.strokeRect(8, 8, w - 16, h - 16);
+        g.lineWidth = 1;
+        g.strokeRect(side, headH, iw, ih);
+        // 照片(完整显示+缩放/偏移,圆角可选)
+        const sc = (S && S.imgScale) || 1;
+        const dw = iw * sc, dh = ih * sc;
+        const dx = side + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
+        const dy = headH + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
+        const arc = S ? Math.min(S.cornerAll || 0, Math.min(iw, ih) / 2) : 0;
+        g.save();
+        g.beginPath();
+        if (arc > 1 && typeof g.roundRect === 'function') g.roundRect(side, headH, iw, ih, arc);
+        else g.rect(side, headH, iw, ih);
+        g.clip();
+        g.drawImage(img, dx, dy, dw, dh);
+        g.restore();
+        // 左右齿孔(照片区高度范围,挖洞撕口感)
+        const pr = Math.max(5, Math.round(size * 0.22));
+        const pitch = Math.max(pr * 2.1, pr * 2 + 3);
+        g.save();
+        g.globalCompositeOperation = 'destination-out';
+        for (let y = headH + pr; y < headH + ih - pr; y += pitch) {
+            g.beginPath(); g.arc(side + pr, y, pr, 0, 6.2832); g.fill();
+            g.beginPath(); g.arc(side + iw - pr, y, pr, 0, 6.2832); g.fill();
+        }
+        g.restore();
+        // 标题/票号/日期
+        const tFs = Math.max(26, Math.round(headH * 0.52));
+        const sFs = Math.max(12, Math.round(headH * 0.26));
+        const dFs = Math.max(12, Math.round(headH * 0.24));
+        const d = new Date();
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dateStr = d.getFullYear() + '.' + mm + '.' + dd;
+        const noBase = 100 + Math.abs(iw * 31 + ih * 17) % 900;
+        const noStr = variant === 'concert' ? 'TK-' + (d.getFullYear() % 100) + noBase
+            : 'NO.' + d.getFullYear() + '-' + String(noBase).padStart(3, '0');
+        const titles = { vintage: '票根', concert: 'KEEP THE MOMENT', scrap: 'PHOTO TICKET' };
+        const subs = { vintage: 'MEMORY TICKET', concert: 'LIVE · 20:30', scrap: 'MEMORIES' };
+        const foots = { vintage: '把这一刻收藏进站里', concert: '收藏联 · TK-' + (d.getFullYear() % 100) + noBase + ' · 20:30', scrap: '今日纪念 · 把瞬间留下' };
+        const cx1 = side + Math.floor(iw / 2);
+        g.textAlign = 'center';
+        g.textBaseline = 'alphabetic';
+        drawTextL(g, titles[variant] || '票根', cx1, Math.round(headH * 0.62), pal.title, tFs, variant !== 'vintage', false, Math.round(tFs * 0.08));
+        g.textAlign = 'right';
+        drawTextL(g, noStr, side + iw - 4, Math.round(headH * 0.5), pal.ink, dFs, true, false, 0);
+        g.textAlign = 'left';
+        drawTextL(g, subs[variant] || 'MEMORY TICKET', side + 4, Math.round(headH * 0.92), pal.sub, sFs, false, false, Math.round(sFs * 0.12));
+        g.textAlign = 'right';
+        drawTextL(g, dateStr, side + iw - 4, Math.round(headH * 0.92), pal.ink, dFs, true, false, 0);
+        // 收藏联(仅演唱会)
+        if (stubW > 0) {
+            const sx = side + iw;
+            g.strokeStyle = pal.line;
+            g.lineWidth = 2;
+            g.setLineDash([6, 6]);
+            g.beginPath(); g.moveTo(sx, headH + 12); g.lineTo(sx, headH + ih - 12); g.stroke();
+            g.setLineDash([]);
+            g.save();
+            g.globalCompositeOperation = 'destination-out';
+            for (let y = headH + pr; y < headH + ih - pr; y += pitch) { g.beginPath(); g.arc(sx, y, pr, 0, 6.2832); g.fill(); }
+            g.restore();
+            const cx2 = sx + Math.floor(stubW / 2);
+            const vFs = Math.max(13, Math.round(size * 0.5));
+            g.save();
+            g.translate(cx2, headH + Math.floor(ih / 2) - Math.round(ih * 0.18));
+            g.rotate(-Math.PI / 2);
+            g.textAlign = 'center';
+            drawTextL(g, '收藏联', 0, Math.round(vFs * 0.36), pal.sub, vFs, false, true, 0);
+            g.restore();
+            g.save();
+            g.translate(cx2, headH + Math.floor(ih / 2) + Math.round(ih * 0.16));
+            g.rotate(-Math.PI / 2);
+            g.textAlign = 'center';
+            drawTextL(g, 'KEEP THE MOMENT', 0, Math.round(vFs * 0.36), pal.sub, Math.round(vFs * 0.72), false, false, 0);
+            g.restore();
+        }
+        // 底部文字
+        g.textAlign = 'center';
+        drawTextL(g, foots[variant] || '', side + Math.floor(iw / 2), h - Math.round(footH * 0.55), pal.sub, Math.max(13, Math.round(footH * 0.4)), false, false, 0);
+        g.textAlign = 'left';
+        g.textBaseline = 'alphabetic';
+    }
+
     function styleWatercolorBleed(img, size, g, iw, ih) {
         const bleed = Math.max(70, Math.floor(size * 1.8));
         const w = iw + bleed * 2, h = ih + bleed * 2;
@@ -2703,6 +2823,16 @@ const w = natW;
                 const stubW = Math.max(100, Math.floor(iw * 0.18));
                 return { w: iw + sidePad * 2 + stubW, h: ih + topBot * 2 };
             }
+
+            case 'TICKET_VINTAGE':
+            case 'TICKET_CONCERT':
+            case 'TICKET_SCRAP': {
+                const headH = Math.max(58, Math.round(size * 2.2));
+                const footH = Math.max(50, Math.round(size * 2.0));
+                const side = Math.max(22, Math.round(size * 1.2));
+                const stubW = name === 'TICKET_CONCERT' ? Math.max(108, Math.round(iw * 0.15)) : 0;
+                return { w: iw + side * 2 + stubW, h: ih + headH + footH };
+            }
             case 'WATERCOLOR_BLEED': {
                 const bleed = Math.max(50, Math.floor(size * 1.5));
                 return { w: iw + bleed * 2, h: ih + bleed * 2 };
@@ -3918,6 +4048,9 @@ const w = natW;
             FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape,
             VHS_TAPE: styleVhsTape, ALBUM_CORNER: styleAlbumCorner,
                         MOVIE_TICKET: styleMovieTicket, WATERCOLOR_BLEED: styleWatercolorBleed,
+            TICKET_VINTAGE: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'vintage'),
+            TICKET_CONCERT: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'concert'),
+            TICKET_SCRAP: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'scrap'),
             NEON_GLOW: styleNeonGlow, BURNED_EDGE: styleBurnedEdge,
             INK_WASH: styleInkWash, CYANOTYPE: styleCyanotype,
             OIL_BRUSH: styleOilBrush, PRESSED_FLOWER: stylePressedFlower,
