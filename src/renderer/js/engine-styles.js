@@ -661,26 +661,28 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
         g.restore();
         // 标题/票号/日期
-        const tFs = Math.max(26, Math.round(headH * 0.52));
-        const sFs = Math.max(12, Math.round(headH * 0.26));
+        const tFs0 = Math.max(26, Math.round(headH * 0.52));
+        const sFs0 = Math.max(12, Math.round(headH * 0.26));
         const dFs = Math.max(12, Math.round(headH * 0.24));
         const d = new Date();
         const dd = String(d.getDate()).padStart(2, '0');
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dateStr = d.getFullYear() + '.' + mm + '.' + dd;
         const noBase = 100 + Math.abs(iw * 31 + ih * 17) % 900;
-        const noStr = variant === 'concert' ? 'TK-' + (d.getFullYear() % 100) + noBase
+        const noStr = variant === 'concert' ? 'TK-' + noBase
             : 'NO.' + d.getFullYear() + '-' + String(noBase).padStart(3, '0');
         const titles = { vintage: '票根', concert: 'KEEP THE MOMENT', scrap: 'PHOTO TICKET' };
         const subs = { vintage: 'MEMORY TICKET', concert: 'LIVE · 20:30', scrap: 'MEMORIES' };
-        const foots = { vintage: '把这一刻收藏进站里', concert: '收藏联 · TK-' + (d.getFullYear() % 100) + noBase + ' · 20:30', scrap: '今日纪念 · 把瞬间留下' };
+        const foots = { vintage: '把这一刻收藏进站里', concert: '收藏联 · TK-' + noBase + ' · 20:30', scrap: '今日纪念 · 把瞬间留下' };
         const cx1 = side + Math.floor(iw / 2);
         g.textAlign = 'center';
         g.textBaseline = 'alphabetic';
+        const tFs = fitFont(g, titles[variant] || '票根', variant !== 'vintage', false, tFs0, Math.round(iw * 0.52), Math.round(tFs0 * 0.08));
         drawTextL(g, titles[variant] || '票根', cx1, Math.round(headH * 0.62), pal.title, tFs, variant !== 'vintage', false, Math.round(tFs * 0.08));
         g.textAlign = 'right';
         drawTextL(g, noStr, side + iw - 4, Math.round(headH * 0.5), pal.ink, dFs, true, false, 0);
         g.textAlign = 'left';
+        const sFs = fitFont(g, subs[variant] || 'MEMORY TICKET', false, false, sFs0, Math.round(iw * 0.5), Math.round(sFs0 * 0.12));
         drawTextL(g, subs[variant] || 'MEMORY TICKET', side + 4, Math.round(headH * 0.92), pal.sub, sFs, false, false, Math.round(sFs * 0.12));
         g.textAlign = 'right';
         drawTextL(g, dateStr, side + iw - 4, Math.round(headH * 0.92), pal.ink, dFs, true, false, 0);
@@ -713,7 +715,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
         // 底部文字
         g.textAlign = 'center';
-        drawTextL(g, foots[variant] || '', side + Math.floor(iw / 2), h - Math.round(footH * 0.55), pal.sub, Math.max(13, Math.round(footH * 0.4)), false, false, 0);
+        const footFs0 = Math.max(13, Math.round(footH * 0.4));
+        const footFs = fitFont(g, foots[variant] || '', false, false, footFs0, Math.round(iw * 0.85), 0);
+        drawTextL(g, foots[variant] || '', side + Math.floor(iw / 2), h - Math.round(footH * 0.55), pal.sub, footFs, false, false, 0);
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
     }
