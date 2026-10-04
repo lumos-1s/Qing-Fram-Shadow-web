@@ -599,6 +599,41 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         drawTextL(g, 'SCREEN 7', sx + r + 10, topBot + Math.floor(ih * 0.60), '#555', fs, true, false, 0);
     }
 
+    // ── 票根纸张纹理:256px tile(纤维颗粒+半调网点+双色噪点),缓存平铺一次,预览不卡 ──
+    let ticketPaperCache = null;
+    function ticketPaperPattern() {
+        if (ticketPaperCache) return ticketPaperCache;
+        const tw = 256, th = 256;
+        const c = newCanvas(tw, th);
+        const g2 = c.getContext('2d');
+        const rnd = styleNoise(2026, 1005, 99);
+        g2.fillStyle = '#ffffff';
+        g2.fillRect(0, 0, tw, th);
+        for (let i = 0; i < 1600; i++) {
+            const light = rnd(2) === 0;
+            const a = 0.025 + rnd(40) / 1000;
+            g2.fillStyle = light ? 'rgba(255,255,250,' + a.toFixed(3) + ')' : 'rgba(40,35,25,' + a.toFixed(3) + ')';
+            g2.fillRect(rnd(tw), rnd(th), 1 + rnd(2), 1 + rnd(2));
+        }
+        const gap = 13;
+        for (let y = gap >> 1; y < th; y += gap) {
+            for (let x = gap >> 1; x < tw; x += gap) {
+                if (rnd(100) < 30) continue;
+                const r = rnd(22) / 10;
+                const light = rnd(2) === 0;
+                const a = 0.03 + rnd(30) / 1000;
+                g2.fillStyle = light ? 'rgba(255,255,250,' + a.toFixed(3) + ')' : 'rgba(90,80,55,' + a.toFixed(3) + ')';
+                g2.beginPath(); g2.arc(x, y, r, 0, 6.2832); g2.fill();
+            }
+        }
+        g2.fillStyle = 'rgba(255,255,245,0.06)';
+        for (let i = 0; i < 70; i++) {
+            g2.fillRect(rnd(tw), rnd(th), 2 + rnd(6), 1);
+        }
+        ticketPaperCache = g2.createPattern(c, 'repeat');
+        return ticketPaperCache;
+    }
+
     // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
     function styleTicket(img, size, g, iw, ih, S, variant) {
         const headH = Math.max(58, Math.round(size * 2.2));
@@ -615,11 +650,26 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 底纸
         g.fillStyle = pal.paper;
         g.fillRect(0, 0, w, h);
-        // 纸张颗粒(做旧)
-        g.fillStyle = 'rgba(60,50,30,0.10)';
-        for (let i = 0; i < Math.round(w * h / 9000); i++) {
+        // 纸张纹理(平铺 256px tile:纤维颗粒+半调网点+双色噪点)
+        g.fillStyle = ticketPaperPattern();
+        g.fillRect(0, 0, w, h);
+        // 印刷脏点(随机墨渍,避开照片区)
+        g.fillStyle = variant === 'concert' ? 'rgba(255,255,255,0.07)' : 'rgba(45,35,22,0.10)';
+        for (let i = 0; i < Math.round((w + h) / 5); i++) {
             const px = rnd(w), py = rnd(h);
-            g.fillRect(px, py, 1, 1);
+            if (px > side && px < side + iw && py > headH && py < headH + ih) continue;
+            g.fillRect(px, py, 1 + rnd(2), 1 + rnd(2));
+        }
+        // 边缘磨损(外框内侧一圈不规则暗点)
+        g.fillStyle = variant === 'concert' ? 'rgba(0,0,25,0.20)' : 'rgba(85,65,35,0.14)';
+        for (let i = 0; i < Math.round((w + h) / 2); i++) {
+            const edge = rnd(4);
+            let px, py;
+            if (edge === 0) { px = rnd(w); py = 2 + rnd(5); }
+            else if (edge === 1) { px = rnd(w); py = h - 7 + rnd(5); }
+            else if (edge === 2) { px = 2 + rnd(5); py = rnd(h); }
+            else { px = w - 7 + rnd(5); py = rnd(h); }
+            g.fillRect(px, py, 1 + rnd(2), 1 + rnd(2));
         }
         // 泛黄(非演唱会):上下淡黄
         if (variant !== 'concert') {
@@ -631,6 +681,12 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.fillStyle = yg;
             g.fillRect(0, 0, w, h);
         }
+        // 四周暗角(票券旧感,演唱会深蓝票面用冷色)
+        const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.34, w / 2, h / 2, Math.max(w, h) * 0.74);
+        vg.addColorStop(0, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, variant === 'concert' ? 'rgba(0,0,25,0.20)' : 'rgba(95,72,40,0.16)');
+        g.fillStyle = vg;
+        g.fillRect(0, 0, w, h);
         // 票券外框 + 照片区细框
         g.strokeStyle = pal.line;
         g.lineWidth = 2;
@@ -677,9 +733,18 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const cx1 = side + Math.floor(iw / 2);
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
-        const tFs = fitFont(g, titles[variant] || '票根', variant !== 'vintage', false, tFs0, Math.round(iw * 0.52), Math.round(tFs0 * 0.08));
+        const titleTxt = titles[variant] || '票根';
+        const tMono = variant !== 'vintage';
+        const tFs = fitFont(g, titleTxt, tMono, false, tFs0, Math.round(iw * 0.52), Math.round(tFs0 * 0.08));
         const tTrack = Math.round(tFs * 0.08);
-        drawTextL(g, titles[variant] || '票根', cx1 - Math.round(textMetrics(g, titles[variant] || '票根', tFs, variant !== 'vintage', false, tTrack).w / 2), Math.round(headH * 0.62), pal.title, tFs, variant !== 'vintage', false, tTrack);
+        const tX = cx1 - Math.round(textMetrics(g, titleTxt, tFs, tMono, false, tTrack).w / 2);
+        const tY = Math.round(headH * 0.62);
+        drawTextL(g, titleTxt, tX, tY, pal.title, tFs, tMono, false, tTrack);
+        // 套印错位(墨迹不均:轻微重影)
+        g.save();
+        g.globalAlpha = 0.13;
+        drawTextL(g, titleTxt, tX + 0.6, tY + 0.4, 'rgba(0,0,0,0.55)', tFs, tMono, false, tTrack);
+        g.restore();
         g.textAlign = 'right';
         drawTextL(g, noStr, side + iw - 4, Math.round(headH * 0.5), pal.ink, dFs, true, false, 0);
         g.textAlign = 'left';
