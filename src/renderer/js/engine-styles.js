@@ -2736,6 +2736,11 @@ const w = natW;
                 const capFs = Math.max(12, Math.round(headH * 0.18)); // 底部说明字号
                 return { w: iw + pad * 2, h: ih + pad * 2 + headH + Math.round(capFs * 1.8) + 24 };
             }
+            case 'COLOR_PALETTE': {
+                const pad = Math.max(30, Math.round(iw * 0.03));
+                const barH = Math.max(88, Math.round(iw * 0.10));
+                return { w: iw + pad * 2, h: ih + pad * 2 + barH };
+            }
             case 'SIGNATURE': {
                 const p = Math.max(30, Math.round(iw * 0.04));
                 const bh = Math.round(iw * 0.12);
@@ -3176,6 +3181,89 @@ const w = natW;
         g.fillText('— A captured moment in time', w / 2, pad + headH + ih + Math.round(bottomH * 0.62));
     }
 
+
+    // ══ 色卡提取 ══ 从照片提取 5 个主色,照片下方深色条内显示色块+色码
+    const _paletteCache = new WeakMap();
+    function _sqDist(a, b) {
+        const dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2];
+        return dr * dr + dg * dg + db * db;
+    }
+    function extractPalette(img, n) {
+        const cached = _paletteCache.get(img);
+        if (cached) return cached;
+        const sw = 64;
+        const sc = document.createElement('canvas');
+        sc.width = sw;
+        sc.height = Math.max(1, Math.round(sw * (img.height / Math.max(1, img.width))));
+        const sctx = sc.getContext('2d', { willReadFrequently: true });
+        sctx.drawImage(img, 0, 0, sw, sc.height);
+        let data = null;
+        try { data = sctx.getImageData(0, 0, sw, sc.height).data; } catch (e) { data = null; }
+        const k = n || 5;
+        const fallback = ['#333333', '#666666', '#999999', '#bbbbbb', '#dddddd'];
+        if (!data) return fallback.slice(0, k);
+        const pts = [];
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 40) pts.push([data[i], data[i + 1], data[i + 2]]);
+        }
+        if (pts.length === 0) return fallback.slice(0, k);
+        if (pts.length <= k) {
+            const pal = pts.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''));
+            while (pal.length < k) pal.push('#888888');
+            _paletteCache.set(img, pal);
+            return pal;
+        }
+        const sorted = pts.slice().sort((a, b) => (0.3 * a[0] + 0.6 * a[1] + 0.1 * a[2]) - (0.3 * b[0] + 0.6 * b[1] + 0.1 * b[2]));
+        const centers = [];
+        for (let i = 0; i < k; i++) centers.push(sorted[Math.floor(i * (sorted.length - 1) / (k - 1))].slice());
+        const assign = new Array(pts.length).fill(0);
+        for (let it = 0; it < 14; it++) {
+            for (let p = 0; p < pts.length; p++) {
+                let b = 0, bd = Infinity;
+                for (let c = 0; c < k; c++) { const d = _sqDist(pts[p], centers[c]); if (d < bd) { bd = d; b = c; } }
+                assign[p] = b;
+            }
+            const sums = Array.from({ length: k }, () => [0, 0, 0, 0]);
+            for (let p = 0; p < pts.length; p++) { sums[assign[p]][0] += pts[p][0]; sums[assign[p]][1] += pts[p][1]; sums[assign[p]][2] += pts[p][2]; sums[assign[p]][3]++; }
+            let moved = false;
+            for (let c = 0; c < k; c++) {
+                if (sums[c][3]) {
+                    const nc = [Math.round(sums[c][0] / sums[c][3]), Math.round(sums[c][1] / sums[c][3]), Math.round(sums[c][2] / sums[c][3])];
+                    if (nc[0] !== centers[c][0] || nc[1] !== centers[c][1] || nc[2] !== centers[c][2]) moved = true;
+                    centers[c] = nc;
+                }
+            }
+            if (!moved) break;
+        }
+        const pal = centers.map(c => '#' + c.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''));
+        _paletteCache.set(img, pal);
+        return pal;
+    }
+    function styleColorPalette(img, size, g, iw, ih) {
+        const pad = Math.max(30, Math.round(iw * 0.03));
+        const barH = Math.max(88, Math.round(iw * 0.10));
+        const w = iw + pad * 2, h = ih + pad * 2 + barH;
+        g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, pad, pad, iw, ih);
+        const by = pad + ih;
+        g.fillStyle = '#191919'; g.fillRect(0, by, w, barH);
+        const colors = extractPalette(img, 5);
+        const dotD = Math.round(barH * 0.36);
+        const cy = by + Math.round(barH * 0.38);
+        const gap = Math.max(18, Math.round(iw * 0.045));
+        const totalW = colors.length * dotD + (colors.length - 1) * gap;
+        let x = (w - totalW) / 2 + dotD / 2;
+        g.textAlign = 'center';
+        for (const c of colors) {
+            g.beginPath(); g.arc(x, cy, dotD / 2, 0, Math.PI * 2);
+            g.fillStyle = c; g.fill();
+            g.lineWidth = 1; g.strokeStyle = 'rgba(255,255,255,0.28)'; g.stroke();
+            g.fillStyle = '#fff';
+            g.font = Math.max(10, Math.round(dotD * 0.32)) + 'px Consolas, monospace';
+            g.fillText('#FF' + c.slice(1).toUpperCase(), x, cy + Math.round(dotD * 0.72));
+            x += dotD + gap;
+        }
+    }
 
     // ══ 签名纪念 ══
     function styleSignature(img, size, g, iw, ih, S, cwO, chO) {
@@ -3806,6 +3894,7 @@ const w = natW;
             CYBER_GLITCH: styleCyberGlitch, POLAROID_HAND: stylePolaroidHand,
             TORN_JOURNAL: styleTornJournal, CARD_3D: styleCard3D,
             COMIC_PANEL: styleComicPanel, NEWSPAPER: styleNewspaper,
+            COLOR_PALETTE: styleColorPalette,
             SIGNATURE: styleSignature, SIGN_PARAM: styleSignParam,
             AVATAR_MEMO: styleAvatarMemo,
             SIGN_BLUR: styleSignBlur,
