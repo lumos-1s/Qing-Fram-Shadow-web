@@ -4,6 +4,12 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { createStateStore } = require('./state');
 
+// 打包版与开发版数据隔离:发布版用独立 userData,首次启动头像/用户名等默认全空,
+// 也不会读到开发机(含开发者自己)已保存的旧登录数据。
+if (app.isPackaged) {
+    app.setPath('userData', path.join(app.getPath('appData'), 'qingframe-web-release'));
+}
+
 // 渲染进程通过 qflocal:// 协议在磁盘上直接读取照片(不经过 base64 过 IPC,节省内存)
 protocol.registerSchemesAsPrivileged([
     { scheme: 'qflocal', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
