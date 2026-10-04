@@ -3213,27 +3213,58 @@ const w = natW;
             _paletteCache.set(img, pal);
             return pal;
         }
-        const sorted = pts.slice().sort((a, b) => (0.3 * a[0] + 0.6 * a[1] + 0.1 * a[2]) - (0.3 * b[0] + 0.6 * b[1] + 0.1 * b[2]));
-        const centers = [];
-        for (let i = 0; i < k; i++) centers.push(sorted[Math.floor(i * (sorted.length - 1) / (k - 1))].slice());
-        const assign = new Array(pts.length).fill(0);
-        for (let it = 0; it < 14; it++) {
-            for (let p = 0; p < pts.length; p++) {
-                let b = 0, bd = Infinity;
-                for (let c = 0; c < k; c++) { const d = _sqDist(pts[p], centers[c]); if (d < bd) { bd = d; b = c; } }
-                assign[p] = b;
+        const runK = (centers) => {
+            const assign = new Array(pts.length).fill(0);
+            for (let it = 0; it < 14; it++) {
+                for (let p = 0; p < pts.length; p++) {
+                    let b = 0, bd = Infinity;
+                    for (let c = 0; c < centers.length; c++) { const d = _sqDist(pts[p], centers[c]); if (d < bd) { bd = d; b = c; } }
+                    assign[p] = b;
+                }
+                const sums = Array.from({ length: centers.length }, () => [0, 0, 0, 0]);
+                for (let p = 0; p < pts.length; p++) { sums[assign[p]][0] += pts[p][0]; sums[assign[p]][1] += pts[p][1]; sums[assign[p]][2] += pts[p][2]; sums[assign[p]][3]++; }
+                let moved = false;
+                for (let c = 0; c < centers.length; c++) {
+                    if (sums[c][3]) {
+                        const nc = [Math.round(sums[c][0] / sums[c][3]), Math.round(sums[c][1] / sums[c][3]), Math.round(sums[c][2] / sums[c][3])];
+                        if (nc[0] !== centers[c][0] || nc[1] !== centers[c][1] || nc[2] !== centers[c][2]) moved = true;
+                        centers[c] = nc;
+                    }
+                }
+                if (!moved) break;
             }
-            const sums = Array.from({ length: k }, () => [0, 0, 0, 0]);
-            for (let p = 0; p < pts.length; p++) { sums[assign[p]][0] += pts[p][0]; sums[assign[p]][1] += pts[p][1]; sums[assign[p]][2] += pts[p][2]; sums[assign[p]][3]++; }
-            let moved = false;
-            for (let c = 0; c < k; c++) {
-                if (sums[c][3]) {
-                    const nc = [Math.round(sums[c][0] / sums[c][3]), Math.round(sums[c][1] / sums[c][3]), Math.round(sums[c][2] / sums[c][3])];
-                    if (nc[0] !== centers[c][0] || nc[1] !== centers[c][1] || nc[2] !== centers[c][2]) moved = true;
-                    centers[c] = nc;
+            return assign;
+        };
+        // 初始种子:最远点法(确定性,避免大面积单一色被拆成多个相近簇)
+        const centers = [];
+        centers.push(pts[0].slice());
+        for (let c = 1; c < k; c++) {
+            let bestP = 0, bestD = -1;
+            for (let p = 0; p < pts.length; p++) {
+                let md = Infinity;
+                for (const ct of centers) { const d = _sqDist(pts[p], ct); if (d < md) md = d; }
+                if (md > bestD) { bestD = md; bestP = p; }
+            }
+            centers.push(pts[bestP].slice());
+        }
+        runK(centers);
+        // 去重合并:两中心距离过近则用离其余中心最远的点替换其一并重新收敛
+        for (let pass = 0; pass < 5; pass++) {
+            let dup = -1, dup2 = -1;
+            for (let a = 0; a < k && dup < 0; a++) {
+                for (let b = a + 1; b < k && dup < 0; b++) {
+                    if (_sqDist(centers[a], centers[b]) < 676) { dup = a; dup2 = b; }
                 }
             }
-            if (!moved) break;
+            if (dup < 0) break;
+            let bestP = 0, bestD = -1;
+            for (let p = 0; p < pts.length; p++) {
+                let md = Infinity;
+                for (let c = 0; c < k; c++) { if (c !== dup2) { const d = _sqDist(pts[p], centers[c]); if (d < md) md = d; } }
+                if (md > bestD) { bestD = md; bestP = p; }
+            }
+            centers[dup2] = pts[bestP].slice();
+            runK(centers);
         }
         const pal = centers.map(c => '#' + c.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''));
         _paletteCache.set(img, pal);
