@@ -664,8 +664,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#faf5ea';
         g.fillRect(0, 0, w, h);
         // 齿孔:票面边缘一排白色圆孔(孔=撕开后露出的白底,一半落在画布外形成半圆锯齿)
-        const holeR = Math.max(3, Math.round(side * 0.2));
-        const pitch = Math.max(10, Math.round(holeR * 2 + 3));
+        // 孔尺寸固定基准(不随照片/白边放大,邮票孔视觉上就是小孔): 直径≈size*0.8, 孔间隙2-4px
+        const holeR = Math.max(2, Math.round(size * 0.4));
+        const pitch = Math.max(8, holeR * 2 + 3);
         g.fillStyle = '#ffffff';
         for (let i = holeR; i <= w - holeR; i += pitch) {
             g.beginPath(); g.arc(i, 0, holeR, 0, Math.PI * 2); g.fill();
