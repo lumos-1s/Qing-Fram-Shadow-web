@@ -654,6 +654,53 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         return w - track;
     }
 
+    // ── 纪念邮票(2026-10):白纸票面+四周齿孔撕边+照片居中+底部地点/日期 ──
+    function styleStamp(img, size, g, iw, ih, S) {
+        const side = Math.max(30, Math.round(size * 2.2));
+        const textH = Math.max(46, Math.round(size * 1.8));
+        const w = iw + side * 2;
+        const h = ih + side * 2 + textH;
+        // 票面(米白纸)
+        g.fillStyle = '#f6f0e4';
+        g.fillRect(0, 0, w, h);
+        // 齿孔:票面边缘一排白色圆孔(孔=撕开后露出的白底,一半落在画布外形成半圆锯齿)
+        const holeR = Math.max(3, Math.round(side * 0.24));
+        const pitch = Math.max(7, Math.round(size * 0.55));
+        g.fillStyle = '#ffffff';
+        for (let i = holeR; i <= w - holeR; i += pitch) {
+            g.beginPath(); g.arc(i, 0, holeR, 0, Math.PI * 2); g.fill();
+            g.beginPath(); g.arc(i, h, holeR, 0, Math.PI * 2); g.fill();
+        }
+        for (let j = holeR; j <= h - holeR; j += pitch) {
+            g.beginPath(); g.arc(0, j, holeR, 0, Math.PI * 2); g.fill();
+            g.beginPath(); g.arc(w, j, holeR, 0, Math.PI * 2); g.fill();
+        }
+        // 照片(完整显示+缩放/偏移,圆角可选)
+        const sc = (S && S.imgScale) || 1;
+        const dw = iw * sc, dh = ih * sc;
+        const dx = side + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
+        const dy = side + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
+        const arc = S ? Math.min(S.cornerAll || 0, Math.min(iw, ih) / 2) : 0;
+        g.save();
+        g.beginPath();
+        if (arc > 1 && typeof g.roundRect === 'function') g.roundRect(side, side, iw, ih, arc);
+        else g.rect(side, side, iw, ih);
+        g.clip();
+        g.drawImage(img, dx, dy, dw, dh);
+        g.restore();
+        // 底部: 地点(有则上行) + 日期(下行), 居中, 宋体黑字
+        const d = new Date();
+        const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+        const locStr = (S && S.location) ? String(S.location) : '';
+        const fFs = Math.max(13, Math.round(size * 0.9));
+        g.font = fFs + 'px "SimSun", serif';
+        g.fillStyle = '#2f2a24';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        if (locStr) g.fillText(locStr, w / 2, h - textH + fFs * 0.6);
+        g.fillText(dateStr, w / 2, h - textH + (locStr ? fFs * 2.05 : fFs * 1.35));
+    }
+
     // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
     function styleTicket(img, size, g, iw, ih, S, variant) {
         const headH = Math.max(58, Math.round(size * 2.2));
@@ -2947,6 +2994,11 @@ const w = natW;
                 const stubW = name === 'TICKET_CONCERT' ? Math.max(108, Math.round(iw * 0.15)) : 0;
                 return { w: iw + side * 2 + stubW, h: ih + headH + footH };
             }
+            case 'TICKET_STAMP': {
+                const side = Math.max(30, Math.round(size * 2.2));
+                const textH = Math.max(46, Math.round(size * 1.8));
+                return { w: iw + side * 2, h: ih + side * 2 + textH };
+            }
             case 'WATERCOLOR_BLEED': {
                 const bleed = Math.max(50, Math.floor(size * 1.5));
                 return { w: iw + bleed * 2, h: ih + bleed * 2 };
@@ -4165,6 +4217,7 @@ const w = natW;
             TICKET_VINTAGE: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'vintage'),
             TICKET_CONCERT: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'concert'),
             TICKET_SCRAP: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'scrap'),
+            TICKET_STAMP: styleStamp,
             NEON_GLOW: styleNeonGlow, BURNED_EDGE: styleBurnedEdge,
             INK_WASH: styleInkWash, CYANOTYPE: styleCyanotype,
             OIL_BRUSH: styleOilBrush, PRESSED_FLOWER: stylePressedFlower,
