@@ -656,16 +656,16 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ── 纪念邮票(2026-10):白纸票面+四周齿孔撕边+照片居中+底部地点/日期 ──
     function styleStamp(img, size, g, iw, ih, S) {
-        const side = Math.max(30, Math.round(size * 2.2));
+        const side = Math.max(30, Math.round(iw * 0.05), Math.round(size * 1.8));
         const textH = Math.max(46, Math.round(size * 1.8));
         const w = iw + side * 2;
         const h = ih + side * 2 + textH;
         // 票面(米白纸)
-        g.fillStyle = '#f6f0e4';
+        g.fillStyle = '#faf5ea';
         g.fillRect(0, 0, w, h);
         // 齿孔:票面边缘一排白色圆孔(孔=撕开后露出的白底,一半落在画布外形成半圆锯齿)
-        const holeR = Math.max(3, Math.round(side * 0.24));
-        const pitch = Math.max(7, Math.round(size * 0.55));
+        const holeR = Math.max(3, Math.round(side * 0.2));
+        const pitch = Math.max(10, Math.round(holeR * 2 + 3));
         g.fillStyle = '#ffffff';
         for (let i = holeR; i <= w - holeR; i += pitch) {
             g.beginPath(); g.arc(i, 0, holeR, 0, Math.PI * 2); g.fill();
