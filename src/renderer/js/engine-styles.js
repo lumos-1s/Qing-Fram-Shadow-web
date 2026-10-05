@@ -759,10 +759,19 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
         const titleTxt = titles[variant] || '票根';
-        const tFs = fitFont(g, titleTxt, false, true, tFs0, Math.round(iw * 0.5), Math.round(tFs0 * 0.08));
+        // 行1布局: 先量出票号/日期实际宽,剩余给标题,三组之间强制保留 gapX 最小间隙
+        const noW = textMetrics(g, noStr, dFs, true, false, 0).w;
+        const dateW = textMetrics(g, dateStr, dFs, true, false, 0).w;
+        const gapX = Math.max(36, Math.round(side * 1.5));
+        const availTitle = Math.max(60, iw - noW - dateW - gapX * 2);
+        let tFs = fitFont(g, titleTxt, false, true, tFs0, availTitle, Math.round(tFs0 * 0.08));
+        let tW = ticketTextW(g, titleTxt, tFs, fams.title, true, Math.round(tFs * 0.08));
+        if (tW > availTitle) {
+            tFs = Math.max(12, Math.floor(tFs * availTitle / tW));
+            tW = ticketTextW(g, titleTxt, tFs, fams.title, true, Math.round(tFs * 0.08));
+        }
         const tTrack = Math.round(tFs * 0.08);
         const tY = Math.round(headH * 0.62);
-        const tW = ticketTextW(g, titleTxt, tFs, fams.title, true, tTrack);
         const tX = cx1 - Math.round(tW / 2);
         ticketText(g, titleTxt, tX, tY, pal.title, tFs, fams.title, true, tTrack);
         // 套印错位(墨迹不均:轻微重影)
