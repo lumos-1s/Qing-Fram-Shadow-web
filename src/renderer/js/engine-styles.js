@@ -634,6 +634,26 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         return ticketPaperCache;
     }
 
+    // 票根文字绘制:可指定字体族(复古印刷/手写体),track 逐字
+    function ticketText(g, text, x, y, fill, fs, family, bold, track) {
+        if (!text) return;
+        g.font = (bold ? 'bold ' : '') + fs + 'px ' + family;
+        g.fillStyle = fill;
+        if (!track) { g.fillText(text, x, y); return; }
+        let cx = x;
+        for (let i = 0; i < text.length; i++) {
+            g.fillText(text[i], cx, y);
+            cx += g.measureText(text[i]).width + track;
+        }
+    }
+    function ticketTextW(g, text, fs, family, bold, track) {
+        g.font = (bold ? 'bold ' : '') + fs + 'px ' + family;
+        if (!track) return g.measureText(text).width;
+        let w = 0;
+        for (let i = 0; i < text.length; i++) w += g.measureText(text[i]).width + track;
+        return w - track;
+    }
+
     // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
     function styleTicket(img, size, g, iw, ih, S, variant) {
         const headH = Math.max(58, Math.round(size * 2.2));
@@ -720,6 +740,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const tFs0 = Math.max(26, Math.round(headH * 0.52));
         const sFs0 = Math.max(12, Math.round(headH * 0.26));
         const dFs = Math.max(12, Math.round(headH * 0.24));
+        const fams = {
+            vintage: { title: '"SimSun", serif', sub: '"Georgia", serif', foot: '"SimSun", serif' },
+            concert: { title: '"Arial", sans-serif', sub: '"Arial", sans-serif', foot: '"Arial", sans-serif' },
+            scrap: { title: '"Georgia", serif', sub: '"Segoe Script", cursive', foot: '"SimSun", serif' }
+        }[variant] || { title: '"SimSun", serif', sub: '"Georgia", serif', foot: '"SimSun", serif' };
         const d = new Date();
         const dd = String(d.getDate()).padStart(2, '0');
         const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -734,24 +759,27 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
         const titleTxt = titles[variant] || '票根';
-        const tMono = variant !== 'vintage';
-        const tFs = fitFont(g, titleTxt, tMono, false, tFs0, Math.round(iw * 0.52), Math.round(tFs0 * 0.08));
+        const tFs = fitFont(g, titleTxt, false, true, tFs0, Math.round(iw * 0.5), Math.round(tFs0 * 0.08));
         const tTrack = Math.round(tFs * 0.08);
-        const tX = cx1 - Math.round(textMetrics(g, titleTxt, tFs, tMono, false, tTrack).w / 2);
         const tY = Math.round(headH * 0.62);
-        drawTextL(g, titleTxt, tX, tY, pal.title, tFs, tMono, false, tTrack);
+        const tW = ticketTextW(g, titleTxt, tFs, fams.title, true, tTrack);
+        const tX = cx1 - Math.round(tW / 2);
+        ticketText(g, titleTxt, tX, tY, pal.title, tFs, fams.title, true, tTrack);
         // 套印错位(墨迹不均:轻微重影)
         g.save();
         g.globalAlpha = 0.13;
-        drawTextL(g, titleTxt, tX + 0.6, tY + 0.4, 'rgba(0,0,0,0.55)', tFs, tMono, false, tTrack);
+        ticketText(g, titleTxt, tX + 0.6, tY + 0.4, 'rgba(0,0,0,0.55)', tFs, fams.title, true, tTrack);
         g.restore();
+        // 行1: 左票号 / 中标题 / 右日期(同一基线)
+        drawTextL(g, noStr, side + 4, tY, pal.ink, dFs, true, false, 0);
         g.textAlign = 'right';
-        drawTextL(g, noStr, side + iw - 4, Math.round(headH * 0.5), pal.ink, dFs, true, false, 0);
-        g.textAlign = 'left';
+        drawTextL(g, dateStr, side + iw - 4, tY, pal.ink, dFs, true, false, 0);
+        // 行2: 副题居中
         const sFs = fitFont(g, subs[variant] || 'MEMORY TICKET', false, false, sFs0, Math.round(iw * 0.5), Math.round(sFs0 * 0.12));
-        drawTextL(g, subs[variant] || 'MEMORY TICKET', side + 4, Math.round(headH * 0.92), pal.sub, sFs, false, false, Math.round(sFs * 0.12));
-        g.textAlign = 'right';
-        drawTextL(g, dateStr, side + iw - 4, Math.round(headH * 0.92), pal.ink, dFs, true, false, 0);
+        const sTrack = Math.round(sFs * 0.12);
+        const sW = ticketTextW(g, subs[variant] || 'MEMORY TICKET', sFs, fams.sub, false, sTrack);
+        g.textAlign = 'left';
+        ticketText(g, subs[variant] || 'MEMORY TICKET', cx1 - Math.round(sW / 2), Math.round(headH * 0.92), pal.sub, sFs, fams.sub, false, sTrack);
         // 收藏联(仅演唱会)
         if (stubW > 0) {
             const sx = side + iw;
@@ -766,24 +794,31 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.restore();
             const cx2 = sx + Math.floor(stubW / 2);
             const vFs = Math.max(13, Math.round(size * 0.5));
+            const vFs2 = Math.round(vFs * 0.72);
+            // 两段竖排整体垂直居中于副券区
+            const len1 = ticketTextW(g, '收藏联', vFs, '"SimSun", serif', true, 0);
+            const len2 = ticketTextW(g, 'KEEP THE MOMENT', vFs2, '"Arial", sans-serif', false, 0);
+            const vGap = Math.round(vFs * 0.9);
+            const yTop = headH + (ih - (len1 + vGap + len2)) / 2;
             g.save();
-            g.translate(cx2, headH + Math.floor(ih / 2) - Math.round(ih * 0.18));
+            g.translate(cx2, yTop + len1 / 2);
             g.rotate(-Math.PI / 2);
             g.textAlign = 'left';
-            drawTextL(g, '收藏联', -Math.round(textMetrics(g, '收藏联', vFs, false, true, 0).w / 2), Math.round(vFs * 0.36), pal.sub, vFs, false, true, 0);
+            ticketText(g, '收藏联', -len1 / 2, Math.round(vFs * 0.36), pal.sub, vFs, '"SimSun", serif', true, 0);
             g.restore();
             g.save();
-            g.translate(cx2, headH + Math.floor(ih / 2) + Math.round(ih * 0.16));
+            g.translate(cx2, yTop + len1 + vGap + len2 / 2);
             g.rotate(-Math.PI / 2);
             g.textAlign = 'left';
-            drawTextL(g, 'KEEP THE MOMENT', -Math.round(textMetrics(g, 'KEEP THE MOMENT', Math.round(vFs * 0.72), false, false, 0).w / 2), Math.round(vFs * 0.36), pal.sub, Math.round(vFs * 0.72), false, false, 0);
+            ticketText(g, 'KEEP THE MOMENT', -len2 / 2, Math.round(vFs2 * 0.36), pal.sub, vFs2, '"Arial", sans-serif', false, 0);
             g.restore();
         }
         // 底部文字
         g.textAlign = 'left';
         const footFs0 = Math.max(13, Math.round(footH * 0.4));
         const footFs = fitFont(g, foots[variant] || '', false, false, footFs0, Math.round(iw * 0.85), 0);
-        drawTextL(g, foots[variant] || '', side + Math.floor(iw / 2) - Math.round(textMetrics(g, foots[variant] || '', footFs, false, false, 0).w / 2), h - Math.round(footH * 0.55), pal.sub, footFs, false, false, 0);
+        const footW = ticketTextW(g, foots[variant] || '', footFs, fams.foot, false, 0);
+        ticketText(g, foots[variant] || '', side + Math.floor(iw / 2) - Math.round(footW / 2), h - Math.round(footH * 0.55), pal.sub, footFs, fams.foot, false, 0);
         g.textAlign = 'left';
         g.textBaseline = 'alphabetic';
     }
