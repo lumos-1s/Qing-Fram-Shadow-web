@@ -656,7 +656,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // ── 纪念邮票(2026-10):邮票浮在照片背景模糊上,白纸票面+齿孔挖空透出模糊色+照片+右下地点/日期+顶部签名 ──
     function styleStamp(img, size, g, iw, ih, S) {
-        const side = Math.max(28, Math.round(iw * 0.06), Math.round(size * 1.8));
+        const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
         const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
         const textH = Math.max(46, Math.round(size * 1.8));
         const w = iw + side * 2 + blurGap * 2;
@@ -3026,7 +3026,7 @@ const w = natW;
                 return { w: iw + side * 2 + stubW, h: ih + headH + footH };
             }
             case 'TICKET_STAMP': {
-                const side = Math.max(28, Math.round(iw * 0.06), Math.round(size * 1.8));
+                const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
                 const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
                 const textH = Math.max(46, Math.round(size * 1.8));
                 return { w: iw + side * 2 + blurGap * 2, h: ih + side * 2 + textH + blurGap * 2 };
