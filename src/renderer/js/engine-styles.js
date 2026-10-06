@@ -672,7 +672,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.restore();
         // 票面+齿孔: 离屏canvas做带半孔齿孔的米白票面(孔中心落在票面边缘线上,半圆天然只咬进票面内),
         // 孔内透明露出下层模糊背景; 一次性叠上, 避免逐孔重复绘制导致缩放卡顿
-        const holeR = Math.max(3, Math.round(size * 0.18 * 5));
+        const holeR = Math.max(3, Math.round(size * 0.45));
         const pitch = Math.max(9, holeR * 2 + 3);
         const tc = document.createElement('canvas');
         tc.width = tw; tc.height = th;
