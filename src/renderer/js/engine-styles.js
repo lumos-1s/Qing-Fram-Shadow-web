@@ -673,17 +673,20 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 票面(米白纸)
         g.fillStyle = '#faf5ea';
         g.fillRect(x0, y0, tw, th);
-        // 齿孔: 票面边缘挖孔露出下层模糊背景(孔=撕开后透出背景色)
+        // 齿孔: 票面边缘半圆孔(clip到票面矩形,只咬票面内的半圆缺口,孔内透出下层模糊背景,票面外模糊背景保持完整)
         const holeR = Math.max(3, Math.round(size * 0.18));
         const pitch = Math.max(9, holeR * 2 + 3);
         g.save();
+        g.beginPath();
+        g.rect(x0, y0, tw, th);
+        g.clip();
         g.globalCompositeOperation = 'destination-out';
         g.fillStyle = '#000000';
-        for (let i = x0 + holeR; i <= x0 + tw - holeR; i += pitch) {
+        for (let i = x0; i <= x0 + tw; i += pitch) {
             g.beginPath(); g.arc(i, y0, holeR, 0, Math.PI * 2); g.fill();
             g.beginPath(); g.arc(i, y0 + th, holeR, 0, Math.PI * 2); g.fill();
         }
-        for (let j = y0 + holeR; j <= y0 + th - holeR; j += pitch) {
+        for (let j = y0; j <= y0 + th; j += pitch) {
             g.beginPath(); g.arc(x0, j, holeR, 0, Math.PI * 2); g.fill();
             g.beginPath(); g.arc(x0 + tw, j, holeR, 0, Math.PI * 2); g.fill();
         }
@@ -715,14 +718,14 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const d = new Date();
         const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
         const locStr = (S && S.location) ? String(S.location) : '';
-        const fFs = Math.max(13, Math.round(size * 0.9));
-        const textRX = x0 + side + iw - Math.max(30, Math.round(side * 0.5));
+        const fFs = Math.max(13, Math.min(Math.round(size * 0.8), Math.round(iw * 0.03)));
+        const textRX = x0 + side + iw - Math.max(36, Math.round(side * 0.5));
         g.font = fFs + 'px "SimSun", serif';
         g.fillStyle = '#2f2a24';
         g.textAlign = 'right';
         g.textBaseline = 'middle';
-        if (locStr) g.fillText(locStr, textRX, y0 + side + ih + textH * 0.38);
-        g.fillText(dateStr, textRX, y0 + side + ih + textH * (locStr ? 0.68 : 0.55));
+        if (locStr) g.fillText(locStr, textRX, y0 + side + ih + textH * 0.34);
+        g.fillText(dateStr, textRX, y0 + side + ih + textH * (locStr ? 0.62 : 0.5));
     }
 
     // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
