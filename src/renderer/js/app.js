@@ -63,6 +63,7 @@ window.App = {
                 if (s.signIncludeModel != null) this.template.signIncludeModel = s.signIncludeModel;
                 if (s.avatarScale) this.template.avatarScale = s.avatarScale;
                 if (s.signSize) this.template.signSize = s.signSize;
+                if (s.avatarShow !== undefined) this.template.avatarShow = s.avatarShow;
                 if (s.signBgBlur != null) this.template.signBgBlur = s.signBgBlur;
                 if (s.paramColor) this.template.paramColor = s.paramColor;
                 if (s.paramFontSize) this.template.paramFontSize = s.paramFontSize;
@@ -240,6 +241,11 @@ window.App = {
         if (chkSM) chkSM.addEventListener('change', () => { this.template.signIncludeModel = chkSM.checked ? 1 : 0; this.onSettingChanged(); });
         const chkBL = document.getElementById('chkBrandLogo');
         if (chkBL) chkBL.addEventListener('change', () => { this.template.brandLogo = Number(chkBL.value) || 0; this.onSettingChanged(); });
+        const chkAS = document.getElementById('chkAvatarShow');
+        if (chkAS) chkAS.addEventListener('change', () => {
+            this.template.avatarShow = chkAS.checked ? 1 : 0;
+            this.onSettingChanged();
+        });
         const rgAS = document.getElementById('rgAvatarScale');
         if (rgAS) rgAS.addEventListener('input', () => {
             this.template.avatarScale = Number(rgAS.value) / 100;
@@ -945,6 +951,7 @@ window.App = {
             if ($('cbSignColor')) $('cbSignColor').value = this.template.signColor || '#555';
             if ($('chkSignModel')) $('chkSignModel').checked = !!(this.template.signIncludeModel);
             if ($('chkBrandLogo')) $('chkBrandLogo').value = String(this.template.brandLogo || 0);
+            if ($('chkAvatarShow')) $('chkAvatarShow').checked = this.template.avatarShow !== 0;
             if ($('rgAvatarScale')) { const v = Math.round((this.template.avatarScale || 0.85) * 100); $('rgAvatarScale').value = v; if ($('valAvatarScale')) $('valAvatarScale').textContent = v + '%'; }
             if ($('rgSignSize')) { const v2 = Math.round((this.template.signSize || 1) * 100); $('rgSignSize').value = v2; if ($('valSignSize')) $('valSignSize').textContent = v2 + '%'; }
             if ($('chkBgBlur')) $('chkBgBlur').checked = !!this.template.signBgBlur;

@@ -658,7 +658,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleStamp(img, size, g, iw, ih, S) {
         const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
         const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
-        const hasAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth);
+        const hasAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth) && (S ? S.avatarShow !== 0 : true);
         const hasSig = !!(S && S.userSignature);
         const textH = (hasAv || hasSig) ? Math.max(64, Math.round(size * 2.5)) : Math.max(46, Math.round(size * 1.8));
         const w = iw + side * 2 + blurGap * 2;
@@ -3073,7 +3073,7 @@ const w = natW;
             case 'TICKET_STAMP': {
                 const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
                 const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
-                const stampAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth);
+                const stampAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth) && (S ? S.avatarShow !== 0 : true);
                 const stampSig = !!(S && S.userSignature);
                 const textH = (stampAv || stampSig) ? Math.max(64, Math.round(size * 2.5)) : Math.max(46, Math.round(size * 1.8));
                 return { w: iw + side * 2 + blurGap * 2, h: ih + side * 2 + textH + blurGap * 2 };

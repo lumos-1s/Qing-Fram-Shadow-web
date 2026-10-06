@@ -545,7 +545,7 @@ window.App = Object.assign(window.App || {}, {
         }
 
         // 签名相关:8 个预设带 userSignature,用户自己填的签名不该被预设覆盖
-        for (const k of ['userSignature', 'signFont', 'signColor', 'avatarScale', 'signSize', 'signIncludeModel']) {
+        for (const k of ['userSignature', 'signFont', 'signColor', 'avatarScale', 'signSize', 'signIncludeModel', 'avatarShow']) {
             if (prev[k] !== undefined && (next[k] === undefined || next[k] === '' || next[k] === null)) next[k] = prev[k];
         }
 

@@ -191,6 +191,7 @@
         v.rowSignColor = sigCore;
         v.rowAvatarScale = sigCore;
         v.rowSignSize = sigCore;
+        v.rowAvatarShow = sigCore;
         v.rowParamColor = sigCore;
         v.rowParamType = isBottomBar;
         v.rowParamPos = isBottomBar;

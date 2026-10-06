@@ -25,6 +25,7 @@ window.App = Object.assign(window.App || {}, {
                 signColor: this.template.signColor || '',
                 signIncludeModel: this.template.signIncludeModel || 0,
                 avatarScale: this.template.avatarScale || 0.85,
+                avatarShow: this.template.avatarShow === undefined ? 1 : this.template.avatarShow,
                 signSize: this.template.signSize || 1,
                 signBgBlur: this.template.signBgBlur || 0,
                 paramColor: this.template.paramColor || 'auto',
