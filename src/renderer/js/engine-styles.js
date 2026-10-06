@@ -672,7 +672,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.restore();
         // 票面+齿孔: 离屏canvas做带半孔齿孔的米白票面(孔中心落在票面边缘线上,半圆天然只咬进票面内),
         // 孔内透明露出下层模糊背景; 一次性叠上, 避免逐孔重复绘制导致缩放卡顿
-        const holeR = Math.max(3, Math.round(size * 0.45));
+        const holeR = Math.max(3, Math.round(size * 0.225));
         const pitch = Math.max(9, holeR * 4);   // 边孔间距=孔径+孔径
         // 角孔两侧平直齿尖长: 至少等于孔直径, 图片越大自动加长(随 min(iw,ih) 缩放)
         const toothL = Math.max(Math.round(holeR * 2), Math.round(Math.min(iw, ih) * 0.012));
