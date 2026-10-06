@@ -689,7 +689,25 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             tg.beginPath(); tg.arc(0, j, holeR, 0, Math.PI * 2); tg.fill();
             tg.beginPath(); tg.arc(tw, j, holeR, 0, Math.PI * 2); tg.fill();
         }
+        // 四角: 45度朝向的半孔(角点挖圆,角变圆弧)
+        tg.beginPath(); tg.arc(0, 0, holeR, 0, Math.PI * 2); tg.fill();
+        tg.beginPath(); tg.arc(tw, 0, holeR, 0, Math.PI * 2); tg.fill();
+        tg.beginPath(); tg.arc(0, th, holeR, 0, Math.PI * 2); tg.fill();
+        tg.beginPath(); tg.arc(tw, th, holeR, 0, Math.PI * 2); tg.fill();
         g.drawImage(tc, x0, y0);
+        // 齿尖: 每两个半孔之间加一条长度=孔直径的票面纸色直线, 沿票面边缘向外延伸(模拟撕开后的平直齿尖)
+        const toothLen = holeR * 2;
+        g.fillStyle = '#faf5ea';
+        for (let c = x0 + holeR + pitch; c <= x0 + tw - holeR; c += pitch) {
+            const mid = c - Math.floor(pitch / 2);
+            g.fillRect(mid - 1, y0 - toothLen, 2, toothLen);
+            g.fillRect(mid - 1, y0 + th, 2, toothLen);
+        }
+        for (let c = y0 + holeR + pitch; c <= y0 + th - holeR; c += pitch) {
+            const mid = c - Math.floor(pitch / 2);
+            g.fillRect(x0 - toothLen, mid - 1, toothLen, 2);
+            g.fillRect(x0 + tw, mid - 1, toothLen, 2);
+        }
         // 照片(完整显示+缩放/偏移,圆角可选)
         const sc = (S && S.imgScale) || 1;
         const dw = iw * sc, dh = ih * sc;
