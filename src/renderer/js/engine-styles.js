@@ -658,7 +658,9 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleStamp(img, size, g, iw, ih, S) {
         const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
         const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
-        const textH = Math.max(46, Math.round(size * 1.8));
+        const hasAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth);
+        const hasSig = !!(S && S.userSignature);
+        const textH = (hasAv || hasSig) ? Math.max(64, Math.round(size * 2.5)) : Math.max(46, Math.round(size * 1.8));
         const w = iw + side * 2 + blurGap * 2;
         const h = ih + side * 2 + textH + blurGap * 2;
         const x0 = blurGap, y0 = blurGap;
@@ -732,18 +734,47 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.textBaseline = 'middle';
             g.fillText(sigStr, x0 + side + iw / 2, y0 + side * 0.55);
         }
-        // 底部: 地点(有则上行)+日期(下行), 票面右下角右对齐, 宋体黑字
+        // 底部: 日期(地点可选)右对齐; 有头像/签名时, 日期上方加一行头像+签名(右对齐, 头像贴签名左)
         const d = new Date();
         const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
         const locStr = (S && S.location) ? String(S.location) : '';
         const fFs = Math.max(13, Math.min(Math.round(size * 0.8), Math.round(iw * 0.03)));
         const textRX = x0 + side + iw - Math.max(36, Math.round(side * 0.5));
+        const footerY = y0 + side + ih;
         g.font = fFs + 'px "SimSun", serif';
         g.fillStyle = '#2f2a24';
         g.textAlign = 'right';
         g.textBaseline = 'middle';
-        if (locStr) g.fillText(locStr, textRX, y0 + side + ih + textH * 0.34);
-        g.fillText(dateStr, textRX, y0 + side + ih + textH * (locStr ? 0.62 : 0.5));
+        if (hasAv || hasSig) {
+            // 日期/地点移到下方行
+            if (locStr) g.fillText(locStr, textRX, footerY + textH * 0.58);
+            g.fillText(dateStr, textRX, footerY + textH * (locStr ? 0.78 : 0.68));
+            // 上方: 头像+签名(随侧栏签名字体/颜色/字号/头像大小设置)
+            const sigStr = hasSig ? String(S.userSignature) : '';
+            const avatarR = Math.round(textH * 0.22 * ((S && S.avatarScale) || 1));
+            const sigFs = Math.round(fFs * ((S && S.signSize) || 1));
+            g.font = 'italic ' + sigFs + 'px "' + ((S && S.signFont) || 'Comic Sans MS') + '", cursive';
+            g.fillStyle = (S && S.signColor) || '#2f2a24';
+            const sigW = sigStr ? g.measureText(sigStr).width : 0;
+            const sigY = footerY + textH * 0.28;
+            let avCX = textRX - avatarR;   // 无签名: 头像右缘=textRX
+            if (sigStr) {
+                g.fillText(sigStr, textRX, sigY);
+                avCX = textRX - sigW - 10 - avatarR;
+            }
+            if (hasAv) {
+                g.save();
+                g.beginPath(); g.arc(avCX, sigY, avatarR, 0, Math.PI * 2); g.clip();
+                const s = Math.max(avatarR * 2 / window.__qfsAvatarImg.width, avatarR * 2 / window.__qfsAvatarImg.height);
+                g.drawImage(window.__qfsAvatarImg, avCX - avatarR, sigY - avatarR, window.__qfsAvatarImg.width * s, window.__qfsAvatarImg.height * s);
+                g.restore();
+                g.strokeStyle = 'rgba(47,42,36,0.35)'; g.lineWidth = 1.5;
+                g.beginPath(); g.arc(avCX, sigY, avatarR, 0, Math.PI * 2); g.stroke();
+            }
+        } else {
+            if (locStr) g.fillText(locStr, textRX, footerY + textH * 0.34);
+            g.fillText(dateStr, textRX, footerY + textH * (locStr ? 0.62 : 0.5));
+        }
     }
 
     // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
@@ -3042,7 +3073,9 @@ const w = natW;
             case 'TICKET_STAMP': {
                 const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
                 const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
-                const textH = Math.max(46, Math.round(size * 1.8));
+                const stampAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth);
+                const stampSig = !!(S && S.userSignature);
+                const textH = (stampAv || stampSig) ? Math.max(64, Math.round(size * 2.5)) : Math.max(46, Math.round(size * 1.8));
                 return { w: iw + side * 2 + blurGap * 2, h: ih + side * 2 + textH + blurGap * 2 };
             }
             case 'WATERCOLOR_BLEED': {
