@@ -747,8 +747,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.textBaseline = 'middle';
         if (hasAv || hasSig) {
             // 日期/地点移到下方行
-            if (locStr) g.fillText(locStr, textRX, footerY + textH * 0.58);
-            g.fillText(dateStr, textRX, footerY + textH * (locStr ? 0.78 : 0.68));
+            if (locStr) g.fillText(locStr, textRX, footerY + textH * 0.60);
+            g.fillText(dateStr, textRX, footerY + textH * (locStr ? 0.82 : 0.72));
             // 上方: 头像+签名(随侧栏签名字体/颜色/字号/头像大小设置)
             const sigStr = hasSig ? String(S.userSignature) : '';
             const avatarR = Math.round(textH * 0.22 * ((S && S.avatarScale) || 1));
@@ -756,7 +756,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.font = 'italic ' + sigFs + 'px "' + ((S && S.signFont) || 'Comic Sans MS') + '", cursive';
             g.fillStyle = (S && S.signColor) || '#2f2a24';
             const sigW = sigStr ? g.measureText(sigStr).width : 0;
-            const sigY = footerY + textH * 0.28;
+            const sigY = footerY + textH * 0.34;
             let avCX = textRX - avatarR;   // 无签名: 头像右缘=textRX
             if (sigStr) {
                 g.fillText(sigStr, textRX, sigY);
