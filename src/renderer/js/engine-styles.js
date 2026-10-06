@@ -663,43 +663,33 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const h = ih + side * 2 + textH + blurGap * 2;
         const x0 = blurGap, y0 = blurGap;
         const tw = iw + side * 2, th = ih + side * 2 + textH; // 票面矩形
-        // 底层: 照片背景模糊铺满画布(参考图邮票下层就是背景模糊)
+        // 底层: 照片背景模糊铺满画布(参考图邮票下层就是背景模糊, 整帧只blur一次)
         const blurR = Math.max(16, Math.round(size * 0.9));
         const bgScale = Math.max(w / iw, h / ih);
-        const bgX = (w - iw * bgScale) / 2, bgY = (h - ih * bgScale) / 2;
-        const paintBlurBg = function () {
-            g.save();
-            g.filter = 'blur(' + blurR + 'px)';
-            g.drawImage(img, bgX, bgY, iw * bgScale, ih * bgScale);
-            g.restore();
-        };
-        paintBlurBg();
-        // 票面(米白纸)
-        g.fillStyle = '#faf5ea';
-        g.fillRect(x0, y0, tw, th);
-        // 齿孔: 票面边缘半圆孔(clip到票面矩形,只咬票面内的半圆缺口)
+        g.save();
+        g.filter = 'blur(' + blurR + 'px)';
+        g.drawImage(img, (w - iw * bgScale) / 2, (h - ih * bgScale) / 2, iw * bgScale, ih * bgScale);
+        g.restore();
+        // 票面+齿孔: 离屏canvas做带半孔齿孔的米白票面(孔中心落在票面边缘线上,半圆天然只咬进票面内),
+        // 孔内透明露出下层模糊背景; 一次性叠上, 避免逐孔重复绘制导致缩放卡顿
         const holeR = Math.max(3, Math.round(size * 0.18));
         const pitch = Math.max(9, holeR * 2 + 3);
-        const holePts = [];
-        for (let i = x0; i <= x0 + tw; i += pitch) { holePts.push([i, y0], [i, y0 + th]); }
-        for (let j = y0; j <= y0 + th; j += pitch) { holePts.push([x0, j], [x0 + tw, j]); }
-        g.save();
-        g.beginPath();
-        g.rect(x0, y0, tw, th);
-        g.clip();
-        g.globalCompositeOperation = 'destination-out';
-        g.fillStyle = '#000000';
-        for (let k = 0; k < holePts.length; k++) {
-            g.beginPath(); g.arc(holePts[k][0], holePts[k][1], holeR, 0, Math.PI * 2); g.fill();
+        const tc = document.createElement('canvas');
+        tc.width = tw; tc.height = th;
+        const tg = tc.getContext('2d');
+        tg.fillStyle = '#faf5ea';
+        tg.fillRect(0, 0, tw, th);
+        tg.globalCompositeOperation = 'destination-out';
+        tg.fillStyle = '#000000';
+        for (let i = holeR; i <= tw - holeR; i += pitch) {
+            tg.beginPath(); tg.arc(i, 0, holeR, 0, Math.PI * 2); tg.fill();
+            tg.beginPath(); tg.arc(i, th, holeR, 0, Math.PI * 2); tg.fill();
         }
-        g.restore();
-        // 孔内补画模糊背景(孔=半圆缺口,缺口内看到的是背景模糊,而不是透明/黑)
-        for (let k = 0; k < holePts.length; k++) {
-            g.save();
-            g.beginPath(); g.arc(holePts[k][0], holePts[k][1], holeR + 0.5, 0, Math.PI * 2); g.clip();
-            paintBlurBg();
-            g.restore();
+        for (let j = holeR; j <= th - holeR; j += pitch) {
+            tg.beginPath(); tg.arc(0, j, holeR, 0, Math.PI * 2); tg.fill();
+            tg.beginPath(); tg.arc(tw, j, holeR, 0, Math.PI * 2); tg.fill();
         }
+        g.drawImage(tc, x0, y0);
         // 照片(完整显示+缩放/偏移,圆角可选)
         const sc = (S && S.imgScale) || 1;
         const dw = iw * sc, dh = ih * sc;
