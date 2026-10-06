@@ -654,52 +654,75 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         return w - track;
     }
 
-    // ── 纪念邮票(2026-10):白纸票面+四周齿孔撕边+照片居中+底部地点/日期 ──
+    // ── 纪念邮票(2026-10):邮票浮在照片背景模糊上,白纸票面+齿孔挖空透出模糊色+照片+右下地点/日期+顶部签名 ──
     function styleStamp(img, size, g, iw, ih, S) {
-        const side = Math.max(30, Math.round(iw * 0.05), Math.round(size * 1.8));
+        const side = Math.max(28, Math.round(iw * 0.06), Math.round(size * 1.8));
+        const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
         const textH = Math.max(46, Math.round(size * 1.8));
-        const w = iw + side * 2;
-        const h = ih + side * 2 + textH;
+        const w = iw + side * 2 + blurGap * 2;
+        const h = ih + side * 2 + textH + blurGap * 2;
+        const x0 = blurGap, y0 = blurGap;
+        const tw = iw + side * 2, th = ih + side * 2 + textH; // 票面矩形
+        // 底层: 照片背景模糊铺满画布(参考图邮票下层就是背景模糊)
+        const blurR = Math.max(16, Math.round(size * 0.9));
+        const bgScale = Math.max(w / iw, h / ih);
+        g.save();
+        g.filter = 'blur(' + blurR + 'px)';
+        g.drawImage(img, (w - iw * bgScale) / 2, (h - ih * bgScale) / 2, iw * bgScale, ih * bgScale);
+        g.restore();
         // 票面(米白纸)
         g.fillStyle = '#faf5ea';
-        g.fillRect(0, 0, w, h);
-        // 齿孔:票面边缘一排白色圆孔(孔=撕开后露出的白底,一半落在画布外形成半圆锯齿)
-        // 孔尺寸固定基准(不随照片/白边放大,邮票孔视觉上就是小孔): 直径≈size*0.8, 孔间隙2-4px
+        g.fillRect(x0, y0, tw, th);
+        // 齿孔: 票面边缘挖孔露出下层模糊背景(孔=撕开后透出背景色)
         const holeR = Math.max(2, Math.round(size * 0.4));
         const pitch = Math.max(8, holeR * 2 + 3);
-        g.fillStyle = '#ffffff';
-        for (let i = holeR; i <= w - holeR; i += pitch) {
-            g.beginPath(); g.arc(i, 0, holeR, 0, Math.PI * 2); g.fill();
-            g.beginPath(); g.arc(i, h, holeR, 0, Math.PI * 2); g.fill();
+        g.save();
+        g.globalCompositeOperation = 'destination-out';
+        g.fillStyle = '#000000';
+        for (let i = x0 + holeR; i <= x0 + tw - holeR; i += pitch) {
+            g.beginPath(); g.arc(i, y0, holeR, 0, Math.PI * 2); g.fill();
+            g.beginPath(); g.arc(i, y0 + th, holeR, 0, Math.PI * 2); g.fill();
         }
-        for (let j = holeR; j <= h - holeR; j += pitch) {
-            g.beginPath(); g.arc(0, j, holeR, 0, Math.PI * 2); g.fill();
-            g.beginPath(); g.arc(w, j, holeR, 0, Math.PI * 2); g.fill();
+        for (let j = y0 + holeR; j <= y0 + th - holeR; j += pitch) {
+            g.beginPath(); g.arc(x0, j, holeR, 0, Math.PI * 2); g.fill();
+            g.beginPath(); g.arc(x0 + tw, j, holeR, 0, Math.PI * 2); g.fill();
         }
+        g.restore();
         // 照片(完整显示+缩放/偏移,圆角可选)
         const sc = (S && S.imgScale) || 1;
         const dw = iw * sc, dh = ih * sc;
-        const dx = side + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
-        const dy = side + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
+        const dx = x0 + side + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
+        const dy = y0 + side + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
         const arc = S ? Math.min(S.cornerAll || 0, Math.min(iw, ih) / 2) : 0;
         g.save();
         g.beginPath();
-        if (arc > 1 && typeof g.roundRect === 'function') g.roundRect(side, side, iw, ih, arc);
-        else g.rect(side, side, iw, ih);
+        if (arc > 1 && typeof g.roundRect === 'function') g.roundRect(x0 + side, y0 + side, iw, ih, arc);
+        else g.rect(x0 + side, y0 + side, iw, ih);
         g.clip();
         g.drawImage(img, dx, dy, dw, dh);
         g.restore();
-        // 底部: 地点(有则上行) + 日期(下行), 居中, 宋体黑字
+        // 签名(可选项): 票面顶部白边内居中
+        const sigStr = (S && S.signatureText) ? String(S.signatureText) : '';
+        if (sigStr) {
+            const sigFs = Math.max(10, Math.round(size * 0.7));
+            g.font = sigFs + 'px "SimSun", serif';
+            g.fillStyle = '#2f2a24';
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.fillText(sigStr, x0 + side + iw / 2, y0 + side * 0.55);
+        }
+        // 底部: 地点(有则上行)+日期(下行), 票面右下角右对齐, 宋体黑字
         const d = new Date();
         const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
         const locStr = (S && S.location) ? String(S.location) : '';
         const fFs = Math.max(13, Math.round(size * 0.9));
+        const textRX = x0 + side + iw - Math.max(30, Math.round(side * 0.5));
         g.font = fFs + 'px "SimSun", serif';
         g.fillStyle = '#2f2a24';
-        g.textAlign = 'center';
+        g.textAlign = 'right';
         g.textBaseline = 'middle';
-        if (locStr) g.fillText(locStr, w / 2, h - textH + fFs * 0.6);
-        g.fillText(dateStr, w / 2, h - textH + (locStr ? fFs * 2.05 : fFs * 1.35));
+        if (locStr) g.fillText(locStr, textRX, y0 + side + ih + textH * 0.38);
+        g.fillText(dateStr, textRX, y0 + side + ih + textH * (locStr ? 0.68 : 0.55));
     }
 
     // ── 票根系列(2026-10):照片嵌在票券里,含票号/日期/收藏联/齿孔/纸张做旧 ──
@@ -2996,9 +3019,10 @@ const w = natW;
                 return { w: iw + side * 2 + stubW, h: ih + headH + footH };
             }
             case 'TICKET_STAMP': {
-                const side = Math.max(30, Math.round(size * 2.2));
+                const side = Math.max(28, Math.round(iw * 0.06), Math.round(size * 1.8));
+                const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
                 const textH = Math.max(46, Math.round(size * 1.8));
-                return { w: iw + side * 2, h: ih + side * 2 + textH };
+                return { w: iw + side * 2 + blurGap * 2, h: ih + side * 2 + textH + blurGap * 2 };
             }
             case 'WATERCOLOR_BLEED': {
                 const bleed = Math.max(50, Math.floor(size * 1.5));
