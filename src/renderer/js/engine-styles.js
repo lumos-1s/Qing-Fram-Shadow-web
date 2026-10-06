@@ -574,7 +574,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
     function styleMovieTicket(img, size, g, iw, ih) {
         // 电影票版式: 深色票头(影院名+日期时间) / 浅色信息带(场次·影厅·座位·票价) / 照片 / 深色票脚(票号)
-        // 右侧副券: 三角锯齿撕线 + 竖排 ADMIT ONE + 虚线副券框
+        // 右侧副券: 三角锯齿撕线 + 竖排 ADMIT ONE + 虚线副券框 + 检票后作废
         const headBar = Math.max(34, Math.round(size * 0.85));
         const infoH = Math.max(26, Math.round(size * 0.62));
         const footBar = Math.max(32, Math.round(size * 0.8));
@@ -588,8 +588,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillRect(0, 0, w, h);
         g.fillStyle = ticketPaperPattern();
         g.fillRect(0, 0, w, h);
-        // 照片(完整显示)
+        // 照片(完整显示) + 照片区细框线(印刷感)
         g.drawImage(img, sidePad, photoTop);
+        g.strokeStyle = 'rgba(90,70,40,0.30)';
+        g.lineWidth = 1;
+        g.strokeRect(sidePad - 0.5, photoTop - 0.5, iw + 1, ih + 1);
         // ── 右侧副券: 三角锯齿撕线 ──
         const sx = sidePad + iw;
         const tooth = Math.max(6, Math.round(size * 0.18));
@@ -607,10 +610,10 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = 'rgba(0,0,0,0.05)';
         g.fillRect(sx, photoTop, w - sx, ih);
         // 副券区顶部小标题(副券/STUB)
-        const stubTitleFs = Math.max(10, Math.round(size * 0.3));
+        const stubTitleFs = Math.max(10, Math.round(size * 0.32));
         const stubTitle = '副券  STUB';
         const stW0 = textMetrics(g, stubTitle, stubTitleFs, false, true, 1).w;
-        drawTextL(g, stubTitle, sx + Math.floor((stubW - stW0) / 2), photoTop + Math.round(size * 0.55), '#8a6d3b', stubTitleFs, false, true, 1);
+        drawTextL(g, stubTitle, sx + Math.floor((stubW - stW0) / 2), photoTop + Math.round(size * 0.58), '#8a6d3b', stubTitleFs, false, true, 1);
         // 副券竖排 ADMIT ONE(金色)
         const cx = sx + Math.floor(stubW / 2);
         const fs = Math.max(14, Math.round(size * 0.42));
@@ -629,31 +632,45 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         drawTextL(g, 'ROW 12', sx + 18, photoTop + Math.floor(ih * 0.32), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
         drawTextL(g, 'SEAT 08', sx + 18, photoTop + Math.floor(ih * 0.46), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
         drawTextL(g, 'SCREEN 7', sx + 18, photoTop + Math.floor(ih * 0.60), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
+        drawTextL(g, '检票后作废', sx + 18, photoTop + Math.floor(ih * 0.79), '#a08a5a', Math.max(9, Math.round(fs * 0.5)), false, false, 0);
         // ── 票头: 深色条(影院名+日期时间) ──
         const d = new Date();
         const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
         const timeStr = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
         g.fillStyle = ink;
         g.fillRect(0, 0, w, headBar);
-        const hFs = Math.max(12, Math.round(headBar * 0.52));
+        const hFs = Math.max(13, Math.round(headBar * 0.55));
         drawTextL(g, 'CINEMA', sidePad, Math.round(headBar * 0.64), '#f7f2e9', hFs, false, true, 1);
-        const hdText = dateStr + '  ' + timeStr;
-        const hdW = textMetrics(g, hdText, Math.round(hFs * 0.8), false, true, 1).w;
-        drawTextL(g, hdText, w - sidePad - hdW, Math.round(headBar * 0.64), '#d8c188', Math.round(hFs * 0.8), false, true, 1);
-        // ── 信息带: 场次·影厅·座位·票价 ──
+        // 右侧日期时间: 直接右对齐绘制,杜绝文字溢出
+        g.save();
+        g.font = 'bold ' + Math.round(hFs * 0.82) + 'px sans-serif';
+        g.fillStyle = '#d8c188';
+        g.textAlign = 'right';
+        g.textBaseline = 'middle';
+        g.fillText(dateStr + '  ' + timeStr, w - sidePad, Math.round(headBar * 0.62));
+        g.restore();
+        // ── 信息带: 场次·影厅·座位·票价(加粗+下边线) ──
         g.fillStyle = '#ece4d4';
         g.fillRect(0, headBar, w, infoH);
-        const infoFs = Math.max(10, Math.round(infoH * 0.5));
+        g.strokeStyle = 'rgba(90,70,40,0.20)';
+        g.lineWidth = 1;
+        g.beginPath(); g.moveTo(0, headBar + infoH - 0.5); g.lineTo(w, headBar + infoH - 0.5); g.stroke();
+        const infoFs = Math.max(11, Math.round(infoH * 0.52));
         const infoStr = '场次 20:30   ·   3号厅   ·   08排12号   ·   ¥35';
-        drawTextL(g, infoStr, sidePad, headBar + Math.round(infoH * 0.66), '#5a4a33', infoFs, false, false, 0);
+        drawTextL(g, infoStr, sidePad, headBar + Math.round(infoH * 0.66), '#5a4a33', infoFs, false, true, 0);
         // ── 票脚: 深色条(票根标语+票号) ──
         g.fillStyle = ink;
         g.fillRect(0, h - footBar, w, footBar);
         const fFs = Math.max(11, Math.round(footBar * 0.5));
         drawTextL(g, 'MEMORY TICKET', sidePad, h - Math.round(footBar * 0.4), '#f7f2e9', fFs, false, true, 1);
         const noStr = 'NO.' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
-        const noW = textMetrics(g, noStr, Math.round(fFs * 0.85), false, true, 1).w;
-        drawTextL(g, noStr, w - sidePad - noW, h - Math.round(footBar * 0.4), '#d8c188', Math.round(fFs * 0.85), false, true, 1);
+        g.save();
+        g.font = 'bold ' + Math.round(fFs * 0.85) + 'px sans-serif';
+        g.fillStyle = '#d8c188';
+        g.textAlign = 'right';
+        g.textBaseline = 'middle';
+        g.fillText(noStr, w - sidePad, h - Math.round(footBar * 0.38));
+        g.restore();
     }
 
     // ── 票根纸张纹理:256px tile(纤维颗粒+半调网点+双色噪点),缓存平铺一次,预览不卡 ──
