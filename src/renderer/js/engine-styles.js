@@ -575,11 +575,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     function styleMovieTicket(img, size, g, iw, ih) {
         // 电影票版式: 深色票头(影院名+日期时间) / 浅色信息带(场次·影厅·座位·票价) / 照片 / 深色票脚(票号)
         // 右侧副券: 三角锯齿撕线 + 竖排 ADMIT ONE + 虚线副券框
-        const headBar = Math.max(26, Math.round(size * 0.62));
-        const infoH = Math.max(20, Math.round(size * 0.48));
-        const footBar = Math.max(24, Math.round(size * 0.58));
-        const sidePad = Math.max(20, Math.round(size * 0.6));
-        const stubW = Math.max(120, Math.round(iw * 0.2));
+        const headBar = Math.max(34, Math.round(size * 0.85));
+        const infoH = Math.max(26, Math.round(size * 0.62));
+        const footBar = Math.max(32, Math.round(size * 0.8));
+        const sidePad = Math.max(24, Math.round(size * 0.7));
+        const stubW = Math.max(150, Math.round(iw * 0.28));
         const photoTop = headBar + infoH;
         const w = iw + sidePad * 2 + stubW, h = ih + headBar + infoH + footBar;
         const ink = '#2c2720', paper = '#f7f2e9';
@@ -606,9 +606,14 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 副券区底纹微暗
         g.fillStyle = 'rgba(0,0,0,0.05)';
         g.fillRect(sx, photoTop, w - sx, ih);
+        // 副券区顶部小标题(副券/STUB)
+        const stubTitleFs = Math.max(10, Math.round(size * 0.3));
+        const stubTitle = '副券  STUB';
+        const stW0 = textMetrics(g, stubTitle, stubTitleFs, false, true, 1).w;
+        drawTextL(g, stubTitle, sx + Math.floor((stubW - stW0) / 2), photoTop + Math.round(size * 0.55), '#8a6d3b', stubTitleFs, false, true, 1);
         // 副券竖排 ADMIT ONE(金色)
         const cx = sx + Math.floor(stubW / 2);
-        const fs = Math.max(13, Math.round(size * 0.4));
+        const fs = Math.max(14, Math.round(size * 0.42));
         g.save();
         g.translate(cx, photoTop + Math.floor(ih / 2));
         g.rotate(-Math.PI / 2);
@@ -619,11 +624,11 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.strokeStyle = 'rgba(140,110,60,0.55)';
         g.lineWidth = 1;
         g.setLineDash([4, 3]);
-        g.strokeRect(sx + 8, photoTop + Math.floor(ih * 0.22), stubW - 16, Math.floor(ih * 0.5));
+        g.strokeRect(sx + 10, photoTop + Math.floor(ih * 0.20), stubW - 20, Math.floor(ih * 0.52));
         g.restore();
-        drawTextL(g, 'ROW 12', sx + 14, photoTop + Math.floor(ih * 0.32), '#6b5843', Math.floor(fs * 0.8), true, false, 0);
-        drawTextL(g, 'SEAT 08', sx + 14, photoTop + Math.floor(ih * 0.46), '#6b5843', Math.floor(fs * 0.8), true, false, 0);
-        drawTextL(g, 'SCREEN 7', sx + 14, photoTop + Math.floor(ih * 0.60), '#6b5843', Math.floor(fs * 0.8), true, false, 0);
+        drawTextL(g, 'ROW 12', sx + 18, photoTop + Math.floor(ih * 0.32), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
+        drawTextL(g, 'SEAT 08', sx + 18, photoTop + Math.floor(ih * 0.46), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
+        drawTextL(g, 'SCREEN 7', sx + 18, photoTop + Math.floor(ih * 0.60), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
         // ── 票头: 深色条(影院名+日期时间) ──
         const d = new Date();
         const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
