@@ -666,31 +666,40 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 底层: 照片背景模糊铺满画布(参考图邮票下层就是背景模糊)
         const blurR = Math.max(16, Math.round(size * 0.9));
         const bgScale = Math.max(w / iw, h / ih);
-        g.save();
-        g.filter = 'blur(' + blurR + 'px)';
-        g.drawImage(img, (w - iw * bgScale) / 2, (h - ih * bgScale) / 2, iw * bgScale, ih * bgScale);
-        g.restore();
+        const bgX = (w - iw * bgScale) / 2, bgY = (h - ih * bgScale) / 2;
+        const paintBlurBg = function () {
+            g.save();
+            g.filter = 'blur(' + blurR + 'px)';
+            g.drawImage(img, bgX, bgY, iw * bgScale, ih * bgScale);
+            g.restore();
+        };
+        paintBlurBg();
         // 票面(米白纸)
         g.fillStyle = '#faf5ea';
         g.fillRect(x0, y0, tw, th);
-        // 齿孔: 票面边缘半圆孔(clip到票面矩形,只咬票面内的半圆缺口,孔内透出下层模糊背景,票面外模糊背景保持完整)
+        // 齿孔: 票面边缘半圆孔(clip到票面矩形,只咬票面内的半圆缺口)
         const holeR = Math.max(3, Math.round(size * 0.18));
         const pitch = Math.max(9, holeR * 2 + 3);
+        const holePts = [];
+        for (let i = x0; i <= x0 + tw; i += pitch) { holePts.push([i, y0], [i, y0 + th]); }
+        for (let j = y0; j <= y0 + th; j += pitch) { holePts.push([x0, j], [x0 + tw, j]); }
         g.save();
         g.beginPath();
         g.rect(x0, y0, tw, th);
         g.clip();
         g.globalCompositeOperation = 'destination-out';
         g.fillStyle = '#000000';
-        for (let i = x0; i <= x0 + tw; i += pitch) {
-            g.beginPath(); g.arc(i, y0, holeR, 0, Math.PI * 2); g.fill();
-            g.beginPath(); g.arc(i, y0 + th, holeR, 0, Math.PI * 2); g.fill();
-        }
-        for (let j = y0; j <= y0 + th; j += pitch) {
-            g.beginPath(); g.arc(x0, j, holeR, 0, Math.PI * 2); g.fill();
-            g.beginPath(); g.arc(x0 + tw, j, holeR, 0, Math.PI * 2); g.fill();
+        for (let k = 0; k < holePts.length; k++) {
+            g.beginPath(); g.arc(holePts[k][0], holePts[k][1], holeR, 0, Math.PI * 2); g.fill();
         }
         g.restore();
+        // 孔内补画模糊背景(孔=半圆缺口,缺口内看到的是背景模糊,而不是透明/黑)
+        for (let k = 0; k < holePts.length; k++) {
+            g.save();
+            g.beginPath(); g.arc(holePts[k][0], holePts[k][1], holeR + 0.5, 0, Math.PI * 2); g.clip();
+            paintBlurBg();
+            g.restore();
+        }
         // 照片(完整显示+缩放/偏移,圆角可选)
         const sc = (S && S.imgScale) || 1;
         const dw = iw * sc, dh = ih * sc;
