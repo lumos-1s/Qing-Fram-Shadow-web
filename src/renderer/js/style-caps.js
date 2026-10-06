@@ -183,7 +183,7 @@
         const isBottomBar = BOTTOM_BAR_STYLES.indexOf(s) >= 0;
 
         // 签名/头像核心组:旧代码里 CARD_3D 先随组显示、再被单独隐藏,净效果等于不显示
-        const sigCore = isPersonal;
+        const sigCore = isPersonal || s === 'TICKET_STAMP';
         const v = {};
         v.rowSignModel = s === 'SIGN_PARAM';
         v.rowSignText = sigCore;
