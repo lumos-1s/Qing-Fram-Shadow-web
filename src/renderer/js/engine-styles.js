@@ -673,7 +673,20 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 票面+齿孔: 离屏canvas做带半孔齿孔的米白票面(孔中心落在票面边缘线上,半圆天然只咬进票面内),
         // 孔内透明露出下层模糊背景; 一次性叠上, 避免逐孔重复绘制导致缩放卡顿
         const holeR = Math.max(3, Math.round(size * 0.45));
-        const pitch = Math.max(9, holeR * 4);   // 孔距=孔径+孔径: 两半孔之间的平直齿尖长度=孔直径
+        const pitch = Math.max(9, holeR * 4);   // 边孔间距=孔径+孔径
+        // 角孔两侧平直齿尖长: 至少等于孔直径, 图片越大自动加长(随 min(iw,ih) 缩放)
+        const toothL = Math.max(Math.round(holeR * 2), Math.round(Math.min(iw, ih) * 0.012));
+        const margin = holeR * 2 + toothL;  // 角点(45度角孔圆心)到第一边孔圆心
+        // 沿边均布边孔: 两端各留 margin(角孔位), 孔位中心对称, 间距在 pitch 附近自适应微调
+        const stampRow = function (len) {
+            const span = len - 2 * margin;
+            const count = Math.max(0, Math.floor(span / pitch) + 1);
+            if (count <= 0) return [];
+            const gap = count > 1 ? span / (count - 1) : 0;
+            const out = [];
+            for (let k = 0; k < count; k++) out.push(margin + gap * k);
+            return out;
+        };
         const tc = document.createElement('canvas');
         tc.width = tw; tc.height = th;
         const tg = tc.getContext('2d');
@@ -681,13 +694,14 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         tg.fillRect(0, 0, tw, th);
         tg.globalCompositeOperation = 'destination-out';
         tg.fillStyle = '#000000';
-        for (let i = holeR; i <= tw - holeR; i += pitch) {
-            tg.beginPath(); tg.arc(i, 0, holeR, 0, Math.PI * 2); tg.fill();
-            tg.beginPath(); tg.arc(i, th, holeR, 0, Math.PI * 2); tg.fill();
+        const topHoles = stampRow(tw), leftHoles = stampRow(th);
+        for (let i = 0; i < topHoles.length; i++) {
+            tg.beginPath(); tg.arc(topHoles[i], 0, holeR, 0, Math.PI * 2); tg.fill();
+            tg.beginPath(); tg.arc(topHoles[i], th, holeR, 0, Math.PI * 2); tg.fill();
         }
-        for (let j = holeR; j <= th - holeR; j += pitch) {
-            tg.beginPath(); tg.arc(0, j, holeR, 0, Math.PI * 2); tg.fill();
-            tg.beginPath(); tg.arc(tw, j, holeR, 0, Math.PI * 2); tg.fill();
+        for (let j = 0; j < leftHoles.length; j++) {
+            tg.beginPath(); tg.arc(0, leftHoles[j], holeR, 0, Math.PI * 2); tg.fill();
+            tg.beginPath(); tg.arc(tw, leftHoles[j], holeR, 0, Math.PI * 2); tg.fill();
         }
         // 四角: 45度朝向的半孔(角点挖圆,角变圆弧)
         tg.beginPath(); tg.arc(0, 0, holeR, 0, Math.PI * 2); tg.fill();
