@@ -573,30 +573,58 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         }
     }
     function styleMovieTicket(img, size, g, iw, ih) {
-        const topBot = Math.max(30, Math.floor(size * 0.8));
-        const sidePad = Math.max(20, Math.floor(size * 0.6));
-        const stubW = Math.max(100, Math.floor(iw * 0.18));
+        const topBot = Math.max(38, Math.floor(size * 1.0));
+        const sidePad = Math.max(24, Math.floor(size * 0.7));
+        const stubW = Math.max(128, Math.floor(iw * 0.22));
         const w = iw + sidePad * 2 + stubW, h = ih + topBot * 2;
+        const barH = Math.max(20, Math.floor(topBot * 0.58));
+        // 米色纸底 + 纸张纹理
         g.fillStyle = '#f5f0e6';
         g.fillRect(0, 0, w, h);
+        g.fillStyle = ticketPaperPattern();
+        g.fillRect(0, 0, w, h);
+        // 照片(完整显示)
         g.drawImage(img, sidePad, topBot);
+        // 右侧副券:三角锯齿撕线(撕票感),撕掉部分透出纸底
         const sx = sidePad + iw;
-        const r = Math.max(6, Math.floor(size * 0.22));
-        const pitch = Math.max(r * 2.2, r * 2 + 2);
+        const tooth = Math.max(6, Math.floor(size * 0.18));
         g.save();
         g.globalCompositeOperation = 'destination-out';
-        for (let y = topBot + r; y < topBot + ih; y += pitch) { g.beginPath(); g.arc(sx, y, r, 0, 6.2832); g.fill(); }
+        g.beginPath();
+        for (let y = topBot - tooth; y <= topBot + ih + tooth; y += tooth * 2) {
+            g.moveTo(sx - tooth, y);
+            g.lineTo(sx, y + tooth);
+            g.lineTo(sx + tooth, y);
+        }
+        g.fill();
         g.restore();
-        const cx = sx + r + Math.floor((stubW - r) / 2);
-        const fs = Math.max(11, Math.floor(size * 0.32));
+        // 副券底色微暗,区分主票
+        g.fillStyle = 'rgba(0,0,0,0.05)';
+        g.fillRect(sx, topBot, w - sx, ih);
+        // 副券竖排 ADMIT ONE
+        const cx = sx + Math.floor(stubW / 2);
+        const fs = Math.max(13, Math.floor(size * 0.4));
         g.save();
         g.translate(cx, topBot + Math.floor(ih / 2));
         g.rotate(-Math.PI / 2);
-        drawTextL(g, 'ADMIT ONE', -Math.floor(ih * 0.18), Math.floor(fs * 0.35), '#999', fs, false, true, 0);
+        drawTextL(g, 'ADMIT ONE', -Math.floor(ih * 0.16), Math.floor(fs * 0.35), '#8a6d3b', fs, false, true, 0);
         g.restore();
-        drawTextL(g, 'ROW 12', sx + r + 10, topBot + Math.floor(ih * 0.30), '#555', fs, true, false, 0);
-        drawTextL(g, 'SEAT 08', sx + r + 10, topBot + Math.floor(ih * 0.45), '#555', fs, true, false, 0);
-        drawTextL(g, 'SCREEN 7', sx + r + 10, topBot + Math.floor(ih * 0.60), '#555', fs, true, false, 0);
+        drawTextL(g, 'ROW 12', sx + 12, topBot + Math.floor(ih * 0.30), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
+        drawTextL(g, 'SEAT 08', sx + 12, topBot + Math.floor(ih * 0.45), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
+        drawTextL(g, 'SCREEN 7', sx + 12, topBot + Math.floor(ih * 0.60), '#6b5843', Math.floor(fs * 0.85), true, false, 0);
+        // 顶部深色票头条:左 CINEMA 右日期
+        const d = new Date();
+        const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+        g.fillStyle = '#2c2720';
+        g.fillRect(0, 0, w, barH);
+        const hFs = Math.max(12, Math.floor(barH * 0.52));
+        drawTextL(g, 'CINEMA', sidePad, Math.floor(barH * 0.62), '#f5ead2', hFs, false, true, 1);
+        drawTextL(g, dateStr, w - sidePad, Math.floor(barH * 0.62), '#cbb78a', Math.floor(hFs * 0.8), false, true, 1);
+        // 底部深色票脚条:左 MEMORY TICKET 右 TODAY
+        g.fillStyle = '#2c2720';
+        g.fillRect(0, h - barH, w, barH);
+        drawTextL(g, 'MEMORY TICKET', sidePad, h - Math.floor(barH * 0.38), '#f5ead2', Math.floor(hFs * 0.8), false, true, 1);
+        drawTextL(g, 'TODAY', w - sidePad, h - Math.floor(barH * 0.38), '#cbb78a', Math.floor(hFs * 0.8), false, true, 1);
     }
 
     // ── 票根纸张纹理:256px tile(纤维颗粒+半调网点+双色噪点),缓存平铺一次,预览不卡 ──
