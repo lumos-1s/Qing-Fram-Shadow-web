@@ -673,7 +673,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         // 票面+齿孔: 离屏canvas做带半孔齿孔的米白票面(孔中心落在票面边缘线上,半圆天然只咬进票面内),
         // 孔内透明露出下层模糊背景; 一次性叠上, 避免逐孔重复绘制导致缩放卡顿
         const holeR = Math.max(3, Math.round(size * 0.45));
-        const pitch = Math.max(9, holeR * 2 + 3);
+        const pitch = Math.max(9, holeR * 4);   // 孔距=孔径+孔径: 两半孔之间的平直齿尖长度=孔直径
         const tc = document.createElement('canvas');
         tc.width = tw; tc.height = th;
         const tg = tc.getContext('2d');
@@ -695,19 +695,6 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         tg.beginPath(); tg.arc(0, th, holeR, 0, Math.PI * 2); tg.fill();
         tg.beginPath(); tg.arc(tw, th, holeR, 0, Math.PI * 2); tg.fill();
         g.drawImage(tc, x0, y0);
-        // 齿尖: 每两个半孔之间加一条长度=孔直径的票面纸色直线, 沿票面边缘向外延伸(模拟撕开后的平直齿尖)
-        const toothLen = holeR * 2;
-        g.fillStyle = '#faf5ea';
-        for (let c = x0 + holeR + pitch; c <= x0 + tw - holeR; c += pitch) {
-            const mid = c - Math.floor(pitch / 2);
-            g.fillRect(mid - 1, y0 - toothLen, 2, toothLen);
-            g.fillRect(mid - 1, y0 + th, 2, toothLen);
-        }
-        for (let c = y0 + holeR + pitch; c <= y0 + th - holeR; c += pitch) {
-            const mid = c - Math.floor(pitch / 2);
-            g.fillRect(x0 - toothLen, mid - 1, toothLen, 2);
-            g.fillRect(x0 + tw, mid - 1, toothLen, 2);
-        }
         // 照片(完整显示+缩放/偏移,圆角可选)
         const sc = (S && S.imgScale) || 1;
         const dw = iw * sc, dh = ih * sc;
