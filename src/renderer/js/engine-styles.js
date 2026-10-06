@@ -2764,6 +2764,7 @@ const w = natW;
             signColor: String(t.signColor || '#555'),
             signIncludeModel: Number(t.signIncludeModel || 0),
             avatarScale: Number(t.avatarScale || 0.85),
+            avatarShow: t.avatarShow === undefined ? 1 : Number(t.avatarShow),
             signSize: Number(t.signSize || 1),
             signBgBlur: Number(t.signBgBlur || 0),
             paramColor: String(t.paramColor || 'auto'),
