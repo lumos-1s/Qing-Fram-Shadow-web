@@ -674,8 +674,8 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fillStyle = '#faf5ea';
         g.fillRect(x0, y0, tw, th);
         // 齿孔: 票面边缘挖孔露出下层模糊背景(孔=撕开后透出背景色)
-        const holeR = Math.max(2, Math.round(size * 0.4));
-        const pitch = Math.max(8, holeR * 2 + 3);
+        const holeR = Math.max(3, Math.round(size * 0.18));
+        const pitch = Math.max(9, holeR * 2 + 3);
         g.save();
         g.globalCompositeOperation = 'destination-out';
         g.fillStyle = '#000000';
