@@ -588,9 +588,11 @@
                             <div class="pg-title collapsible">元素管理</div>
                             <div class="el-status" id="elStatus">未选中元素</div>
                             <div class="el-list" id="elList"></div>
-                            <div class="param-row"><label>透明度</label><input type="range" id="slActiveIconOpacity" class="ctl-rng" min="0" max="100" value="100" /><span class="pval" id="lblActiveIconOpacity"></span></div>
-                            <div class="param-row"><label>缩放</label><input type="range" id="slElementSize" class="ctl-rng" min="16" max="10000" value="500" /><span class="pval" id="lblElementSize"></span></div>
-                            <div class="param-row"><label>旋转</label><input type="range" id="slElementRotation" class="ctl-rng" min="0" max="360" value="0" /><span class="pval" id="lblElementRotation"></span></div>
+                            <div class="param-row"><label>位置 X</label><input type="number" id="inpElX" class="ctl-num" min="0" step="1" value="0" title="元素中心 X(像素),方向键微移 / 直接输入精确值" /></div>
+                            <div class="param-row"><label>位置 Y</label><input type="number" id="inpElY" class="ctl-num" min="0" step="1" value="0" title="元素中心 Y(像素),方向键微移 / 直接输入精确值" /></div>
+                            <div class="param-row"><label>透明度</label><input type="range" id="slActiveIconOpacity" class="ctl-rng" min="0" max="100" value="100" /><input type="number" id="inpElOpacity" class="ctl-num" min="0" max="100" step="1" value="100" /><span class="pval" id="lblActiveIconOpacity"></span></div>
+                            <div class="param-row"><label>缩放</label><input type="range" id="slElementSize" class="ctl-rng" min="16" max="10000" value="500" /><input type="number" id="inpElSize" class="ctl-num" min="16" step="1" value="500" /><span class="pval" id="lblElementSize"></span></div>
+                            <div class="param-row"><label>旋转</label><input type="range" id="slElementRotation" class="ctl-rng" min="0" max="360" value="0" /><input type="number" id="inpElRotation" class="ctl-num" min="0" max="360" step="1" value="0" /><span class="pval" id="lblElementRotation"></span></div>
                             <div class="btn-row btn-4">
                                 <button class="mini-btn" id="btnZOrderTop" title="置于顶层">↑顶</button>
                                 <button class="mini-btn" id="btnZOrderUp" title="上移一层">上移</button>

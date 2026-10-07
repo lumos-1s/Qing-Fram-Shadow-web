@@ -114,6 +114,14 @@ window.App = Object.assign(window.App || {}, {
             else if (e.ctrlKey && e.key.toLowerCase() === 'd') { e.preventDefault(); this.applyBorderToSelected(); }
             else if (e.ctrlKey && e.key === '0') { e.preventDefault(); this.fitZoom(); }
             else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.saveTemplate(); }
+            // Compositor 借鉴:选中元素时方向键微移(1px/次,Shift=10px);无选中元素时左右键仍切图
+            else if (this.selectedEls && this.selectedEls.length && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+                const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+                const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+                this.nudgeSelectedPosition(dx, dy);
+            }
             else if (e.key === 'ArrowLeft' && this.images && this.images.length > 1) { e.preventDefault(); this.selectImage((this.currentIdx - 1 + this.images.length) % this.images.length); }
             else if (e.key === 'ArrowRight' && this.images && this.images.length > 1) { e.preventDefault(); this.selectImage((this.currentIdx + 1) % this.images.length); }
         });

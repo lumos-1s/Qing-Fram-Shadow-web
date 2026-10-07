@@ -221,6 +221,74 @@ window.App = Object.assign(window.App || {}, {
         this.scheduleRender();
     },
 
+    // ── Compositor 借鉴 #1:方向键微移元素 + 精确数值输入 ──
+    // 方向键微移:1px/次,Shift=10px;logo 走 setLogoPixelPos(同步 rx/ry,换照片尺寸不错位)
+    nudgeSelectedPosition(dx, dy) {
+        if (!this.selectedEls || !this.selectedEls.length) return;
+        const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
+        this.selectedEls.forEach(sel => {
+            const e = sel.obj;
+            if (sel.kind === 'logo') {
+                if (typeof e.x !== 'number' || typeof e.y !== 'number') {
+                    const p = this.logoPos(e, cw, ch, e.size || 60);
+                    this.setLogoPixelPos(e, p.cx, p.cy);
+                }
+                this.setLogoPixelPos(e, (e.x || 0) + dx, (e.y || 0) + dy);
+            } else if (sel.kind === 'sticker') {
+                e.x = Math.max(20, Math.min(cw - 20, (e.x || 0) + dx));
+                e.y = Math.max(20, Math.min(ch - 20, (e.y || 0) + dy));
+            } else if (sel.kind === 'text') {
+                e.x = Math.max(30, Math.min(cw - 30, (e.x || 0) + dx));
+                e.y = Math.max(20, Math.min(ch - 20, (e.y || 0) + dy));
+            }
+        });
+        this.syncElInputs();
+        this.saveCurrentTemplate();
+        this.scheduleRender();
+    },
+
+    _elCenterX(sel) {
+        const e = sel.obj;
+        if (sel.kind === 'logo') {
+            if (typeof e.x === 'number') return Math.round(e.x);
+            const p = this.logoPos(e, this.dom.canvas.width || 0, this.dom.canvas.height || 0, e.size || 60);
+            return Math.round(p.cx);
+        }
+        return Math.round(e.x || 0);
+    },
+    _elCenterY(sel) {
+        const e = sel.obj;
+        if (sel.kind === 'logo') {
+            if (typeof e.y === 'number') return Math.round(e.y);
+            const p = this.logoPos(e, this.dom.canvas.width || 0, this.dom.canvas.height || 0, e.size || 60);
+            return Math.round(p.cy);
+        }
+        return Math.round(e.y || 0);
+    },
+    // 回显位置输入框:多选时禁用(绝对坐标只对单元素有意义)
+    syncElInputs() {
+        const $ = this.$;
+        const inpX = $('inpElX'), inpY = $('inpElY');
+        if (!inpX && !inpY) return;
+        const sel = this.selectedEls && this.selectedEls[0];
+        const multi = (this.selectedEls || []).length > 1;
+        if (!sel || multi) {
+            if (inpX) { if (!inpX.disabled) inpX.disabled = true; if (inpX.value !== '') inpX.value = ''; }
+            if (inpY) { if (!inpY.disabled) inpY.disabled = true; if (inpY.value !== '') inpY.value = ''; }
+            return;
+        }
+        if (inpX) { if (inpX.disabled) inpX.disabled = false; const v = String(this._elCenterX(sel)); if (inpX.value !== v) inpX.value = v; }
+        if (inpY) { if (inpY.disabled) inpY.disabled = false; const v2 = String(this._elCenterY(sel)); if (inpY.value !== v2) inpY.value = v2; }
+    },
+    // 精确写入元素中心像素坐标(logo 走 setLogoPixelPos 保持 rx/ry)
+    setElementCenter(sel, x, y) {
+        const e = sel.obj;
+        const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
+        if (sel.kind === 'logo') this.setLogoPixelPos(e, x, y);
+        else if (sel.kind === 'sticker') { e.x = Math.max(20, Math.min(cw - 20, x)); e.y = Math.max(20, Math.min(ch - 20, y)); }
+        else if (sel.kind === 'text') { e.x = Math.max(30, Math.min(cw - 30, x)); e.y = Math.max(20, Math.min(ch - 20, y)); }
+    },
+
     rebindSelectedEls() { /* template引用稳定,无需重绑 */ },
 
     moveElement(drag, x, y) {
@@ -325,6 +393,11 @@ window.App = Object.assign(window.App || {}, {
         this.updateLabel('lblElementRotation', ((e.rotation || 0) % 360 + 360) % 360 + '°');
         this.updateLabel('lblActiveIconOpacity', Math.round(e.opacity != null ? e.opacity : 100) + '%');
         this.updateLabel('lblElementSize', sizeVal);
+        const inpR = $('inpElRotation'), inpO = $('inpElOpacity'), inpS = $('inpElSize');
+        if (inpR) inpR.value = ((e.rotation || 0) % 360 + 360) % 360;
+        if (inpO) inpO.value = Math.round(e.opacity != null ? e.opacity : 100);
+        if (inpS) inpS.value = sizeVal;
+        this.syncElInputs();
     },
 
     drawSelectionBox() {
@@ -579,6 +652,7 @@ window.App = Object.assign(window.App || {}, {
         status.textContent = !first ? `共 ${items.length} 个元素,点击选择(可 Ctrl/Shift 多选)`
             : (n > 1 ? `已选中 ${n} 个元素` : `${tagMap[first.kind]}「${this.elLabel(first.obj)}」已选中`);
         if (first) this.syncSliderFromEl({ kind: first.kind, obj: first.obj });
+        this.syncElInputs();
     },
 
     elLabel(el) {

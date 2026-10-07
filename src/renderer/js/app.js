@@ -1876,12 +1876,14 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         if ($('slActiveIconOpacity')) $('slActiveIconOpacity').addEventListener('input', () => {
             const v = parseInt($('slActiveIconOpacity').value, 10);
             this.updateLabel('lblActiveIconOpacity', v + '%');
+            if ($('inpElOpacity')) $('inpElOpacity').value = v;
             this.applyToSelectedEls(el => { el.opacity = v; });
             this.batchElOps();
         });
         if ($('slElementRotation')) $('slElementRotation').addEventListener('input', () => {
             const v = parseInt($('slElementRotation').value, 10);
             this.updateLabel('lblElementRotation', v + '°');
+            if ($('inpElRotation')) $('inpElRotation').value = v;
             this.applyToSelectedEls(el => { el.rotation = v; });
             this.batchElOps();
         });
@@ -1891,11 +1893,46 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             const k = pos / 1000;
             const v = Math.round(16 + (10000 - 16) * k * k);
             this.updateLabel('lblElementSize', v);
+            if ($('inpElSize')) $('inpElSize').value = v;
             this.applyToSelectedEls((el, kind) => {
                 if (kind === 'logo') el.size = v;
                 else if (kind === 'sticker') el.scale = clampNum(v / 60, 0.02, 3);
             });
             this.batchElOps();
+        });
+        // 精确数值输入(借鉴 Compositor):输入框 change → 复用滑块通路,不另起渲染分支
+        const bindNum = (id, fn) => { const el = $(id); if (el) el.addEventListener('change', fn); };
+        bindNum('inpElX', () => {
+            const v = parseFloat($('inpElX').value);
+            if (isNaN(v) || !this.selectedEls.length) { this.syncElInputs(); return; }
+            this.setElementCenter(this.selectedEls[0], v, this._elCenterY(this.selectedEls[0]));
+            this.syncElInputs(); this.batchElOps();
+        });
+        bindNum('inpElY', () => {
+            const v = parseFloat($('inpElY').value);
+            if (isNaN(v) || !this.selectedEls.length) { this.syncElInputs(); return; }
+            this.setElementCenter(this.selectedEls[0], this._elCenterX(this.selectedEls[0]), v);
+            this.syncElInputs(); this.batchElOps();
+        });
+        bindNum('inpElOpacity', () => {
+            const v = parseFloat($('inpElOpacity').value);
+            if (isNaN(v)) return;
+            const sl = $('slActiveIconOpacity');
+            if (sl) { sl.value = Math.max(0, Math.min(100, v)); sl.dispatchEvent(new Event('input')); }
+        });
+        bindNum('inpElSize', () => {
+            const v = parseFloat($('inpElSize').value);
+            if (isNaN(v)) return;
+            const c = Math.max(16, Math.min(10000, v));
+            const sl = $('slElementSize');
+            if (sl) { sl.value = Math.round(1000 * Math.sqrt((c - 16) / (10000 - 16))); sl.dispatchEvent(new Event('input')); }
+        });
+        bindNum('inpElRotation', () => {
+            const v = parseFloat($('inpElRotation').value);
+            if (isNaN(v)) return;
+            const r = ((v % 360) + 360) % 360;
+            const sl = $('slElementRotation');
+            if (sl) { sl.value = r; sl.dispatchEvent(new Event('input')); }
         });
 
         // 拼图布局
