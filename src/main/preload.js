@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('qingframe', {
     savePrefs: (prefs) => ipcRenderer.invoke('save-prefs', prefs),
     readExif: (filePath) => ipcRenderer.invoke('read-exif', filePath),
     openStickerImage: () => ipcRenderer.invoke('open-sticker-image'),
+    getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+    saveDiagnosticsFile: (text) => ipcRenderer.invoke('save-diagnostics', text),
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     startUpdateDownload: () => ipcRenderer.invoke('start-update-download'),
     quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),

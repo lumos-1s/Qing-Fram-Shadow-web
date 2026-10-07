@@ -160,6 +160,7 @@ window.App = Object.assign(window.App || {}, {
     statusMsg: '',
     setStatus(msg) {
         this.statusMsg = msg;
+        this.diagLog && this.diagLog('状态: ' + msg);
         if (this.dom.stCanvas) this.dom.stCanvas.textContent = `画布 ${this.canvasW()}×${this.canvasH()}` + (msg ? ` · ${msg}` : '');
     },
     canvasW() { return this.dom.canvas ? (this.dom.canvas._logW || this.dom.canvas.width) : 0; },

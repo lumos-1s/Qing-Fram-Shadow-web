@@ -458,6 +458,31 @@ window.App = Object.assign(window.App || {}, {
         setTimeout(() => {
             if (this._updater && this._updater.state === 'idle' && api.checkForUpdates) this.checkUpdates(true);
         }, 5000);
+        // 更新内容详情按钮
+        const nb = this.$ && this.$('btnUpdateNotes');
+        if (nb) nb.addEventListener('click', () => this.showUpdateNotes());
+        const nc = document.getElementById('updateNotesClose'), nk = document.getElementById('updateNotesOk');
+        if (nc) nc.addEventListener('click', () => this.hideUpdateNotes());
+        if (nk) nk.addEventListener('click', () => this.hideUpdateNotes());
+        const nm = document.getElementById('updateNotesModal');
+        if (nm) nm.addEventListener('click', (e) => { if (e.target === nm) this.hideUpdateNotes(); });
+    },
+    showUpdateNotes() {
+        const m = document.getElementById('updateNotesModal'), b = document.getElementById('updateNotesBody');
+        if (!m || !b) return;
+        const info = this._updateInfo;
+        let note = (info && (info.releaseNotes || info.releaseNotesString)) || '';
+        if (Array.isArray(note)) {
+            const last = note[note.length - 1];
+            note = last && (last.note || last.body || '');
+        }
+        note = String(note || '').replace(/<[^>]+>/g, '');
+        b.textContent = note.trim() || '暂无更新说明';
+        m.style.display = 'flex';
+    },
+    hideUpdateNotes() {
+        const m = document.getElementById('updateNotesModal');
+        if (m) m.style.display = 'none';
     },
     _onUpdaterEvent(ev) {
         if (!this._updater) this._updater = {};
@@ -467,9 +492,12 @@ window.App = Object.assign(window.App || {}, {
         if (!b || !t) return;
         const bar = $('updateProgressBar'), barWrap = $('updateProgressWrap'), act = $('btnUpdateAction');
         if (ev.type === 'available') {
+            this._updateInfo = { version: ev.version, releaseNotes: ev.releaseNotes };
             t.textContent = '发现新版本 v' + (ev.version || '') + '，点击更新';
             if (barWrap) barWrap.style.display = 'none';
             if (act) { act.textContent = '立即更新'; act.disabled = false; }
+            const nb = document.getElementById('btnUpdateNotes');
+            if (nb) nb.style.display = '';
             b.style.display = 'flex';
         } else if (ev.type === 'not-available') {
             if (this._checking) { this.setStatus('已是最新版本'); this._checking = false; }
@@ -490,6 +518,9 @@ window.App = Object.assign(window.App || {}, {
             if (barWrap) barWrap.style.display = 'none';
             if (act) { act.textContent = '重试'; act.disabled = false; }
             b.style.display = 'flex';
+        } else {
+            const nb = document.getElementById('btnUpdateNotes');
+            if (nb) nb.style.display = 'none';
         }
     },
     async checkUpdates(silent) {
@@ -512,6 +543,43 @@ window.App = Object.assign(window.App || {}, {
     hideUpdateBanner() {
         const b = document.getElementById('updateBanner');
         if (b) b.style.display = 'none';
+    },
+
+    // ── 诊断日志:环形缓冲记录操作/异常,一键导出(同 yt-dlp --verbose 思路) ──
+    initDiag() {
+        this._diagBuf = [];
+        this.diagLog = (m) => {
+            if (!this._diagBuf) this._diagBuf = [];
+            this._diagBuf.push(new Date().toLocaleTimeString('zh-CN', { hour12: false }) + '  ' + String(m));
+            if (this._diagBuf.length > 200) this._diagBuf = this._diagBuf.slice(-200);
+        };
+        window.addEventListener('error', (e) => { this.diagLog && this.diagLog('[异常] ' + (e && e.message)); });
+        window.addEventListener('unhandledrejection', (e) => { this.diagLog && this.diagLog('[Promise异常] ' + ((e && e.reason && e.reason.message) || e.reason)); });
+        const bd = document.getElementById('btnExportDiag');
+        if (bd) bd.addEventListener('click', () => this.exportDiagnostics());
+    },
+    async exportDiagnostics() {
+        const api = window.qingframe;
+        if (!api || !api.getAppInfo) { this.setStatus('开发模式下不可导出诊断日志'); return; }
+        this.diagLog('导出诊断日志');
+        let info = {};
+        try { info = (await api.getAppInfo()) || {}; } catch (e) { this.diagLog('[异常] 读取应用信息失败: ' + e.message); }
+        const lines = [];
+        lines.push('清框影 诊断日志');
+        lines.push('导出时间: ' + new Date().toLocaleString('zh-CN', { hour12: false }));
+        lines.push('版本: ' + (info.version || '未知'));
+        lines.push('Electron: ' + (info.electron || '') + ' · Chrome: ' + (info.chrome || '') + ' · Node: ' + (info.node || ''));
+        lines.push('平台: ' + (info.platform || '') + ' ' + (info.arch || '') + (info.packaged ? ' (打包版)' : ' (开发模式)'));
+        lines.push('userData: ' + (info.userData || ''));
+        lines.push('appPath: ' + (info.appPath || ''));
+        lines.push('');
+        lines.push('── 操作日志(最近 ' + ((this._diagBuf || []).length) + ' 条) ──');
+        (this._diagBuf || []).forEach(l => lines.push(l));
+        const text = lines.join('\n');
+        const r = await api.saveDiagnosticsFile(text).catch(() => ({ ok: false, message: '保存失败' }));
+        if (r && r.ok) this.setStatus('诊断日志已保存: ' + (r.path || ''));
+        else if (r && r.canceled) this.setStatus('已取消导出诊断日志');
+        else this.setStatus('诊断日志导出失败: ' + ((r && r.message) || '未知原因'));
     },
 
     // 导出时元素尺寸/锚点偏移要乘的倍数。抽成纯函数便于单测(见 tools/test-engine-invariants.js ⑥):

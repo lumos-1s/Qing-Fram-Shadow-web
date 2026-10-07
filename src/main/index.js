@@ -94,7 +94,7 @@ app.whenReady().then(() => {
                 const w = BrowserWindow.getAllWindows()[0];
                 if (w && !w.isDestroyed()) w.webContents.send('updater:event', Object.assign({ type }, payload || {}));
             };
-            autoUpdater.on('update-available', (info) => pushUpdater('available', { version: info && info.version }));
+            autoUpdater.on('update-available', (info) => pushUpdater('available', { version: info && info.version, releaseNotes: info && (info.releaseNotes || info.releaseNotesString) }));
             autoUpdater.on('update-not-available', () => pushUpdater('not-available'));
             autoUpdater.on('download-progress', (p) => pushUpdater('progress', { percent: p && p.percent, speed: p && p.bytesPerSecond }));
             autoUpdater.on('update-downloaded', () => pushUpdater('downloaded'));
@@ -137,6 +137,31 @@ ipcMain.handle('list-presets', () => {
             .filter(f => f.endsWith('.json'))
             .map(f => f.replace(/\.json$/, ''));
     } catch (e) { return []; }
+});
+
+// ── 诊断日志:应用信息 + 渲染层操作日志导出(报 bug 时一键提供,同 yt-dlp --verbose 思路) ──
+ipcMain.handle('get-app-info', () => ({
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+    platform: process.platform,
+    arch: process.arch,
+    packaged: app.isPackaged,
+    userData: app.getPath('userData'),
+    appPath: app.getAppPath()
+}));
+ipcMain.handle('save-diagnostics', async (_e, text) => {
+    try {
+        const r = await dialog.showSaveDialog({
+            title: '保存诊断日志',
+            defaultPath: path.join(app.getPath('documents'), '清框影诊断日志.txt'),
+            filters: [{ name: '文本文件', extensions: ['txt'] }]
+        });
+        if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+        fs.writeFileSync(r.filePath, String(text || ''), 'utf-8');
+        return { ok: true, path: r.filePath };
+    } catch (e) { return { ok: false, message: e && e.message }; }
 });
 
 ipcMain.handle('load-preset', (_e, name) => {

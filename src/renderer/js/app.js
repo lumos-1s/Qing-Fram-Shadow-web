@@ -1859,6 +1859,7 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
         bindBtn('btnUpdateAction', () => this.updateAction());
         bindBtn('btnUpdateClose', () => this.hideUpdateBanner());
         this.initUpdater();
+        this.initDiag();
         bindBtn('btnPuzzleAddImg', () => this.openImage());
         bindBtn('btnPuzzleRepuzzle', () => this.rePuzzleFill());
 
