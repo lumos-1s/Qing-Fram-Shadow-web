@@ -609,7 +609,7 @@ window.App = {
                 this._dragPz = null;
                 canvas.style.cursor = '';
             }
-            if (this._dragEl) { this._dragEl = null; this._skipUserEl = null; this._dropDragBase(); this._logoSnapV = null; this._logoSnapH = null; this._logoSnapEdgeV = null; this._logoSnapEdgeH = null; }
+            if (this._dragEl) { this._dragEl = null; this._skipUserEl = null; this._dropDragBase(); this._logoSnapV = null; this._logoSnapH = null; this._logoSnapEdgeV = null; this._logoSnapEdgeH = null; this._logoSnapPhotoV = null; this._logoSnapPhotoH = null; }
             if (this._pan) { this._pan = null; canvas.style.cursor = ''; }
         };
         window.addEventListener('blur', cancelDrags);

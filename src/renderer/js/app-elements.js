@@ -294,27 +294,49 @@ window.App = Object.assign(window.App || {}, {
     moveElement(drag, x, y) {
         const e = drag.ref;
         const cw = this.dom.canvas.width || 0, ch = this.dom.canvas.height || 0;
-        const clampV = (v, max, half) => half > 0 ? Math.max(half, Math.min(v, max - half)) : Math.max(0, Math.min(v, max));
+        const snap = this.snapToGuides(x, y, cw, ch, e, drag.kind);
         if (drag.kind === 'logo') {
-            const snap = this.snapLogoToGuides(x, y, cw, ch, e);
             // 用相对比例写回,换照片尺寸时不会跑到画布外
             this.setLogoPixelPos(e, snap.x, snap.y);
-            this._logoSnapV = snap.v; this._logoSnapH = snap.h;
-            this._logoSnapEdgeV = snap.vEdge; this._logoSnapEdgeH = snap.hEdge;
+        } else if (drag.kind === 'sticker') {
+            e.x = Math.max(20, Math.min(cw - 20, snap.x)); e.y = Math.max(20, Math.min(ch - 20, snap.y));
+        } else if (drag.kind === 'text') {
+            e.x = Math.max(30, Math.min(cw - 30, snap.x)); e.y = Math.max(20, Math.min(ch - 20, snap.y));
         }
-        else if (drag.kind === 'sticker') { e.x = clampV(x, cw, 20); e.y = clampV(y, ch, 20); }
-        else if (drag.kind === 'text') { e.x = clampV(x, cw, 30); e.y = clampV(y, ch, 20); }
+        this._logoSnapV = snap.v; this._logoSnapH = snap.h;
+        this._logoSnapEdgeV = snap.vEdge; this._logoSnapEdgeH = snap.hEdge;
+        this._logoSnapPhotoV = snap.photoV; this._logoSnapPhotoH = snap.photoH;
         this.onSettingChanged();
     },
 
-    // 参考线 + 四边吸附:吸附 logo 中心并记录命中的位置(供高亮)
+    // 参考线 + 四边吸附:吸附元素中心并记录命中的位置(供高亮)
     //  - 参考线:1/3、1/2、2/3 六条,吸附中心
     //  - 边缘  :贴左/右/上/下,吸附到「元素完整可见 + 最小边距」的位置
     //    水印最常见用法就是贴四角(右下角品牌、左下角日期),原实现只有三分线,贴角全靠手感,
     //    而且容易贴得太靠外——大 logo 会有一半落在画布外。
     // 位移量按元素实际绘制尺寸推导(而非固定比例),因此大 logo 会自动留出更大的贴边距离。
-    _logoDrawSize(el) {
-        const size = Math.max(2, (el && el.size) || 60);
+    //  - 照片区域:有边距(留白/卡片)时,照片是画布内的一块居中区域,额外吸附照片四边/中心,
+    //    让元素能贴"照片边缘"而不是画布边缘。照片矩形按 baseMargin 边距估算。
+    // 该方法对 logo / 贴纸 / 自由文字统一生效(Compositor 借鉴:元素吸附+参考线)。
+    photoRectEstimate() {
+        const cv = this.dom && this.dom.canvas;
+        if (!cv || cv.width <= 1 || cv.height <= 1) return null;
+        const m = (this.template && this.template.baseMargin) || {};
+        const gm = m.globalMargin || 1;
+        const padT = (m.refTop || 0) * gm, padB = (m.refBottom || 0) * gm;
+        const padL = (m.refLeft || 0) * gm, padR = (m.refRight || 0) * gm;
+        if (padT + padB + padL + padR <= 1 && Math.abs(gm - 1) <= 0.01) return null;
+        const areaW = Math.max(10, cv.width - padL - padR);
+        const areaH = Math.max(10, cv.height - padT - padB);
+        const sc = m.imgScale || 1;
+        const dw = areaW * sc, dh = areaH * sc;
+        const px = m.imgOffsetX || 0, py = m.imgOffsetY || 0;
+        return { x: cv.width / 2 - dw / 2 + px, y: cv.height / 2 - dh / 2 + py, w: dw, h: dh };
+    },
+
+    _logoDrawSize(el, kind) {
+        let size = Math.max(2, (el && el.size) || 60);
+        if (kind === 'sticker') size = Math.max(6, Math.round(((el && el.scale) || 1) * 60));
         let ratio = (el && el.ratio) || 0;
         if (!ratio && el && el.dataUrl) {
             const im = window.getElementBitmap ? window.getElementBitmap(el.dataUrl) : null;
@@ -324,7 +346,7 @@ window.App = Object.assign(window.App || {}, {
         return { w: size, h: size * ratio };
     },
 
-    snapLogoToGuides(x, y, cw, ch, el) {
+    snapToGuides(x, y, cw, ch, el, kind) {
         const vLines = [cw / 3, cw / 2, cw * 2 / 3];
         const hLines = [ch / 3, ch / 2, ch * 2 / 3];
         const tol = 8;
@@ -340,7 +362,7 @@ window.App = Object.assign(window.App || {}, {
         let nx = sv >= 0 ? vLines[sv] : x;
         let ny = sh >= 0 ? hLines[sh] : y;
 
-        const dim = this._logoDrawSize(el);
+        const dim = this._logoDrawSize(el, kind);
         const dx = dim.w / 2, dy = dim.h / 2;
         const kx = Math.max(10, Math.min(cw * 0.05, dx));
         const ky = Math.max(10, Math.min(ch * 0.05, dy));
@@ -362,11 +384,34 @@ window.App = Object.assign(window.App || {}, {
         if (hEdge === 'top') ny = gly; else if (hEdge === 'bottom') ny = ch - gly;
         else if (hEdge === 'vcenter') ny = ch / 2;
 
+        // 照片区域四边 + 中心吸附:仅在有边距(照片<画布)时生效
+        let photoV = null, photoH = null;
+        const pr = this.photoRectEstimate();
+        if (pr) {
+            const pTol = 10;
+            let pbX = pTol, pTag = null;
+            for (const [d, tag] of [[pr.x + dx, 'pleft'], [pr.x + pr.w - dx, 'pright'], [pr.x + pr.w / 2, 'phcenter']]) {
+                const dd = Math.abs(x - d);
+                if (dd < pbX) { pbX = dd; pTag = tag; }
+            }
+            if (pTag === 'pleft') { nx = pr.x + dx; photoV = 'pleft'; }
+            else if (pTag === 'pright') { nx = pr.x + pr.w - dx; photoV = 'pright'; }
+            else if (pTag === 'phcenter') { nx = pr.x + pr.w / 2; photoV = 'phcenter'; }
+            let pbY = pTol, pTag2 = null;
+            for (const [d, tag] of [[pr.y + dy, 'ptop'], [pr.y + pr.h - dy, 'pbottom'], [pr.y + pr.h / 2, 'pvcenter']]) {
+                const dd = Math.abs(y - d);
+                if (dd < pbY) { pbY = dd; pTag2 = tag; }
+            }
+            if (pTag2 === 'ptop') { ny = pr.y + dy; photoH = 'ptop'; }
+            else if (pTag2 === 'pbottom') { ny = pr.y + pr.h - dy; photoH = 'pbottom'; }
+            else if (pTag2 === 'pvcenter') { ny = pr.y + pr.h / 2; photoH = 'pvcenter'; }
+        }
+
         return {
             x: nx, y: ny,
             v: sv >= 0 ? sv : null,
             h: sh >= 0 ? sh : null,
-            vEdge, hEdge,
+            vEdge, hEdge, photoV, photoH,
         };
     },
 
@@ -433,7 +478,7 @@ window.App = Object.assign(window.App || {}, {
     // 拖 logo 时叠加参考线:三分/中心线、四边吸附高亮、安全区提示
     drawLogoGuides() {
         try {
-            if (!this._dragEl || this._dragEl.kind !== 'logo') return;
+            if (!this._dragEl) return;
             const canvas = this.dom.canvas;
             if (!canvas || !canvas.width) return;
             const ctx = canvas.getContext('2d');
@@ -468,7 +513,7 @@ window.App = Object.assign(window.App || {}, {
             else if (eh === 'bottom') drawLine(0, ch - 1, cw, ch - 1, true);
 
             // 安全区:提示"贴到这里以内不会被裁"。(居中吸附时不画,避免与中心线视觉混淆)
-            const dim = this._logoDrawSize(this._dragEl.ref);
+            const dim = this._logoDrawSize(this._dragEl.ref, this._dragEl.kind);
             const kx = Math.max(10, Math.min(cw * 0.05, dim.w / 2));
             const ky = Math.max(10, Math.min(ch * 0.05, dim.h / 2));
             ctx.setLineDash([7, 6]);
@@ -477,8 +522,30 @@ window.App = Object.assign(window.App || {}, {
             ctx.strokeRect(kx, ky, Math.max(1, cw - kx * 2), Math.max(1, ch - ky * 2));
             ctx.setLineDash([]);
 
-            // 命中反馈:在 logo 中心画瞄准环
-            if (this._logoSnapV != null || this._logoSnapH != null || ev || eh) {
+            // 照片区域参考线(金色):照片四边 + 中心,命中的那条高亮
+            const pr = this.photoRectEstimate();
+            if (pr) {
+                const pv = this._logoSnapPhotoV, ph = this._logoSnapPhotoH;
+                const drawP = (x1, y1, x2, y2, active) => {
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                    ctx.lineWidth = active ? 5 : 2.5;
+                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = active ? '#ffb454' : 'rgba(255,180,84,0.45)';
+                    ctx.lineWidth = active ? 2.5 : 1;
+                    ctx.stroke();
+                };
+                drawP(pr.x, pr.y, pr.x, pr.y + pr.h, pv === 'pleft');
+                drawP(pr.x + pr.w, pr.y, pr.x + pr.w, pr.y + pr.h, pv === 'pright');
+                drawP(pr.x, pr.y, pr.x + pr.w, pr.y, ph === 'ptop');
+                drawP(pr.x, pr.y + pr.h, pr.x + pr.w, pr.y + pr.h, ph === 'pbottom');
+                if (pv === 'phcenter') drawP(pr.x + pr.w / 2, 0, pr.x + pr.w / 2, ch, true);
+                if (ph === 'pvcenter') drawP(0, pr.y + pr.h / 2, cw, pr.y + pr.h / 2, true);
+            }
+
+            // 命中反馈:在元素中心画瞄准环
+            if (this._logoSnapV != null || this._logoSnapH != null || ev || eh || this._logoSnapPhotoV || this._logoSnapPhotoH) {
                 const el = this._dragEl.ref;
                 const size = el.size || 60;
                 // 与 hitTestLogos 同理:瞄准环要画在 logo 实际绘制处(rel 用 _logW 口径),
