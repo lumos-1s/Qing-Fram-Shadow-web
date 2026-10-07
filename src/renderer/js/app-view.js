@@ -161,7 +161,14 @@ window.App = Object.assign(window.App || {}, {
     setStatus(msg) {
         this.statusMsg = msg;
         this.diagLog && this.diagLog('状态: ' + msg);
-        if (this.dom.stCanvas) this.dom.stCanvas.textContent = `画布 ${this.canvasW()}×${this.canvasH()}` + (msg ? ` · ${msg}` : '');
+        if (this.dom.stCanvas) {
+            const m = String(msg || '');
+            let level = '';
+            if (/失败|错误|不支持|不可用|无法|未找到|未加载|请先|请输入|至少保留|没有可|不存在|异常|缺失|未知原因/.test(m)) level = ' st-err';
+            else if (/已|完成|成功/.test(m)) level = ' st-ok';
+            this.dom.stCanvas.className = 'st-item grow' + level;
+            this.dom.stCanvas.textContent = `画布 ${this.canvasW()}×${this.canvasH()}` + (m ? ` · ${m}` : '');
+        }
     },
     canvasW() { return this.dom.canvas ? (this.dom.canvas._logW || this.dom.canvas.width) : 0; },
     canvasH() { return this.dom.canvas ? (this.dom.canvas._logH || this.dom.canvas.height) : 0; },

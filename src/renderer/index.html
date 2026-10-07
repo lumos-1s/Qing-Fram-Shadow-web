@@ -107,6 +107,7 @@
                     <span class="ico-moon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 9.2A6 6 0 0 1 6.8 2.5a6 6 0 1 0 6.7 6.7Z"/></svg></span>
                 </button>
                 <button id="btnCheckUpdate" class="tbtn icon" title="检查软件更新"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7"/><path d="M4.8 6.5 8 9.7l3.2-3.2"/><path d="M2.5 12.5h11"/></svg></button>
+                <button id="btnExportDiag" class="tbtn icon" title="导出诊断日志（遇到问题时一键打包应用信息与操作记录）"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 2.5h5L13 5v8.5H3V2.5h2.5Z"/><path d="M5.5 2.5v3h-3"/><path d="M6 8h4M6 10.5h4"/></svg></button>
                 <div class="sep"></div>
                 <div class="account" id="accountArea">
                     <div id="loginStatus" class="status-pill clickable" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 12px 4px 4px;">
@@ -785,7 +786,6 @@
             <span id="stRes" class="st-item">分辨率 --</span>
             <span id="stInfo" class="st-item">未导入照片</span>
             <span id="stCanvas" class="st-item grow">画布 --×--</span>
-            <button id="btnExportDiag" class="st-btn" title="导出诊断日志（遇到问题时一键打包应用信息与操作记录）">诊断</button>
             <button id="btnCompare" class="st-btn" title="按住查看原图（触屏可点按，空格 按住）/ 松开恢复"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8v12.4"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4" fill="currentColor" fill-opacity=".25" stroke="none"/></svg>对比原图</button>
             <div class="progress-wrap"><div id="progressBar" class="progress-bar"></div></div>
             <span id="exportProgressText" class="st-item" style="display:none"></span>

@@ -713,6 +713,8 @@ html.dark .icon-pool .icon-cell {
 }
 .st-item { white-space: nowrap; }
 #stCanvas { font-variant-numeric: tabular-nums; }
+#stCanvas.st-err { color: var(--rose); font-weight: 600; }
+#stCanvas.st-ok  { color: var(--primary); }
 .st-btn {
     border: 1px solid var(--border-strong); background: var(--surface);
     color: var(--text-2); padding: 5px 12px; border-radius: 9px;
