@@ -111,6 +111,15 @@ window.App = {
         this.updateHistoryButtons();
         this.initLogin();
         this.initDraft();
+        // 首帧预设:启动页撤掉、恢复草稿跑完后,在空闲回调里选中第一个预设。
+        // 用模板引用判断「没人碰过」:restoreLastState 恢复草稿 / 用户手动点预设都会
+        // 替换 this.template,此时引用不再等于启动时的引用,选择被安全跳过。
+        const bootTpl = this.template;
+        const pickFirst = () => {
+            if (this.presets && this.presets.length && this.template === bootTpl) this.selectPreset(this.presets[0]);
+        };
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(pickFirst, { timeout: 1500 });
+        else setTimeout(pickFirst, 1000);
     },
 
     // 恢复上次的界面偏好(导出质量等)

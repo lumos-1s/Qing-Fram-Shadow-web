@@ -216,9 +216,23 @@ const readImagesAsDataUrls = (dir, exts) => {
     } catch (e) { return []; }
 };
 
-ipcMain.handle('list-logos', () => {
-    return readImagesAsDataUrls(LOGOS_DIR, ['.png', '.jpg', '.jpeg']);
-});
+// 静态资源进程内缓存:品牌logo/纹理/标记都是只读资源,每次启动重复读盘+base64 是启动慢的主因之一。
+// 失效策略:按目录内每个文件的 mtime 做摘要,任何文件增删/修改都会触发重建(代价只是几十次 stat)。
+const _staticCache = new Map();
+const cachedImages = (key, dir, exts) => {
+    let sig = '';
+    try {
+        sig = fs.readdirSync(dir)
+            .map(f => f + ':' + fs.statSync(path.join(dir, f)).mtimeMs)
+            .sort().join('|');
+    } catch (_) { sig = 'missing'; }
+    const c = _staticCache.get(key);
+    if (c && c.sig === sig) return c.data;
+    const data = readImagesAsDataUrls(dir, exts);
+    _staticCache.set(key, { sig, data });
+    return data;
+};
+ipcMain.handle('list-logos', () => cachedImages('logos', LOGOS_DIR, ['.png', '.jpg', '.jpeg']));
 
 // 内置自定义图标库。种子 shared/custom-icons.json 只读,实际读写走 userData 下的副本 ——
 // 打包后种子在 app.asar 里是只读的,就地改必然失败(见 custom-icons.js 顶部注释)。
@@ -234,15 +248,11 @@ ipcMain.handle('list-custom-icons', () => customIcons.list());
 ipcMain.handle('delete-custom-icon', (_e, dataUrl) => customIcons.remove(dataUrl));
 ipcMain.handle('rename-custom-icon', (_e, dataUrl, name) => customIcons.rename(dataUrl, name));
 
-ipcMain.handle('list-textures', () => {
-    return readImagesAsDataUrls(TEXTURES_DIR, ['.png', '.jpg', '.jpeg']);
-});
+ipcMain.handle('list-textures', () => cachedImages('textures', TEXTURES_DIR, ['.png', '.jpg', '.jpeg']));
 
 // 内置原创标记(shared/marks,随包分发)。全部是项目自绘的几何/排版图形,
 // 不含任何第三方品牌素材 —— 品牌 logo 因商标/著作权原因不随发行版分发,见 OPTIMIZATIONS.md。
-ipcMain.handle('list-marks', () => {
-    return readImagesAsDataUrls(MARKS_DIR, ['.svg', '.png']);
-});
+ipcMain.handle('list-marks', () => cachedImages('marks', MARKS_DIR, ['.svg', '.png']));
 
 const ensureTemplatesDir = () => {
     if (!fs.existsSync(TEMPLATES_DIR)) fs.mkdirSync(TEMPLATES_DIR, { recursive: true });

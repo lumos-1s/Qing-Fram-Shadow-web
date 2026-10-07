@@ -283,7 +283,8 @@ window.App = Object.assign(window.App || {}, {
         try { this.presets = await window.__loadAllPresets(); }
         catch (e) { this.presets = []; }
         this.buildTree();
-        if (this.presets.length) this.selectPreset(this.presets[0]);
+        // 首帧预设选择不在启动路径上执行:先把窗口/预设树渲染出来,选择推迟到
+        // init() 末尾的空闲回调(见 app.js),恢复草稿/用户手动选择都不会被覆盖。
         this.splashTick();
     },
 
@@ -322,7 +323,11 @@ window.App = Object.assign(window.App || {}, {
             console.warn('[清框影] listMarks 调用失败(主进程可能还是旧的):', e && e.message);
         }
         this.splashTick();
-        if (this.dom.stRes) this.renderLogoPools();
+        // 启动路径不立即构建 logo 池 DOM(上百个 img 赋值 src 会触发批量解码,是启动卡顿主因)。
+        // 空闲时再建;用户切到「Logo」页签时 switchTab 有兜底渲染,数据(this.logos)已在上面就绪。
+        const buildPools = () => { if (this.dom.stRes) this.renderLogoPools(); };
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(buildPools, { timeout: 2500 });
+        else setTimeout(buildPools, 1500);
     },
     saveCustomIcon(logo) {
         try {
