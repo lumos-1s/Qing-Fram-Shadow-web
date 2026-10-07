@@ -864,6 +864,16 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             scrap: { paper: '#ece3cf', ink: '#4a3a2a', sub: '#9a7f5f', title: '#7a4f3a', line: 'rgba(120,90,50,0.45)' }
         }[variant] || { paper: '#f4eedd', ink: '#3a2b1a', sub: '#8a744f', title: '#5b4128', line: 'rgba(90,70,40,0.45)' };
         const rnd = styleNoise(iw, ih, 20261004);
+        // 演唱会:仿邮票预设 —— 票面底下先垫一层照片模糊,半孔挖穿票面后露出模糊色,
+        // 而不是透出画布深色背景(黑点)。票面全幅覆盖,外观不变,只影响孔内可见内容。
+        if (variant === 'concert') {
+            const blurR = Math.max(12, Math.round(size * 0.7));
+            const bgScale = Math.max(w / iw, h / ih);
+            g.save();
+            g.filter = 'blur(' + blurR + 'px)';
+            g.drawImage(img, (w - iw * bgScale) / 2, (h - ih * bgScale) / 2, iw * bgScale, ih * bgScale);
+            g.restore();
+        }
         // 底纸
         g.fillStyle = pal.paper;
         g.fillRect(0, 0, w, h);
