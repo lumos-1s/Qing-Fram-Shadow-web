@@ -178,6 +178,7 @@ window.App = Object.assign(window.App || {}, {
                 ? `已取消导出：完成 ${okCount}${failCount ? `，失败 ${failCount}` : ''}`
                 : `导出完成：成功 ${okCount}${failCount ? `，失败 ${failCount}` : ''}${useBaseCount ? `（${useBaseCount} 张沿用当前设计）` : ''}`;
             this.setStatus(m);
+            this.revealExport(loc, okCount, aborted);
         } finally {
             if (btnCancel) btnCancel.style.display = 'none';
             delete this.uiDprOverride;
@@ -476,8 +477,8 @@ window.App = Object.assign(window.App || {}, {
             const last = note[note.length - 1];
             note = last && (last.note || last.body || '');
         }
-        note = String(note || '').replace(/<[^>]+>/g, '');
-        b.textContent = note.trim() || '暂无更新说明';
+        const html = this.mdToHtml(String(note || '').trim());
+        b.innerHTML = html || '<div class="rn-line">暂无更新说明</div>';
         m.style.display = 'flex';
     },
     hideUpdateNotes() {
@@ -613,10 +614,45 @@ window.App = Object.assign(window.App || {}, {
 
     // 导出进度:进度条 + 底部“第 n / N 张”标签
     showExportProgress(n, total, name) {
+        const pct = Math.round(((n + 1) / total) * 100);
         const bar = document.getElementById('progressBar');
-        if (bar) bar.style.width = Math.round(((n + 1) / total) * 100) + '%';
+        if (bar) bar.style.width = pct + '%';
         const label = document.getElementById('exportProgressText');
-        if (label) { label.style.display = ''; label.textContent = `导出中 ${n + 1}/${total} · ${String(name || '').replace(/\.[^.]+$/, '')}`; }
+        if (label) { label.style.display = ''; label.textContent = `导出中 ${n + 1}/${total} · ${pct}% · ${String(name || '').replace(/\.[^.]+$/, '')}`; }
+    },
+    // 导出完成后在资源管理器中定位产物:单文件选中该文件,目录模式打开目录
+    revealExport(loc, okCount, aborted) {
+        const api = window.qingframe;
+        if (!api || !api.showItemInFolder) return;
+        if (aborted || !okCount) return;
+        const p = loc && (loc.mode === 'dir' ? loc.dir : loc.path);
+        if (!p) return;
+        api.showItemInFolder(p).then(r => {
+            if (!(r && r.ok)) this.diagLog && this.diagLog('[提示] 打开导出位置失败: ' + ((r && r.message) || '路径不可用'));
+        }).catch(() => {});
+    },
+    // 更新内容 markdown 轻渲染(先转义防注入,再处理标题/列表/加粗/代码)
+    mdToHtml(text) {
+        const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const lines = String(text || '').split(/\r?\n/);
+        const out = [];
+        let inList = false;
+        const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+        for (const raw of lines) {
+            const line = esc(raw);
+            const h = line.match(/^(#{1,4})\s+(.*)/);
+            if (h) { closeList(); out.push(`<div class="rn-h">${h[2]}</div>`); continue; }
+            const li = line.match(/^[-*•]\s+(.*)/);
+            if (li) {
+                if (!inList) { out.push('<ul class="rn-list">'); inList = true; }
+                out.push(`<li>${li[1]}</li>`); continue;
+            }
+            if (!line.trim()) { closeList(); continue; }
+            closeList();
+            out.push(`<div class="rn-line">${line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>')}</div>`);
+        }
+        closeList();
+        return out.join('');
     },
 
     // 导出尺寸提示:所选档位超过相框能给出的最大尺寸时,提醒用户实际输出会小于所选值。

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -151,6 +151,17 @@ ipcMain.handle('get-app-info', () => ({
     userData: app.getPath('userData'),
     appPath: app.getAppPath()
 }));
+// 导出完成后在资源管理器中显示文件/目录(不再只显示一串路径文本)
+ipcMain.handle('show-item-in-folder', (_e, p) => {
+    try {
+        if (!p) return { ok: false };
+        const stat = fs.statSync(p);
+        if (stat.isDirectory()) { shell.openPath(p); return { ok: true, opened: 'dir' }; }
+        shell.showItemInFolder(p);
+        return { ok: true, opened: 'file' };
+    } catch (e) { return { ok: false, message: e && e.message }; }
+});
+
 ipcMain.handle('save-diagnostics', async (_e, text) => {
     try {
         const r = await dialog.showSaveDialog({
