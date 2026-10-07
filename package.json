@@ -44,6 +44,7 @@
     "app:dir": "electron-builder --win --dir",
     "verify:dist": "node tools/verify-dist.js",
     "release": "electron-builder --win --dir && node tools/verify-dist.js && electron-builder --win",
+    "release:publish": "electron-builder --win --publish always && node tools/verify-dist.js",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable"
   },
