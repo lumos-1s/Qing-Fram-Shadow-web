@@ -1527,6 +1527,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
     },
 
     // 用该图自己的模板(没有则用当前模板快照)在 200px 离屏画布渲染装框成品,替换占位
+    // 注意:无独立模板的图只显示边框效果,不继承当前图的 logo/贴纸/自由文字——
+    // 这些元素是各图独立记忆的(见 syncBorderTo 注释),缩略图与主画布口径保持一致。
     renderFramedThumb(im) {
         if (!window.__render || !im) return;
         const prevCanvas = this.dom.canvas;
@@ -1543,6 +1545,14 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
             const saved = this.imageTemplates.get(im);
             this.template = saved ? JSON.parse(JSON.stringify(saved)) : (prevTpl ? JSON.parse(JSON.stringify(prevTpl)) : null);
             if (!this.template) return;
+            // 无独立模板的图:剔除水印元素,避免当前图的 logo/贴纸/文字串到其它图缩略图上
+            if (!saved) {
+                delete this.template.logoElements;
+                if (this.template.decorConfig) {
+                    delete this.template.decorConfig.stickers;
+                    delete this.template.decorConfig.textLines;
+                }
+            }
             window.__render(this, false);
             im.thumb = cv.toDataURL('image/jpeg', 0.8);
             // 直接按图对象取缩略图节点:原来每次都 querySelectorAll('img.thumb') 扫全条再逐个比对
