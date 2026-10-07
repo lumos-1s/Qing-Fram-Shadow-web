@@ -928,9 +928,18 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const pitch = Math.max(pr * 2.1, pr * 2 + 3);
         g.save();
         g.globalCompositeOperation = 'destination-out';
-        for (let y = headH + pr; y < headH + ih - pr; y += pitch) {
-            g.beginPath(); g.arc(side + pr, y, pr, 0, 6.2832); g.fill();
-            g.beginPath(); g.arc(side + iw - pr, y, pr, 0, 6.2832); g.fill();
+        if (variant === 'concert') {
+            // 演唱会:模仿邮票预设 —— 孔圆心落在票券左右边缘线上,半圆只咬进票面(露出下层),
+            // 不再像旧版那样在照片区内侧打完整圆孔。
+            for (let y = headH + pr; y < headH + ih - pr; y += pitch) {
+                g.beginPath(); g.arc(0, y, pr, 0, 6.2832); g.fill();
+                g.beginPath(); g.arc(w, y, pr, 0, 6.2832); g.fill();
+            }
+        } else {
+            for (let y = headH + pr; y < headH + ih - pr; y += pitch) {
+                g.beginPath(); g.arc(side + pr, y, pr, 0, 6.2832); g.fill();
+                g.beginPath(); g.arc(side + iw - pr, y, pr, 0, 6.2832); g.fill();
+            }
         }
         g.restore();
         // 标题/票号/日期
