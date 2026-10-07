@@ -577,7 +577,10 @@ window.App = Object.assign(window.App || {}, {
         lines.push('── 操作日志(最近 ' + ((this._diagBuf || []).length) + ' 条) ──');
         (this._diagBuf || []).forEach(l => lines.push(l));
         const text = lines.join('\n');
-        const r = await api.saveDiagnosticsFile(text).catch(() => ({ ok: false, message: '保存失败' }));
+        // 不用 catch 吞错:把 invoke 的真实失败原因透传出来(常见:主进程没重启,handler 未注册)
+        let r;
+        try { r = await api.saveDiagnosticsFile(text); }
+        catch (e) { r = { ok: false, message: (e && e.message) || '保存失败' }; }
         if (r && r.ok) this.setStatus('诊断日志已保存: ' + (r.path || ''));
         else if (r && r.canceled) this.setStatus('已取消导出诊断日志');
         else this.setStatus('诊断日志导出失败: ' + ((r && r.message) || '未知原因'));
