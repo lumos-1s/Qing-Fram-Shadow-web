@@ -464,14 +464,37 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
 
     // 折角相纸:白卡纸四边留白,右上角撕折(缺角 + 翻起的纸角落在照片上)
     function styleFoldCorner(img, size, g, iw, ih) {
-        const w = iw + size * 2, h = ih + size * 2;
-        const px = size, py = size;
-        g.fillStyle = '#ffffff';
+        const pad = Math.max(60, Math.round(iw * 0.06));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        const px = pad, py = pad;
+        // 桌面背景(浅灰)
+        g.fillStyle = '#e9e6df';
         g.fillRect(0, 0, w, h);
+        // 便签纸: 奶油黄, 圆角, 浮起投影, 比照片四周大一圈
+        const m = Math.max(26, Math.round(size * 1.1));
+        const bx = px - m, by = py - m, bw = iw + m * 2, bh = ih + m * 2;
+        g.save();
+        g.shadowColor = 'rgba(90,70,30,0.30)';
+        g.shadowBlur = Math.max(14, Math.round(size * 0.6));
+        g.shadowOffsetX = Math.round(size * 0.25);
+        g.shadowOffsetY = Math.round(size * 0.6);
+        g.fillStyle = '#fdf2d0';
+        fillRoundRectCtx(g, bx, by, bw, bh, 3);
+        g.restore();
+        // 便签纸浅噪点(纸感)
+        const rndf = styleNoise(w, h, 6601);
+        g.fillStyle = 'rgba(150,120,60,0.07)';
+        for (let i = 0; i < 90; i++) {
+            const nx = rndf(w), ny = rndf(h), ns = 1 + (i % 3);
+            g.fillRect(nx, ny, ns, ns);
+        }
+        // 照片: 白色贴纸边 + 居中贴便签上
+        g.fillStyle = '#ffffff';
+        fillRoundRectCtx(g, px - 6, py - 6, iw + 12, ih + 12, 2);
         g.drawImage(img, px, py);
-        const fl = Math.max(36, Math.floor(Math.min(iw, ih) * 0.10));
-        const P0 = [px + iw, py], P1 = [px + iw - fl, py], P2 = [px + iw, py + fl], R = [px + iw - fl, py + fl];
-        // 先镂空被折掉的照片角(露出底色)
+        // 右上角折角: 便签纸+照片角一起折起(镂空露出桌面背景)
+        const fl = Math.max(48, Math.round(Math.min(iw, ih) * 0.12));
+        const P0 = [bx + bw, by], P1 = [bx + bw - fl, by], P2 = [bx + bw, by + fl], R = [bx + bw - fl, by + fl];
         g.save();
         g.globalCompositeOperation = 'destination-out';
         g.beginPath();
@@ -479,22 +502,195 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         g.fill();
         g.restore();
         // 折痕投影
-        g.strokeStyle = 'rgba(0,0,0,0.12)';
+        g.strokeStyle = 'rgba(0,0,0,0.18)';
         g.lineWidth = 3;
         g.beginPath();
-        g.moveTo(P1[0] + 1, P1[1] + 2); g.lineTo(P2[0] + 2, P2[1] - 1);
+        g.moveTo(P1[0] + 1, P1[1] + 3); g.lineTo(P2[0] + 3, P2[1] - 1);
         g.stroke();
-        // 翻起的纸角(纸背高光渐变面)
+        // 翻起的纸角(便签纸背, 深一档的黄)
         const lg = g.createLinearGradient(P2[0], P2[1], P1[0], P1[1]);
-        lg.addColorStop(0, 'rgb(245,242,233)');
-        lg.addColorStop(1, 'rgb(226,222,210)');
+        lg.addColorStop(0, '#f5e3b3');
+        lg.addColorStop(1, '#e9d190');
         g.fillStyle = lg;
         g.beginPath();
         g.moveTo(P1[0], P1[1]); g.lineTo(R[0], R[1]); g.lineTo(P2[0], P2[1]); g.closePath();
         g.fill();
-        g.strokeStyle = 'rgba(0,0,0,0.16)';
+        g.strokeStyle = 'rgba(120,90,40,0.35)';
         g.lineWidth = 1;
         g.stroke();
+        // 左下角便签小字
+        g.fillStyle = 'rgba(120,95,50,0.55)';
+        g.font = Math.max(11, Math.round(size * 0.55)) + 'px "Segoe Script", "Comic Sans MS", cursive';
+        g.textAlign = 'left';
+        g.textBaseline = 'alphabetic';
+        g.fillText('memo', px + 8, py + ih - 4);
+    }
+
+    // ══ 双重曝光(2026-10重做): 深底 + 同图镜像滤色叠影 + 胶片颗粒 + 暗角 + 底部条 ──
+    function styleDoubleExposure(img, size, g, iw, ih) {
+        const pad = Math.max(50, Math.round(iw * 0.05));
+        const w = iw + pad * 2, h = ih + pad * 2;
+        const px = pad, py = pad;
+        // 深色底
+        g.fillStyle = '#141418';
+        g.fillRect(0, 0, w, h);
+        // 照片1: 正常
+        g.drawImage(img, px, py, iw, ih);
+        // 照片2: 同图放大 + 错位重影(不翻转), 滤色混合(双曝叠光)
+        const off = Math.round(iw * 0.02);
+        g.save();
+        g.globalCompositeOperation = 'screen';
+        g.globalAlpha = 0.55;
+        g.drawImage(img, px - Math.round(iw * 0.25) + off, py - Math.round(ih * 0.25) + Math.round(off * 0.5), Math.round(iw * 1.5), Math.round(ih * 1.5));
+        g.restore();
+        // 局部柔光带(叠影高光区)
+        g.save();
+        g.globalCompositeOperation = 'soft-light';
+        g.globalAlpha = 0.35;
+        const lg = g.createLinearGradient(px, py, px + iw, py + ih);
+        lg.addColorStop(0, 'rgba(255,255,255,0)');
+        lg.addColorStop(0.45, 'rgba(255,245,220,0.5)');
+        lg.addColorStop(0.7, 'rgba(255,255,255,0)');
+        lg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = lg;
+        g.fillRect(px, py, iw, ih);
+        g.restore();
+        // 胶片颗粒
+        const rndf = styleNoise(w, h, 7711);
+        g.fillStyle = 'rgba(255,255,255,0.05)';
+        for (let i = 0; i < 160; i++) {
+            const nx = rndf(w), ny = rndf(h), ns = 1 + (i % 3);
+            g.fillRect(nx, ny, ns, ns);
+        }
+        // 暗角
+        const vg = g.createRadialGradient(px + iw / 2, py + ih / 2, Math.min(iw, ih) * 0.35, px + iw / 2, py + ih / 2, Math.max(iw, ih) * 0.75);
+        vg.addColorStop(0, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, 'rgba(0,0,0,0.38)');
+        g.fillStyle = vg;
+        g.fillRect(px, py, iw, ih);
+    }
+
+    // ══ 杂志大刊头(2026-10重做) ──
+    function styleMagazineMasthead(img, size, g, iw, ih) {
+        const pad = Math.max(50, Math.round(iw * 0.05));
+        const topBar = Math.round(iw * 0.15);
+        const botBar = Math.round(iw * 0.07);
+        const w = iw + pad * 2, h = ih + pad * 2 + topBar + botBar;
+        const px = pad, py = pad + topBar;
+        // 深色底
+        g.fillStyle = '#0d0d12';
+        g.fillRect(0, 0, w, h);
+        // 照片(细白框)
+        g.strokeStyle = 'rgba(255,255,255,0.85)';
+        g.lineWidth = 1;
+        g.strokeRect(px, py, iw, ih);
+        g.drawImage(img, px, py);
+        // 刊头区
+        const cxm = w / 2;
+        g.fillStyle = '#9a9aa5';
+        g.font = '600 ' + Math.max(10, Math.round(topBar * 0.16)) + 'px "Arial", sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('THE WEEKLY PHOTO JOURNAL', cxm, pad + Math.round(topBar * 0.22));
+        g.fillStyle = '#f2f0e8';
+        g.font = '900 italic ' + Math.round(topBar * 0.5) + 'px Georgia, "Times New Roman", serif';
+        g.fillText('M A G A Z I N E', cxm, pad + Math.round(topBar * 0.60));
+        g.strokeStyle = 'rgba(255,255,255,0.35)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(cxm - Math.round(iw * 0.30), pad + Math.round(topBar * 0.82));
+        g.lineTo(cxm + Math.round(iw * 0.30), pad + Math.round(topBar * 0.82));
+        g.stroke();
+        // 底部条
+        const bb = h - botBar;
+        g.fillStyle = '#16161c';
+        g.fillRect(0, bb, w, botBar);
+        g.strokeStyle = '#3a3a44';
+        g.lineWidth = 1;
+        g.beginPath(); g.moveTo(0, bb); g.lineTo(w, bb); g.stroke();
+        g.fillStyle = '#c8c8d0';
+        g.font = '700 ' + Math.max(10, Math.round(botBar * 0.28)) + 'px "Arial", sans-serif';
+        g.textAlign = 'left'; g.textBaseline = 'middle';
+        g.fillText('VOL.08 — 2026', pad, bb + Math.round(botBar / 2));
+        g.textAlign = 'right';
+        g.fillText('STREET EDITION', w - pad, bb + Math.round(botBar / 2));
+    }
+
+    // ══ 杂志封面(2026-10重做) ──
+    function styleMagazineCover(img, size, g, iw, ih) {
+        const pad = Math.max(36, Math.round(iw * 0.045));
+        const topBar = Math.round(iw * 0.105);
+        const botBar = Math.round(iw * 0.055);
+        const w = iw + pad * 2, h = ih + pad * 2 + topBar + botBar;
+        const px = pad, py = pad + topBar;
+        // 米白封底
+        g.fillStyle = '#f7f5f0';
+        g.fillRect(0, 0, w, h);
+        // 照片(白贴纸边 + 细灰线)
+        g.fillStyle = '#ffffff';
+        g.fillRect(px - 8, py - 8, iw + 16, ih + 16);
+        g.strokeStyle = '#d8d4cc';
+        g.lineWidth = 1;
+        g.strokeRect(px - 8.5, py - 8.5, iw + 17, ih + 17);
+        g.drawImage(img, px, py);
+        // 刊头区
+        const cxm = w / 2;
+        g.fillStyle = '#8a8578';
+        g.font = '600 ' + Math.max(9, Math.round(topBar * 0.17)) + 'px "Arial", sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('PARIS · SPRING 2026', cxm, pad + Math.round(topBar * 0.20));
+        g.fillStyle = '#141414';
+        g.font = '900 italic ' + Math.round(topBar * 0.55) + 'px Georgia, "Times New Roman", serif';
+        g.fillText('FASHION', cxm, pad + Math.round(topBar * 0.60));
+        g.strokeStyle = '#141414';
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(cxm - Math.round(iw * 0.28), pad + Math.round(topBar * 0.82));
+        g.lineTo(cxm + Math.round(iw * 0.28), pad + Math.round(topBar * 0.82));
+        g.stroke();
+        // 底部
+        g.fillStyle = '#141414';
+        g.font = '700 ' + Math.max(9, Math.round(botBar * 0.30)) + 'px "Arial", sans-serif';
+        g.textAlign = 'left'; g.textBaseline = 'middle';
+        g.fillText('THE BEST MOMENTS', pad, h - Math.round(botBar / 2));
+        g.textAlign = 'right';
+        g.fillText('P. 08', w - pad, h - Math.round(botBar / 2));
+    }
+
+    // ══ 杂志页眉(2026-10重做) ──
+    function styleMagazineHeader(img, size, g, iw, ih) {
+        const pad = Math.max(36, Math.round(iw * 0.04));
+        const topBar = Math.round(iw * 0.09);
+        const botBar = Math.round(iw * 0.05);
+        const w = iw + pad * 2, h = ih + pad * 2 + topBar + botBar;
+        const px = pad, py = pad + topBar;
+        // 白底
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, w, h);
+        // 页眉条
+        g.fillStyle = '#141414';
+        g.font = '800 ' + Math.max(11, Math.round(topBar * 0.34)) + 'px Georgia, "Times New Roman", serif';
+        g.textAlign = 'left'; g.textBaseline = 'middle';
+        g.fillText('MAGAZINE', pad, pad + Math.round(topBar * 0.42));
+        g.fillStyle = '#777777';
+        g.font = '600 ' + Math.max(9, Math.round(topBar * 0.22)) + 'px "Arial", sans-serif';
+        g.textAlign = 'right';
+        g.fillText('VOL.16 · 2026', w - pad, pad + Math.round(topBar * 0.35));
+        // 页眉双线
+        const yl = pad + Math.round(topBar * 0.72);
+        g.strokeStyle = '#141414'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(pad, yl); g.lineTo(w - pad, yl); g.stroke();
+        g.strokeStyle = '#bbbbbb'; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(pad, yl + 3); g.lineTo(w - pad, yl + 3); g.stroke();
+        // 照片(细黑框)
+        g.strokeStyle = '#222222';
+        g.lineWidth = 1;
+        g.strokeRect(px, py, iw, ih);
+        g.drawImage(img, px, py);
+        // 页脚
+        g.fillStyle = '#999999';
+        g.font = '600 ' + Math.max(8, Math.round(botBar * 0.26)) + 'px "Arial", sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('THE PHOTO ESSAY — CONTINUED ON P.14', w / 2, h - Math.round(botBar / 2));
     }
 
     // 胶带挂片:牛皮纸底 + 和纸胶带(半透明)压住照片
@@ -731,12 +927,12 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     // ── 纪念邮票(2026-10):邮票浮在照片背景模糊上,白纸票面+齿孔挖空透出模糊色+照片+右下地点/日期+顶部签名 ──
     function styleStamp(img, size, g, iw, ih, S, variant) {
         const pal = ({
-            classic:  { paper: '#faf5ea', ink: '#2f2a24', deco: null },
-            kraft:    { paper: '#e6d3ae', ink: '#3a2a14', deco: 'paper' },
+            classic:  { paper: '#f8fafd', ink: '#2f2a24', deco: 'whiteframe' },
+            kraft:    { paper: '#d6b58c', ink: '#3a2a14', deco: 'paper' },
             blueprint:{ paper: '#1e3a5f', ink: '#e9f1fb', deco: 'grid' },
             redseal:  { paper: '#faf5ea', ink: '#2f2a24', deco: 'seal' },
             gold:     { paper: '#16130c', ink: '#d4af37', deco: 'goldline' }
-        })[variant] || { paper: '#faf5ea', ink: '#2f2a24', deco: null };
+        })[variant] || { paper: '#f8fafd', ink: '#2f2a24', deco: 'whiteframe' };
         const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
         const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
         const hasAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth) && (S ? S.avatarShow !== 0 : true);
@@ -778,15 +974,46 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         if (pal.deco === 'paper') {
             tg.fillStyle = ticketPaperPattern();
             tg.fillRect(0, 0, tw, th);
+            const rndf = styleNoise(tw, th, 9527);
+            // 大块斑驳晕斑: 牛皮纸天然深浅不均的做旧感
+            for (let i = 0; i < 34; i++) {
+                const bx = rndf(tw), by = rndf(th), br = 36 + rndf(60);
+                tg.fillStyle = 'rgba(122,82,34,' + (0.10 + (i % 5) * 0.03) + ')';
+                tg.beginPath(); tg.arc(bx, by, br, 0, 6.2832); tg.fill();
+            }
+            // 纤维短纹(加粗加密)
+            tg.strokeStyle = 'rgba(96,64,22,0.28)';
+            tg.lineWidth = 1.8;
+            for (let i = 0; i < 220; i++) {
+                const nx = rndf(tw), ny = rndf(th), nl = 6 + (i % 15);
+                tg.beginPath(); tg.moveTo(nx, ny); tg.lineTo(nx + nl, ny + 1); tg.stroke();
+            }
+            // 四边做旧晕染(旧纸边缘发暗)
+            const egX = tg.createLinearGradient(0, 0, tw, 0);
+            egX.addColorStop(0, 'rgba(90,58,20,0.20)');
+            egX.addColorStop(0.07, 'rgba(90,58,20,0)');
+            egX.addColorStop(0.93, 'rgba(90,58,20,0)');
+            egX.addColorStop(1, 'rgba(90,58,20,0.20)');
+            tg.fillStyle = egX; tg.fillRect(0, 0, tw, th);
+            const egY = tg.createLinearGradient(0, 0, 0, th);
+            egY.addColorStop(0, 'rgba(90,58,20,0.20)');
+            egY.addColorStop(0.07, 'rgba(90,58,20,0)');
+            egY.addColorStop(0.93, 'rgba(90,58,20,0)');
+            egY.addColorStop(1, 'rgba(90,58,20,0.20)');
+            tg.fillStyle = egY; tg.fillRect(0, 0, tw, th);
         } else if (pal.deco === 'grid') {
-            tg.strokeStyle = 'rgba(255,255,255,0.13)';
-            tg.lineWidth = 1;
-            for (let x = 8; x < tw; x += 8) { tg.beginPath(); tg.moveTo(x, 0); tg.lineTo(x, th); tg.stroke(); }
-            for (let y = 8; y < th; y += 8) { tg.beginPath(); tg.moveTo(0, y); tg.lineTo(tw, y); tg.stroke(); }
+            tg.strokeStyle = 'rgba(255,255,255,0.20)';
+            tg.lineWidth = 1.5;
+            for (let x = 12; x < tw; x += 12) { tg.beginPath(); tg.moveTo(x, 0); tg.lineTo(x, th); tg.stroke(); }
+            for (let y = 12; y < th; y += 12) { tg.beginPath(); tg.moveTo(0, y); tg.lineTo(tw, y); tg.stroke(); }
+        } else if (pal.deco === 'whiteframe') {
+            tg.strokeStyle = 'rgba(0,0,0,0.12)';
+            tg.lineWidth = 1.5;
+            tg.strokeRect(5, 5, tw - 10, th - 10);
         } else if (pal.deco === 'goldline') {
-            tg.strokeStyle = 'rgba(212,175,55,0.55)';
-            tg.lineWidth = 2;
-            tg.strokeRect(6, 6, tw - 12, th - 12);
+            tg.strokeStyle = 'rgba(212,175,55,0.8)';
+            tg.lineWidth = 3;
+            tg.strokeRect(7, 7, tw - 14, th - 14);
         }
         tg.globalCompositeOperation = 'destination-out';
         tg.fillStyle = '#000000';
@@ -870,18 +1097,20 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
             g.fillText(dateStr, textRX, footerY + textH * (locStr ? 0.62 : 0.5));
         }
         if (pal.deco === 'seal') {
-            const r = Math.max(16, Math.round(Math.min(iw, ih) * 0.07));
-            const cx = x0 + side + Math.max(r + 8, Math.round(iw * 0.12));
-            const cy = y0 + side + ih - Math.max(r + 10, Math.round(ih * 0.08));
+            const r = Math.max(20, Math.round(Math.min(iw, ih) * 0.115));
+            const cx = x0 + side + r + 18;
+            const cy = y0 + side + ih - r - 20;
             g.save();
-            g.strokeStyle = 'rgba(178,34,34,0.85)';
-            g.fillStyle = 'rgba(178,34,34,0.85)';
-            g.lineWidth = 2;
-            g.beginPath(); g.arc(cx, cy, r, 0, 6.2832); g.stroke();
-            g.beginPath(); g.arc(cx, cy, r * 0.72, 0, 6.2832); g.stroke();
-            g.font = Math.round(r * 0.52) + 'px "SimSun", serif';
+            g.translate(cx, cy);
+            g.rotate(-0.18);
+            g.strokeStyle = 'rgba(196,30,30,0.92)';
+            g.fillStyle = 'rgba(196,30,30,0.92)';
+            g.lineWidth = 3.5;
+            g.beginPath(); g.arc(0, 0, r, 0, 6.2832); g.stroke();
+            g.beginPath(); g.arc(0, 0, r * 0.72, 0, 6.2832); g.stroke();
+            g.font = 'bold ' + Math.round(r * 0.42) + 'px "SimSun", serif';
             g.textAlign = 'center'; g.textBaseline = 'middle';
-            g.fillText('纪念', cx, cy);
+            g.fillText('★ 纪念 ★', 0, 0);
             g.restore();
         }
     }
@@ -1727,20 +1956,23 @@ AV_OVERLAY_BC2:67 };
         g.restore();
         const photoCr = Math.min(S.cornerAll, Math.min(iw, ih) / 2);
         const cx = blurMargin + exPadX, cy = blurMargin + exPadY;
-        drawMainPhoto(g, img, cx, cy, photoCr, S.imgScale, S.imgOffsetX, S.imgOffsetY);
+        drawMainPhoto(g, img, cx, cy, photoCr, (S.imgScale || 1) * 0.94, S.imgOffsetX, S.imgOffsetY);
 
         if (!S.useExif) return;
-        // 字号:跟随 paramFs,并对经典/日期应用「参数缩放」滑块(与印象系列同映射)
-        const exifSz = blurExifSz(iw, ih, S.paramFs, S.paramScale);
-        const modelSz = exifSz + scaledPx(4);
-        const paramSz = exifSz;
-        // 参数带:位于照片(缩放后+偏移)下边缘与画布底边之间,拖动图片缩放时自动贴合
-        const phBottom = cy + Math.round(ih * (1 + (S.imgScale || 1)) / 2) + (S.imgOffsetY || 0);
-        const minH = exifSz + (S.paramType === 0 ? (exifSz + scaledPx(4) + scaledPx(6)) : 0) + scaledPx(24);
+        // 字号: 先按用户基准(paramFs + 参数缩放滑块)计算, 再根据照片底边与画布底边之间的
+        // 可用高度实时自适应 —— 用户每次改变图片大小, 参数带都重新居中并缩放字号
+        const baseSz = blurExifSz(iw, ih, S.paramFs, S.paramScale);
+        const showModel = S.paramType === 0;
+        const minH = baseSz + (showModel ? (baseSz + scaledPx(4) + scaledPx(6)) : 0) + scaledPx(24);
+        const phBottom = cy + Math.round(ih * (1 + (S.imgScale || 1) * 0.94) / 2) + (S.imgOffsetY || 0);
         const topY = Math.max(cy, Math.min(phBottom, ch - minH));
         const maskH = ch - topY;
+        const idealH = showModel ? (baseSz + (baseSz + scaledPx(4)) + scaledPx(24) + scaledPx(16)) : (baseSz + scaledPx(24) + scaledPx(12));
+        const k = Math.min(1.15, Math.max(0.7, maskH / idealH));
+        const exifSz = Math.round(baseSz * k);
+        const modelSz = exifSz + scaledPx(4);
+        const paramSz = exifSz;
         const centerY = topY + Math.floor(maskH / 2);
-        const showModel = S.paramType === 0;
 
         const bc = sampleBottomDarkColor(img);
         const grad = g.createLinearGradient(0, topY, 0, ch);
@@ -1758,7 +1990,7 @@ AV_OVERLAY_BC2:67 };
         if (showModel) {
             const logoW = brandMarkW(S, modelSz);
             const modelOnly = (S.brandLogo === 2 && logoW) ? S.cam.model.trim() : model;
-            const gap = Math.min(scaledPx(6), Math.max(0, maskH - modelSz - paramSz));
+            const gap = Math.min(scaledPx(24), Math.max(0, maskH - modelSz - paramSz));
             const blockH = modelSz + gap + paramSz;
             const modelY = Math.max(topY + modelSz, centerY - Math.floor(blockH / 2) + modelSz);
             const paramsY = modelY + paramSz + gap;
@@ -3171,9 +3403,28 @@ const w = natW;
                 const tp = tornPaperParams(iw, ih, size);
                 return { w: tp.bw + tp.pad * 2, h: tp.bh + tp.pad * 2 };
             }
-            case 'FOLD_CORNER':
+            case 'FOLD_CORNER': {
+                const padF = Math.max(60, Math.round(iw * 0.06));
+                return { w: iw + padF * 2, h: ih + padF * 2 };
+            }
             case 'PINBOARD_TAPE':
                 return { w: iw + size * 2, h: ih + size * 2 };
+            case 'DOUBLE_EXPOSURE': {
+                const padD = Math.max(50, Math.round(iw * 0.05));
+                return { w: iw + padD * 2, h: ih + padD * 2 };
+            }
+            case 'MAGAZINE_MASTHEAD': {
+                const pM = Math.max(50, Math.round(iw * 0.05));
+                return { w: iw + pM * 2, h: ih + pM * 2 + Math.round(iw * 0.22) };
+            }
+            case 'MAGAZINE_COVER': {
+                const pC = Math.max(36, Math.round(iw * 0.045));
+                return { w: iw + pC * 2, h: ih + pC * 2 + Math.round(iw * 0.16) };
+            }
+            case 'MAGAZINE_HEADER': {
+                const pH = Math.max(36, Math.round(iw * 0.04));
+                return { w: iw + pH * 2, h: ih + pH * 2 + Math.round(iw * 0.14) };
+            }
             case 'VHS_TAPE': {
                 const sidePad = Math.max(8, Math.floor(size / 4));
                 const barH = Math.max(28, Math.floor(size * 0.75));
@@ -3237,6 +3488,10 @@ const w = natW;
             case 'COMIC_PANEL': {
                 const gap = Math.round(iw * 0.015);
                 return { w: iw + gap * 3, h: ih + gap * 3 + Math.round(iw * 0.08) };
+            }
+            case 'POP_COMIC': {
+                const pad2 = Math.max(50, Math.round(iw * 0.05));
+                return { w: iw + pad2 * 2, h: ih + pad2 * 2 + Math.round(iw * 0.07) };
             }
             case 'NEWSPAPER': {
                 const pad = Math.max(40, Math.round(iw * 0.04));
@@ -3604,37 +3859,86 @@ const w = natW;
         const padTop = Math.round(iw * 0.1);
         const padBottom = Math.round(iw * 0.2);
         const w = iw + padX * 2, h = ih + padTop + padBottom;
-        const thickness = Math.round(iw * 0.02);
-        // 深棕桌面渐变
+        const cx = padX, cy = padTop;
+        const thick = Math.max(16, Math.round(iw * 0.025));
+        const cr = Math.max(10, Math.round(iw * 0.006));
+        // 冷灰黑桌面渐变
         const grad = g.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, '#4a3728');
-        grad.addColorStop(1, '#2a1d12');
+        grad.addColorStop(0, '#34343e');
+        grad.addColorStop(1, '#17171d');
         g.fillStyle = grad; g.fillRect(0, 0, w, h);
-        // 卡片投影(最底层)
+        // 桌面微弱网格(空间感)
+        g.strokeStyle = 'rgba(255,255,255,0.05)';
+        g.lineWidth = 1;
+        const gs = Math.round(iw * 0.06);
+        for (let gx = gs; gx < w; gx += gs) { g.beginPath(); g.moveTo(gx, 0); g.lineTo(gx, h); g.stroke(); }
+        for (let gy = gs; gy < h; gy += gs) { g.beginPath(); g.moveTo(0, gy); g.lineTo(w, gy); g.stroke(); }
+        // 三层递进悬浮投影
+        const shadowLayers = [
+            { ox: Math.round(iw * 0.06), oy: Math.round(iw * 0.09), blur: Math.round(iw * 0.05), color: 'rgba(0,0,0,0.55)' },
+            { ox: Math.round(iw * 0.035), oy: Math.round(iw * 0.05), blur: Math.round(iw * 0.028), color: 'rgba(0,0,0,0.45)' },
+            { ox: Math.round(iw * 0.012), oy: Math.round(iw * 0.018), blur: Math.round(iw * 0.012), color: 'rgba(0,0,0,0.38)' }
+        ];
         g.save();
-        g.shadowColor = 'rgba(0,0,0,0.7)';
-        g.shadowBlur = 40;
-        g.shadowOffsetX = 12;
-        g.shadowOffsetY = 18;
-        g.fillStyle = '#888';
-        g.fillRect(padX + thickness, padTop + thickness, iw, ih);
+        for (const L of shadowLayers) {
+            g.shadowColor = L.color;
+            g.shadowBlur = L.blur;
+            g.shadowOffsetX = L.ox;
+            g.shadowOffsetY = L.oy;
+            g.fillStyle = '#000000';
+            fillRoundRectCtx(g, cx, cy, iw, ih, cr);
+        }
         g.restore();
-        // 卡片厚度边(灰色层,右下露出)
-        g.fillStyle = '#c8c8c8';
-        g.fillRect(padX + thickness, padTop + thickness, iw, ih);
-        g.fillStyle = '#b0b0b0';
-        g.fillRect(padX + thickness, padTop + thickness, thickness, ih);
-        g.fillRect(padX + thickness, padTop + thickness, iw, thickness);
-        // 白色正面卡片(左上对齐)
+        // 卡片厚度(右下露出, 渐变灰)
+        const tGrad = g.createLinearGradient(cx, cy, cx + iw, cy + ih);
+        tGrad.addColorStop(0, '#dcdce2');
+        tGrad.addColorStop(0.75, '#b9b9c2');
+        tGrad.addColorStop(1, '#9c9ca6');
+        g.fillStyle = tGrad;
+        fillRoundRectCtx(g, cx + thick, cy + thick, iw, ih, cr);
+        // 白色正面卡
         g.fillStyle = '#ffffff';
-        g.fillRect(padX, padTop, iw, ih);
-        // 照片贴在卡片上部
-        g.drawImage(img, padX, padTop, iw, Math.round(ih * 0.85));
-        // 底部手写
-        g.fillStyle = '#aaa';
-        g.font = Math.round(iw * 0.025) + 'px cursive';
+        fillRoundRectCtx(g, cx, cy, iw, ih, cr);
+        // 卡面顶部高光(光线反射)
+        const hl = g.createLinearGradient(0, cy, 0, cy + Math.round(ih * 0.22));
+        hl.addColorStop(0, 'rgba(255,255,255,0.55)');
+        hl.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = hl;
+        fillRoundRectCtx(g, cx, cy, iw, Math.round(ih * 0.22), cr);
+        // 照片(圆角裁剪)贴卡面上部
+        const m = Math.max(20, Math.round(iw * 0.02));
+        const pw = iw - m * 2;
+        const ph = Math.round(ih * 0.80);
+        const pxx = cx + m, pyy = cy + m;
+        g.save();
+        g.beginPath();
+        if (g.roundRect) { g.roundRect(pxx, pyy, pw, ph, cr); }
+        else {
+            g.moveTo(pxx + cr, pyy); g.lineTo(pxx + pw - cr, pyy);
+            g.arcTo(pxx + pw, pyy, pxx + pw, pyy + cr, cr);
+            g.lineTo(pxx + pw, pyy + ph - cr);
+            g.arcTo(pxx + pw, pyy + ph, pxx + pw - cr, pyy + ph, cr);
+            g.lineTo(pxx + cr, pyy + ph);
+            g.arcTo(pxx, pyy + ph, pxx, pyy + ph - cr, cr);
+            g.lineTo(pxx, pyy + cr);
+            g.arcTo(pxx, pyy, pxx + cr, pyy, cr);
+        }
+        g.closePath();
+        g.clip();
+        g.drawImage(img, pxx, pyy, pw, ph);
+        g.restore();
+        // 照片细描边
+        g.strokeStyle = 'rgba(0,0,0,0.10)';
+        g.lineWidth = 1;
+        if (g.roundRect) { g.beginPath(); g.roundRect(pxx, pyy, pw, ph, cr); g.stroke(); }
+        else { g.beginPath(); g.rect(pxx, pyy, pw, ph); g.stroke(); }
+        // 签名行(照片下方居中, 跟随右侧栏签名设置: userSignature/signFont/signColor/signSize)
+        const sigStr3 = (S && S.userSignature) ? String(S.userSignature) : '✎ my memory';
+        g.fillStyle = (S && S.signColor) || '#8a8a92';
+        g.font = 'italic ' + Math.round(iw * 0.02 * ((S && S.signSize) || 1)) + 'px "' + ((S && S.signFont) || 'Comic Sans MS') + '", cursive';
         g.textAlign = 'center';
-        g.fillText(S.userSignature || '✎ my memory', padX + iw / 2, padTop + Math.round(ih * 0.93));
+        g.textBaseline = 'middle';
+        g.fillText(sigStr3, cx + iw / 2, cy + m + ph + Math.round((ih - m * 2 - ph) / 2));
     }
 
     // ══ 漫画分镜 ══
@@ -3647,19 +3951,178 @@ const w = natW;
         const cols = 2, rows = 2;
         const w = iw + gap * 3, h = ih + gap * 3 + barH;
         const cw = Math.floor(iw / cols), ch = Math.floor(ih / rows);
-        // 黑底
-        g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
-        // 切成4格(网格整体含间距,水平垂直居中)
+        // 波普黄底
+        g.fillStyle = '#ffe600'; g.fillRect(0, 0, w, h);
+        // 背景红色波点(错位排列)
+        const dotR = Math.max(6, Math.round(iw * 0.006));
+        const dotGap = dotR * 3;
+        g.fillStyle = 'rgba(255,45,45,0.85)';
+        for (let y = -dotGap; y < h + dotGap; y += dotGap) {
+            const off = (Math.round(y / dotGap) % 2) ? dotGap / 2 : 0;
+            for (let x = -dotGap; x < w + dotGap; x += dotGap) {
+                g.beginPath(); g.arc(x + off, y, dotR, 0, 6.2832); g.fill();
+            }
+        }
+        // 网格在上部区域(不含底部黑条)水平垂直居中
         const gridW = cw * cols + gap, gridH = ch * rows + gap;
-        const x0 = Math.round((w - gridW) / 2), y0 = Math.round((h - gridH) / 2);
+        const topH = h - barH;
+        const x0 = Math.round((w - gridW) / 2), y0 = Math.round((topH - gridH) / 2);
+        // 四格: 照片叠黑色半调网点 + 白3px内框 + 黑4px外框
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const x = x0 + c * (cw + gap), y = y0 + r * (ch + gap);
-                g.drawImage(img, c * cw, r * ch, cw, ch, x, y, cw, ch);
+                const cvs = document.createElement('canvas');
+                cvs.width = cw; cvs.height = ch;
+                const cx = cvs.getContext('2d');
+                cx.drawImage(img, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
+                const dr2 = Math.max(2, Math.round(cw * 0.004));
+                cx.fillStyle = 'rgba(0,0,0,0.18)';
+                for (let py = 0; py < ch; py += dr2 * 3) {
+                    for (let px = 0; px < cw; px += dr2 * 3) {
+                        cx.beginPath(); cx.arc(px, py, dr2, 0, 6.2832); cx.fill();
+                    }
+                }
+                g.drawImage(cvs, x, y);
                 g.strokeStyle = '#fff'; g.lineWidth = 3;
-                g.strokeRect(x, y, cw, ch);
+                g.strokeRect(x - 2, y - 2, cw + 4, ch + 4);
+                g.strokeStyle = '#111'; g.lineWidth = 4;
+                g.strokeRect(x - 5, y - 5, cw + 10, ch + 10);
             }
         }
+        // 拟声词贴纸(白字黑描边)
+        const bang = (txt, bx, by, fs) => {
+            g.save();
+            g.font = 'bold ' + fs + 'px "Impact", "Arial Black", sans-serif';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.lineJoin = 'round';
+            g.strokeStyle = '#111'; g.lineWidth = Math.max(3, Math.round(fs * 0.16));
+            g.strokeText(txt, bx, by);
+            g.fillStyle = '#fff';
+            g.fillText(txt, bx, by);
+            g.restore();
+        };
+        const fs1 = Math.round(cw * 0.13);
+        bang('POW!', x0 + cw - Math.round(cw * 0.12), y0 + Math.round(ch * 0.13), fs1);
+        bang('BANG!', x0 + cw * 2 + gap - Math.round(cw * 0.12), y0 + ch + gap + Math.round(ch * 0.13), fs1);
+        // WOW! 白色对话气泡(右上格左下角)
+        const bubble = (txt, bx, by, fs) => {
+            g.save();
+            g.font = 'bold ' + fs + 'px "Impact", "Arial Black", sans-serif';
+            const bw = g.measureText(txt).width + fs * 1.1, bh = fs * 1.7;
+            g.fillStyle = '#fff';
+            g.strokeStyle = '#111';
+            g.lineWidth = Math.max(2, Math.round(fs * 0.12));
+            g.beginPath(); g.ellipse(bx, by, bw / 2, bh / 2, -0.12, 0, 6.2832); g.fill(); g.stroke();
+            g.beginPath();
+            g.moveTo(bx - bw * 0.10, by + bh * 0.40);
+            g.lineTo(bx - bw * 0.34, by + bh * 0.88);
+            g.lineTo(bx + bw * 0.06, by + bh * 0.42);
+            g.closePath(); g.fill(); g.stroke();
+            g.fillStyle = '#111';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.fillText(txt, bx + fs * 0.02, by + fs * 0.05);
+            g.restore();
+        };
+        bubble('WOW!', x0 + cw + gap + Math.round(cw * 0.24), y0 + Math.round(ch * 0.24), Math.round(cw * 0.085));
+        // 底部 POP ART 黑条
+        g.fillStyle = '#111';
+        g.fillRect(0, h - barH, w, barH);
+        g.fillStyle = '#ffe600';
+        g.font = 'bold ' + Math.max(13, Math.round(barH * 0.45)) + 'px "Impact", "Arial Black", sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('POP ART ★ ' + new Date().getFullYear(), w / 2, h - barH / 2);
+        // 红黑双外框
+        g.strokeStyle = '#111'; g.lineWidth = 6;
+        g.strokeRect(3, 3, w - 6, h - 6);
+        g.strokeStyle = '#ff4500'; g.lineWidth = 2.5;
+        g.strokeRect(10, 10, w - 20, h - 20);
+    }
+
+    // ══ 波普漫画风(2026-10): 单张大照片+波普黄底红波点+半调网点+拟声词气泡+POP ART底部条 ──
+    function stylePopComic(img, size, g, iw, ih) {
+        const pad = Math.max(50, Math.round(iw * 0.05));
+        const barH = Math.round(iw * 0.07);
+        const w = iw + pad * 2, h = ih + pad * 2 + barH;
+        // 波普黄底
+        g.fillStyle = '#ffe600'; g.fillRect(0, 0, w, h);
+        // 背景红色波点(错位排列)
+        const dotR = Math.max(6, Math.round(iw * 0.006));
+        const dotGap = dotR * 3;
+        g.fillStyle = 'rgba(255,45,45,0.85)';
+        for (let y = -dotGap; y < h + dotGap; y += dotGap) {
+            const off = (Math.round(y / dotGap) % 2) ? dotGap / 2 : 0;
+            for (let x = -dotGap; x < w + dotGap; x += dotGap) {
+                g.beginPath(); g.arc(x + off, y, dotR, 0, 6.2832); g.fill();
+            }
+        }
+        // 照片在上半区域居中
+        const topH = h - barH;
+        const px = Math.round((w - iw) / 2), py = Math.round((topH - ih) / 2);
+        // 照片叠黑色半调网点
+        const cvs = document.createElement('canvas');
+        cvs.width = iw; cvs.height = ih;
+        const cx = cvs.getContext('2d');
+        cx.drawImage(img, 0, 0, iw, ih);
+        const dr2 = Math.max(2, Math.round(iw * 0.004));
+        cx.fillStyle = 'rgba(0,0,0,0.18)';
+        for (let pyy = 0; pyy < ih; pyy += dr2 * 3) {
+            for (let pxx = 0; pxx < iw; pxx += dr2 * 3) {
+                cx.beginPath(); cx.arc(pxx, pyy, dr2, 0, 6.2832); cx.fill();
+            }
+        }
+        g.drawImage(cvs, px, py);
+        // 漫画粗框: 白8px + 黑12px
+        g.strokeStyle = '#fff'; g.lineWidth = 8;
+        g.strokeRect(px - 4, py - 4, iw + 8, ih + 8);
+        g.strokeStyle = '#111'; g.lineWidth = 12;
+        g.strokeRect(px - 10, py - 10, iw + 20, ih + 20);
+        // 拟声词贴纸(白字黑描边)
+        const bang = (txt, bx, by, fs) => {
+            g.save();
+            g.font = 'bold ' + fs + 'px "Impact", "Arial Black", sans-serif';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.lineJoin = 'round';
+            g.strokeStyle = '#111'; g.lineWidth = Math.max(3, Math.round(fs * 0.16));
+            g.strokeText(txt, bx, by);
+            g.fillStyle = '#fff';
+            g.fillText(txt, bx, by);
+            g.restore();
+        };
+        const fs1 = Math.round(iw * 0.10);
+        bang('POW!', px + iw - Math.round(iw * 0.10), py + Math.round(ih * 0.10), fs1);
+        bang('BANG!', px + Math.round(iw * 0.10), py + ih - Math.round(ih * 0.10), fs1);
+        // 对话气泡 WOW!(右下角)
+        const bubble = (txt, bx, by, fs) => {
+            g.save();
+            g.font = 'bold ' + fs + 'px "Impact", "Arial Black", sans-serif';
+            const bw = g.measureText(txt).width + fs * 1.1, bh = fs * 1.7;
+            g.fillStyle = '#fff';
+            g.strokeStyle = '#111';
+            g.lineWidth = Math.max(2, Math.round(fs * 0.12));
+            g.beginPath(); g.ellipse(bx, by, bw / 2, bh / 2, -0.12, 0, 6.2832); g.fill(); g.stroke();
+            g.beginPath();
+            g.moveTo(bx - bw * 0.10, by + bh * 0.40);
+            g.lineTo(bx - bw * 0.34, by + bh * 0.88);
+            g.lineTo(bx + bw * 0.06, by + bh * 0.42);
+            g.closePath(); g.fill(); g.stroke();
+            g.fillStyle = '#111';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.fillText(txt, bx + fs * 0.02, by + fs * 0.05);
+            g.restore();
+        };
+        bubble('WOW!', px + iw - Math.round(iw * 0.22), py + ih - Math.round(ih * 0.22), Math.round(iw * 0.075));
+        // 底部 POP ART 黑条
+        g.fillStyle = '#111';
+        g.fillRect(0, h - barH, w, barH);
+        g.fillStyle = '#ffe600';
+        g.font = 'bold ' + Math.max(13, Math.round(barH * 0.45)) + 'px "Impact", "Arial Black", sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('POP ART ★ ' + new Date().getFullYear(), w / 2, h - barH / 2);
+        // 红黑双外框
+        g.strokeStyle = '#111'; g.lineWidth = 6;
+        g.strokeRect(3, 3, w - 6, h - 6);
+        g.strokeStyle = '#ff4500'; g.lineWidth = 2.5;
+        g.strokeRect(10, 10, w - 20, h - 20);
     }
 
     // ══ 复古报纸 ══
@@ -4423,13 +4886,13 @@ const w = natW;
             FUJI_WHITE: styleFujiWhite, SIMPLE_FILM: styleSimpleFilm,
             PARAM_TOP_LEFT: styleParamTopLeft, PARAM_BOTTOM_LEFT: styleParamBottomLeft, PARAM_BOTTOM_SINGLE: styleParamBottomSingle,
             STAMP_POSTAGE: styleStampPostage, TEARED_PAPER: styleTornPaper,
-            FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape,
+            FOLD_CORNER: styleFoldCorner, PINBOARD_TAPE: stylePinboardTape, DOUBLE_EXPOSURE: styleDoubleExposure, MAGAZINE_MASTHEAD: styleMagazineMasthead, MAGAZINE_COVER: styleMagazineCover, MAGAZINE_HEADER: styleMagazineHeader,
             VHS_TAPE: styleVhsTape, ALBUM_CORNER: styleAlbumCorner,
                         MOVIE_TICKET: styleMovieTicket, WATERCOLOR_BLEED: styleWatercolorBleed,
             TICKET_VINTAGE: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'vintage'),
             TICKET_CONCERT: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'concert'),
             TICKET_SCRAP: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'scrap'),
-            TICKET_STAMP: styleStamp,
+            TICKET_STAMP: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'classic'),
             STAMP_KRAFT: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'kraft'),
             STAMP_BLUEPRINT: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'blueprint'),
             STAMP_REDSEAL: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'redseal'),
@@ -4440,7 +4903,7 @@ const w = natW;
             WAX_SEAL: styleWaxSeal, PRISMATIC: stylePrismatic,
             CYBER_GLITCH: styleCyberGlitch, POLAROID_HAND: stylePolaroidHand,
             TORN_JOURNAL: styleTornJournal, CARD_3D: styleCard3D,
-            COMIC_PANEL: styleComicPanel, NEWSPAPER: styleNewspaper,
+            COMIC_PANEL: styleComicPanel, POP_COMIC: stylePopComic, NEWSPAPER: styleNewspaper,
             COLOR_PALETTE: styleColorPalette,
             SIGNATURE: styleSignature, SIGN_PARAM: styleSignParam,
             AVATAR_MEMO: styleAvatarMemo,

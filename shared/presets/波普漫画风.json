@@ -4,135 +4,18 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 140,
-    "marginBottom": 140,
-    "marginLeft": 100,
-    "marginRight": 100,
-    "imgScale": 0.95,
+    "marginTop": 0,
+    "marginBottom": 0,
+    "marginLeft": 0,
+    "marginRight": 0,
+    "imgScale": 1,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
     "bgBlurEnable": 0,
     "bgBlurRadius": 30,
     "bgBlurWhiteOverlay": 0
   },
-  "layerList": [
-    {
-      "visible": true,
-      "marginTop": 0,
-      "marginBottom": 0,
-      "marginLeft": 0,
-      "marginRight": 0,
-      "fillConfig": {
-        "fillType": "solid",
-        "fillHex": "#ffffff",
-        "fillOpacity": 100,
-        "gradientType": "linear",
-        "gradientAngle": 0,
-        "gradientStops": [
-          {
-            "position": 0,
-            "color": "#ffffff"
-          },
-          {
-            "position": 1,
-            "color": "#cccccc"
-          }
-        ],
-        "gradientOpacity": 100,
-        "textureSrc": "",
-        "textureScale": 1,
-        "textureOffsetX": 0,
-        "textureOffsetY": 0,
-        "textureOpacity": 100,
-        "textureBlend": "normal"
-      },
-      "strokeConfig": {
-        "strokeWidth": 8,
-        "strokePos": "inside",
-        "strokeColorHex": "#000000",
-        "strokeOpacity": 100,
-        "strokeDashArray": [],
-        "strokeDashOffset": 0,
-        "strokeFillType": "solid",
-        "strokeGradientType": "linear",
-        "strokeGradientAngle": 0,
-        "strokeGradientStops": []
-      },
-      "shadowGlowConfig": {
-        "shadowEnable": 0,
-        "shadowOffsetX": 3,
-        "shadowOffsetY": 3,
-        "shadowBlur": 10,
-        "shadowSpread": 0,
-        "shadowColorHex": "#000000",
-        "shadowOpacity": 40,
-        "glowEnable": 0,
-        "glowColorHex": "#ffffff",
-        "glowBlur": 15,
-        "glowSpread": 0,
-        "glowOpacity": 60,
-        "glowType": "outer"
-      }
-    },
-    {
-      "visible": true,
-      "marginTop": -150,
-      "marginBottom": -150,
-      "marginLeft": -150,
-      "marginRight": -150,
-      "fillConfig": {
-        "fillType": "solid",
-        "fillHex": "#ffe600",
-        "fillOpacity": 100,
-        "gradientType": "linear",
-        "gradientAngle": 0,
-        "gradientStops": [
-          {
-            "position": 0,
-            "color": "#ffffff"
-          },
-          {
-            "position": 1,
-            "color": "#cccccc"
-          }
-        ],
-        "gradientOpacity": 100,
-        "textureSrc": "",
-        "textureScale": 1,
-        "textureOffsetX": 0,
-        "textureOffsetY": 0,
-        "textureOpacity": 100,
-        "textureBlend": "normal"
-      },
-      "strokeConfig": {
-        "strokeWidth": 0,
-        "strokePos": "inside",
-        "strokeColorHex": "#ffffff",
-        "strokeOpacity": 100,
-        "strokeDashArray": [],
-        "strokeDashOffset": 0,
-        "strokeFillType": "solid",
-        "strokeGradientType": "linear",
-        "strokeGradientAngle": 0,
-        "strokeGradientStops": []
-      },
-      "shadowGlowConfig": {
-        "shadowEnable": 0,
-        "shadowOffsetX": 3,
-        "shadowOffsetY": 3,
-        "shadowBlur": 10,
-        "shadowSpread": 0,
-        "shadowColorHex": "#000000",
-        "shadowOpacity": 40,
-        "glowEnable": 0,
-        "glowColorHex": "#ffffff",
-        "glowBlur": 15,
-        "glowSpread": 0,
-        "glowOpacity": 60,
-        "glowType": "outer"
-      }
-    }
-  ],
+  "layerList": [],
   "cornerConfig": {
     "cornerLock": 1,
     "cornerRadiusAll": 0,
@@ -168,38 +51,13 @@
     "filmGrainIntensity": 10
   },
   "decorConfig": {
-    "textLines": [
-      {
-        "text": "POP ART!",
-        "fontFamily": "Arial Black",
-        "fontSize": 30,
-        "fontWeight": 900,
-        "letterSpacing": 10,
-        "colorHex": "#ff2d55",
-        "opacity": 100,
-        "x": 0,
-        "y": 0,
-        "align": "top",
-        "enableShadow": 0
-      },
-      {
-        "text": "POW!",
-        "fontFamily": "Arial Black",
-        "fontSize": 52,
-        "fontWeight": 900,
-        "letterSpacing": 8,
-        "colorHex": "#111111",
-        "opacity": 100,
-        "x": 0,
-        "y": 0,
-        "align": "bottom",
-        "enableShadow": 0
-      }
-    ],
+    "textLines": [],
     "stickers": [],
     "cornerDecorEnable": 0,
     "cornerDecorType": "none",
     "cornerDecorSize": 30,
     "exifAutoText": 0
-  }
+  },
+  "photoFrameStyle": "POP_COMIC",
+  "photoFrameBorderSize": 100
 }

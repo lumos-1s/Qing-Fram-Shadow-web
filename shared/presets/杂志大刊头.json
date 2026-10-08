@@ -4,81 +4,18 @@
   "exportDpi": 300,
   "baseMargin": {
     "marginLock": 0,
-    "marginTop": 300,
-    "marginBottom": 110,
-    "marginLeft": 64,
-    "marginRight": 64,
-    "imgScale": 0.98,
+    "marginTop": 0,
+    "marginBottom": 0,
+    "marginLeft": 0,
+    "marginRight": 0,
+    "imgScale": 1,
     "imgOffsetX": 0,
     "imgOffsetY": 0,
     "bgBlurEnable": 0,
     "bgBlurRadius": 30,
     "bgBlurWhiteOverlay": 0
   },
-  "layerList": [
-    {
-      "visible": true,
-      "marginTop": 0,
-      "marginBottom": 0,
-      "marginLeft": 0,
-      "marginRight": 0,
-      "fillConfig": {
-        "fillType": "gradient",
-        "fillHex": "#111111",
-        "fillOpacity": 100,
-        "gradientType": "linear",
-        "gradientAngle": 160,
-        "gradientStops": [
-          {
-            "position": 0,
-            "color": "#0a0a0a"
-          },
-          {
-            "position": 0.65,
-            "color": "#15151a"
-          },
-          {
-            "position": 1,
-            "color": "#1e1e26"
-          }
-        ],
-        "gradientOpacity": 100,
-        "textureSrc": "",
-        "textureScale": 1,
-        "textureOffsetX": 0,
-        "textureOffsetY": 0,
-        "textureOpacity": 100,
-        "textureBlend": "normal"
-      },
-      "strokeConfig": {
-        "strokeWidth": 0,
-        "strokePos": "inside",
-        "strokeColorHex": "#ffffff",
-        "strokeOpacity": 100,
-        "strokeDashArray": [],
-        "strokeDashOffset": 0,
-        "strokeFillType": "solid",
-        "strokeGradientType": "linear",
-        "strokeGradientAngle": 0,
-        "strokeGradientStops": []
-      },
-      "shadowGlowConfig": {
-        "shadowEnable": 0,
-        "shadowOffsetX": 3,
-        "shadowOffsetY": 3,
-        "shadowBlur": 10,
-        "shadowSpread": 0,
-        "shadowColorHex": "#000000",
-        "shadowOpacity": 40,
-        "glowEnable": 0,
-        "glowColorHex": "#ffffff",
-        "glowBlur": 15,
-        "glowSpread": 0,
-        "glowOpacity": 60,
-        "glowType": "outer"
-      }
-    }
-  ],
+  "layerList": [],
   "cornerConfig": {
     "cornerLock": 1,
     "cornerRadiusAll": 0,
@@ -114,38 +51,13 @@
     "filmGrainIntensity": 0
   },
   "decorConfig": {
-    "textLines": [
-      {
-        "text": "MAGAZINE",
-        "fontFamily": "Impact",
-        "fontSize": 150,
-        "fontWeight": 900,
-        "letterSpacing": 22,
-        "colorHex": "ccff00",
-        "opacity": 100,
-        "x": 0,
-        "y": 0,
-        "align": "top",
-        "enableShadow": 0
-      },
-      {
-        "text": "VOL.08 — 2026 · STREET EDITION",
-        "fontFamily": "Arial",
-        "fontSize": 34,
-        "fontWeight": 800,
-        "letterSpacing": 10,
-        "colorHex": "ff4d00",
-        "opacity": 100,
-        "x": 0,
-        "y": 0,
-        "align": "bottom",
-        "enableShadow": 0
-      }
-    ],
+    "textLines": [],
     "stickers": [],
     "cornerDecorEnable": 1,
     "cornerDecorType": "double",
     "cornerDecorSize": 72,
     "exifAutoText": 0
-  }
+  },
+  "photoFrameStyle": "MAGAZINE_MASTHEAD",
+  "photoFrameBorderSize": 50
 }

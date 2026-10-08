@@ -88,7 +88,7 @@
         COLOR_CLASSIC: { pf: true },
         COLOR_PALETTE: {  },
         COLOR_REFINED: { pf: true },
-        COMIC_PANEL: {  },
+        COMIC_PANEL: {  }, POP_COMIC: {  }, DOUBLE_EXPOSURE: {  }, MAGAZINE_MASTHEAD: {  }, MAGAZINE_COVER: {  }, MAGAZINE_HEADER: {  },
         CYANOTYPE: {  },
         CYBER_GLITCH: { pf: true, cr: true, gm: true, isc: true, bi: true },
         DARK_BRAND_ONLY: { pf: true, cr: true, isc: true },
@@ -193,13 +193,15 @@
 
         // 签名/头像核心组:旧代码里 CARD_3D 先随组显示、再被单独隐藏,净效果等于不显示
         const sigCore = isPersonal || s === 'TICKET_STAMP' || s === 'STAMP_KRAFT' || s === 'STAMP_BLUEPRINT' || s === 'STAMP_REDSEAL' || s === 'STAMP_GOLD';
+        // CARD_3D 只有签名文字四件套(内容/字体/颜色/字号),无头像,单独放行
+        const sigTextOnly = s === 'CARD_3D';
         const v = {};
         v.rowSignModel = s === 'SIGN_PARAM';
-        v.rowSignText = sigCore;
-        v.rowSignFont = sigCore;
-        v.rowSignColor = sigCore;
+        v.rowSignText = sigCore || sigTextOnly;
+        v.rowSignFont = sigCore || sigTextOnly;
+        v.rowSignColor = sigCore || sigTextOnly;
         v.rowAvatarScale = sigCore;
-        v.rowSignSize = sigCore;
+        v.rowSignSize = sigCore || sigTextOnly;
         v.rowAvatarShow = sigCore;
         v.rowParamColor = sigCore;
         v.rowParamType = isBottomBar;
