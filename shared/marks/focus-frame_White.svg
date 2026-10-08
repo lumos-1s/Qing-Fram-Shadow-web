@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
-        <path d="M64 40 H40 V64" stroke="#FFFFFF" stroke-width="10"/>
-        <path d="M192 40 H216 V64" stroke="#FFFFFF" stroke-width="10"/>
-        <path d="M64 216 H40 V192" stroke="#FFFFFF" stroke-width="10"/>
-        <path d="M192 216 H216 V192" stroke="#FFFFFF" stroke-width="10"/>
-        <circle cx="128" cy="128" r="12" fill="#FFFFFF"/>
-        <circle cx="128" cy="128" r="86" stroke="#FFFFFF" stroke-width="8" stroke-dasharray="10 14"/>
+        <path d="M64 40 H40 V64" stroke="#ffffff" stroke-width="10"/>
+        <path d="M192 40 H216 V64" stroke="#ffffff" stroke-width="10"/>
+        <path d="M64 216 H40 V192" stroke="#ffffff" stroke-width="10"/>
+        <path d="M192 216 H216 V192" stroke="#ffffff" stroke-width="10"/>
+        <circle cx="128" cy="128" r="12" fill="#ffffff"/>
+        <circle cx="128" cy="128" r="86" stroke="#ffffff" stroke-width="8" stroke-dasharray="10 14"/>
 </svg>

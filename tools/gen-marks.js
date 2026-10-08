@@ -2,7 +2,7 @@
 //   node tools/gen-marks.js           写入文件
 //   node tools/gen-marks.js --check   只校验磁盘上的文件是否与本文件一致(过期则退出码 1)
 //
-// 为什么要生成器而不是手写 16 个 SVG:与 tools/gen-style-caps.js 同一个理由 ——
+// 为什么要生成器而不是手写 28 个 SVG:与 tools/gen-style-caps.js 同一个理由 ——
 // 「素材」也应该是可复现、可审查、可批量改的。改配色/改线宽/加一个标记,改这里再重新生成。
 //
 // 为什么是"原创标记"而不是品牌 Logo:发行版不随包分发任何第三方品牌的图形素材
@@ -102,7 +102,55 @@ const MARKS = {
             rays += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${C}" stroke-width="10" stroke-linecap="round"/>`;
         }
         return `${rays}\n        <circle cx="128" cy="128" r="16" fill="${C}"/>`;
-    }
+    },
+
+    // 对焦框:四角折线 + 虚线圆 + 中心点
+    'focus-frame': (C) => `
+        <path d="M64 40 H40 V64" stroke="${C}" stroke-width="10"/>
+        <path d="M192 40 H216 V64" stroke="${C}" stroke-width="10"/>
+        <path d="M64 216 H40 V192" stroke="${C}" stroke-width="10"/>
+        <path d="M192 216 H216 V192" stroke="${C}" stroke-width="10"/>
+        <circle cx="128" cy="128" r="12" fill="${C}"/>
+        <circle cx="128" cy="128" r="86" stroke="${C}" stroke-width="8" stroke-dasharray="10 14"/>`,
+
+    // 位置图钉:圆头 + 针脚
+    'location-pin': (C) => `
+        <circle cx="128" cy="104" r="60" stroke="${C}" stroke-width="10"/>
+        <path d="M128 164 L128 226" stroke="${C}" stroke-width="10"/>
+        <path d="M96 226 H160" stroke="${C}" stroke-width="10"/>
+        <circle cx="128" cy="104" r="20" fill="${C}"/>`,
+
+    // 拍立得:相框 + 镜头 + 底部签名条
+    'polaroid': (C) => `
+        <rect x="44" y="58" width="168" height="122" rx="12" stroke="${C}" stroke-width="10"/>
+        <circle cx="128" cy="124" r="36" stroke="${C}" stroke-width="10"/>
+        <circle cx="128" cy="124" r="11" fill="${C}"/>
+        <rect x="80" y="180" width="96" height="12" rx="6" fill="${C}"/>`,
+
+    // 爱心:单笔贝塞尔轮廓
+    'heart': (C) => `
+        <path d="M128 214 C 62 160 34 124 46 92 C 56 64 94 56 118 72 C 124 76 127 80 128 84 C 129 80 132 76 138 72 C 162 56 200 64 210 92 C 222 124 194 160 128 214 Z" stroke="${C}" stroke-width="10"/>`,
+
+    // 花朵:五瓣 + 花芯
+    'flower': (C) => `
+        <circle cx="128" cy="128" r="16" fill="${C}"/>
+        <circle cx="128" cy="80" r="27" stroke="${C}" stroke-width="9"/>
+        <circle cx="170" cy="110" r="27" stroke="${C}" stroke-width="9"/>
+        <circle cx="155" cy="162" r="27" stroke="${C}" stroke-width="9"/>
+        <circle cx="101" cy="162" r="27" stroke="${C}" stroke-width="9"/>
+        <circle cx="86" cy="110" r="27" stroke="${C}" stroke-width="9"/>`,
+
+    // 日历:外框 + 顶栏 + 两个挂环 + 日期格
+    'calendar': (C) => `
+        <rect x="42" y="56" width="172" height="164" rx="14" stroke="${C}" stroke-width="10"/>
+        <line x1="42" y1="104" x2="214" y2="104" stroke="${C}" stroke-width="10"/>
+        <line x1="90" y1="34" x2="90" y2="70" stroke="${C}" stroke-width="10"/>
+        <line x1="166" y1="34" x2="166" y2="70" stroke="${C}" stroke-width="10"/>
+        <rect x="66" y="128" width="22" height="22" rx="4" fill="${C}"/>
+        <rect x="102" y="128" width="22" height="22" rx="4" fill="${C}"/>
+        <rect x="138" y="128" width="22" height="22" rx="4" fill="${C}"/>
+        <rect x="66" y="166" width="22" height="22" rx="4" fill="${C}"/>
+        <rect x="102" y="166" width="22" height="22" rx="4" fill="${C}"/>`
 };
 
 const VARIANTS = [['White', '#ffffff'], ['Black', '#000000']];

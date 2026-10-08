@@ -1,0 +1,4 @@
+# gen-marks.js --check 做的是严格字符串比较(fs.readFileSync !== 生成结果),
+# 生成结果固定用 LF。若这些 SVG 被 git 按 core.autocrlf 转成 CRLF,check 必挂。
+# 强制按 LF 检出/入库,让生成器与磁盘永远逐字节一致。
+shared/marks/*.svg text eol=lf
