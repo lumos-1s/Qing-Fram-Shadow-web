@@ -729,7 +729,14 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
     }
 
     // ── 纪念邮票(2026-10):邮票浮在照片背景模糊上,白纸票面+齿孔挖空透出模糊色+照片+右下地点/日期+顶部签名 ──
-    function styleStamp(img, size, g, iw, ih, S) {
+    function styleStamp(img, size, g, iw, ih, S, variant) {
+        const pal = ({
+            classic:  { paper: '#faf5ea', ink: '#2f2a24', deco: null },
+            kraft:    { paper: '#e6d3ae', ink: '#3a2a14', deco: 'paper' },
+            blueprint:{ paper: '#1e3a5f', ink: '#e9f1fb', deco: 'grid' },
+            redseal:  { paper: '#faf5ea', ink: '#2f2a24', deco: 'seal' },
+            gold:     { paper: '#16130c', ink: '#d4af37', deco: 'goldline' }
+        })[variant] || { paper: '#faf5ea', ink: '#2f2a24', deco: null };
         const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
         const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
         const hasAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth) && (S ? S.avatarShow !== 0 : true);
@@ -766,8 +773,21 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const tc = document.createElement('canvas');
         tc.width = tw; tc.height = th;
         const tg = tc.getContext('2d');
-        tg.fillStyle = '#faf5ea';
+        tg.fillStyle = pal.paper;
         tg.fillRect(0, 0, tw, th);
+        if (pal.deco === 'paper') {
+            tg.fillStyle = ticketPaperPattern();
+            tg.fillRect(0, 0, tw, th);
+        } else if (pal.deco === 'grid') {
+            tg.strokeStyle = 'rgba(255,255,255,0.13)';
+            tg.lineWidth = 1;
+            for (let x = 8; x < tw; x += 8) { tg.beginPath(); tg.moveTo(x, 0); tg.lineTo(x, th); tg.stroke(); }
+            for (let y = 8; y < th; y += 8) { tg.beginPath(); tg.moveTo(0, y); tg.lineTo(tw, y); tg.stroke(); }
+        } else if (pal.deco === 'goldline') {
+            tg.strokeStyle = 'rgba(212,175,55,0.55)';
+            tg.lineWidth = 2;
+            tg.strokeRect(6, 6, tw - 12, th - 12);
+        }
         tg.globalCompositeOperation = 'destination-out';
         tg.fillStyle = '#000000';
         const topHoles = stampRow(tw), leftHoles = stampRow(th);
@@ -803,7 +823,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         if (sigStr) {
             const sigFs = Math.max(10, Math.round(size * 0.7));
             g.font = sigFs + 'px "SimSun", serif';
-            g.fillStyle = '#2f2a24';
+            g.fillStyle = pal.ink;
             g.textAlign = 'center';
             g.textBaseline = 'middle';
             g.fillText(sigStr, x0 + side + iw / 2, y0 + side * 0.55);
@@ -816,7 +836,7 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
         const textRX = x0 + side + iw - Math.max(36, Math.round(side * 0.5));
         const footerY = y0 + side + ih;
         g.font = fFs + 'px "SimSun", serif';
-        g.fillStyle = '#2f2a24';
+        g.fillStyle = pal.ink;
         g.textAlign = 'right';
         g.textBaseline = 'middle';
         if (hasAv || hasSig) {
@@ -842,12 +862,27 @@ ctx.font = px + 'px ' + (mono ? 'monospace' : 'sans-serif');
                 const s = Math.max(avatarR * 2 / window.__qfsAvatarImg.width, avatarR * 2 / window.__qfsAvatarImg.height);
                 g.drawImage(window.__qfsAvatarImg, avCX - avatarR, sigY - avatarR, window.__qfsAvatarImg.width * s, window.__qfsAvatarImg.height * s);
                 g.restore();
-                g.strokeStyle = 'rgba(47,42,36,0.35)'; g.lineWidth = 1.5;
+                g.strokeStyle = 'rgba(0,0,0,0.30)'; g.lineWidth = 1.5;
                 g.beginPath(); g.arc(avCX, sigY, avatarR, 0, Math.PI * 2); g.stroke();
             }
         } else {
             if (locStr) g.fillText(locStr, textRX, footerY + textH * 0.34);
             g.fillText(dateStr, textRX, footerY + textH * (locStr ? 0.62 : 0.5));
+        }
+        if (pal.deco === 'seal') {
+            const r = Math.max(16, Math.round(Math.min(iw, ih) * 0.07));
+            const cx = x0 + side + Math.max(r + 8, Math.round(iw * 0.12));
+            const cy = y0 + side + ih - Math.max(r + 10, Math.round(ih * 0.08));
+            g.save();
+            g.strokeStyle = 'rgba(178,34,34,0.85)';
+            g.fillStyle = 'rgba(178,34,34,0.85)';
+            g.lineWidth = 2;
+            g.beginPath(); g.arc(cx, cy, r, 0, 6.2832); g.stroke();
+            g.beginPath(); g.arc(cx, cy, r * 0.72, 0, 6.2832); g.stroke();
+            g.font = Math.round(r * 0.52) + 'px "SimSun", serif';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.fillText('纪念', cx, cy);
+            g.restore();
         }
     }
 
@@ -3164,7 +3199,11 @@ const w = natW;
                 const stubW = name === 'TICKET_CONCERT' ? Math.max(108, Math.round(iw * 0.15)) : 0;
                 return { w: iw + side * 2 + stubW, h: ih + headH + footH };
             }
-            case 'TICKET_STAMP': {
+            case 'TICKET_STAMP':
+            case 'STAMP_KRAFT':
+            case 'STAMP_BLUEPRINT':
+            case 'STAMP_REDSEAL':
+            case 'STAMP_GOLD': {
                 const side = Math.max(16, Math.round(iw * 0.025), Math.round(size * 0.8));
                 const blurGap = Math.max(36, Math.round(iw * 0.06), Math.round(size * 2.0));
                 const stampAv = !!(window.__qfsAvatarImg && window.__qfsAvatarImg.complete && window.__qfsAvatarImg.naturalWidth) && (S ? S.avatarShow !== 0 : true);
@@ -4391,6 +4430,10 @@ const w = natW;
             TICKET_CONCERT: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'concert'),
             TICKET_SCRAP: (img, size, g, iw, ih, S) => styleTicket(img, size, g, iw, ih, S, 'scrap'),
             TICKET_STAMP: styleStamp,
+            STAMP_KRAFT: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'kraft'),
+            STAMP_BLUEPRINT: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'blueprint'),
+            STAMP_REDSEAL: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'redseal'),
+            STAMP_GOLD: (img, size, g, iw, ih, S) => styleStamp(img, size, g, iw, ih, S, 'gold'),
             NEON_GLOW: styleNeonGlow, BURNED_EDGE: styleBurnedEdge,
             INK_WASH: styleInkWash, CYANOTYPE: styleCyanotype,
             OIL_BRUSH: styleOilBrush, PRESSED_FLOWER: stylePressedFlower,
