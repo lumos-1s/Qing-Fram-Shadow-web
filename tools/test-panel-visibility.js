@@ -106,7 +106,8 @@ const SHOW_OK = new Set([
 
 // 接入能力表时在 index.html 上补 id 的三个行(原先没有任何 id,故永远显示、也没法纳入快照)。
 // 冻结基线里不存在这些行,audit 时按"新增行"单独记账,不算覆盖缺口。
-const NEW_ROWS = new Set(['rowCornerRadius', 'rowGlobalMargin', 'rowImgScale']);
+// rowAvatarShow:2026-10 新增的「显示头像」开关(53bd5e2),同样晚于冻结基线,按新增行记账。
+const NEW_ROWS = new Set(['rowCornerRadius', 'rowGlobalMargin', 'rowImgScale', 'rowAvatarShow']);
 
 function drawKeys() {
     const src = fs.readFileSync(ENGINE, 'utf8');

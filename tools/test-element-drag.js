@@ -49,8 +49,23 @@ const SETUP = `
     // 先渲一帧,让引擎写入 _logW 等基准信息,logoBaseSize() 才有值。
     // 顺序与 tools/test-element-position.js 一致:先渲染建基准,再插入元素。
     delete A.uiDprOverride; delete A.exportScale; A.displayMax = undefined;
+    // 等到「基准可算(_logW 已写入) + rect/画布尺寸连续 2 次采样不变」才继续。
+    // 冷启动首帧常超过固定 900ms:旧写法在渲染完成前就插入元素并写 rx(分母取到
+    // 还没放大的旧画布),随后 canvas 尺寸突变,SETUP 里算好的按压点全部作废,
+    // 表现为「按下一律不选中」(实测 pt 偏移可达 100 画布像素)。
+    const settle = async (needBase) => {
+        let prev = '', stable = 0;
+        for (let i = 0; i < 60 && stable < 2; i++) {
+            const rr = A.dom.canvas.getBoundingClientRect();
+            const cvv = A.dom.canvas;
+            const cur = [Math.round(rr.left), Math.round(rr.top), Math.round(rr.width), Math.round(rr.height), cvv.width, cvv.height].join(',');
+            stable = (cur === prev && (!needBase || A.logoBaseSize())) ? stable + 1 : 0;
+            prev = cur;
+            await new Promise(res => setTimeout(res, 250));
+        }
+    };
     A.scheduleRender(true);
-    await new Promise(r => setTimeout(r, 900));
+    await settle(true);
 
     // logo 元素必须带 dataUrl:normalizeTemplate() 会剔除没有图片源的残留元素。
     const lc = document.createElement('canvas'); lc.width = 300; lc.height = 120;
@@ -67,7 +82,7 @@ const SETUP = `
     A.setLogoPixelPos(elNew, (b0 ? b0.w : 1000) * 0.5, (b0 ? b0.h : 800) * 0.5);
     A.imageTemplates.set(A.image, JSON.parse(JSON.stringify(A.template)));
     A.scheduleRender(true);
-    await new Promise(r => setTimeout(r, 900));
+    await settle(true);
 
     const el = A.template.logoElements[0];
     const cv = A.dom.canvas, r = cv.getBoundingClientRect();
@@ -153,9 +168,20 @@ app.whenReady().then(async () => {
     let s = await win.webContents.executeJavaScript(SETUP);
     if (s && s.failed) { console.log('  SETUP 失败: ' + s.why); console.log(JSON.stringify(s, null, 2)); dbg.detach(); finish(1); return; }
 
+    // 按压点在「按下前一刻」按当前 rect/画布重算:布局在 SETUP 返回后仍可能微调
+    // (缩放/首帧渲染),用旧坐标会打偏到画布别处,表现为按下不选中。
+    const pressXY = () => win.webContents.executeJavaScript(`(() => {
+        const A = window.App, cv = A.dom.canvas, r = cv.getBoundingClientRect();
+        const el = (A.template.logoElements || [])[0];
+        if (!el) return null;
+        const b = A.logoBaseForOverlay(); const p = A.logoPos(el, b.w, b.h, el.size);
+        return { x: r.left + (p.cx / cv.width) * r.width, y: r.top + (p.cy / cv.height) * r.height };
+    })()`);
+
     console.log('鼠标拖拽行为(CDP 真实事件)');
     console.log('─'.repeat(84));
 
+    let q = await pressXY(); if (q) { s.x = q.x; s.y = q.y; }
     await mouse('mouseMoved', s.x, s.y);
     await mouse('mousePressed', s.x, s.y);
     await new Promise(r => setTimeout(r, 120));
@@ -175,6 +201,7 @@ app.whenReady().then(async () => {
 
     // ② 核心回归:拖出画布边界。canvas 显示尺寸被 zoom 压缩,挪几像素即出界。
     s = await win.webContents.executeJavaScript(SETUP);
+    q = await pressXY(); if (q) { s.x = q.x; s.y = q.y; }
     await mouse('mouseMoved', s.x, s.y);
     await mouse('mousePressed', s.x, s.y);
     await new Promise(r => setTimeout(r, 120));

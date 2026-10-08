@@ -43,7 +43,7 @@ async () => {
     const ky = Math.max(10, Math.min(ch * 0.05, dim.h / 2));   // min(40,40)=40
     const glx = Math.min(dim.w / 2 + kx, cw / 2);              // 150
     const gly = Math.min(dim.h / 2 + ky, ch / 2);              // 80
-    const S = (x, y) => App.snapLogoToGuides(x, y, cw, ch, el);
+    const S = (x, y) => App.snapToGuides(x, y, cw, ch, el);
 
     const cases = [
         ['拖到左上角',        30, 30,   glx, gly,             'left', 'top'],
@@ -73,7 +73,7 @@ async () => {
     // 大 Logo:贴边距离应随尺寸增大,保证完整可见(半宽 400 → glx 应显著大于小 Logo 的 150)
     {
         const big = mkLogo(0, 0, 800, 0.4);   // 半宽 400,半高 160
-        const rb = App.snapLogoToGuides(20, 20, cw, ch, big);
+        const rb = App.snapToGuides(20, 20, cw, ch, big);
         const ok = rb.x >= 400 && rb.x <= cw / 2 && rb.y >= 160;
         out.snap.push({ label: '大Logo贴边仍完整可见', ok, got: 'x=' + rb.x + ' y=' + rb.y, expect: 'x>=400 且 x<=500, y>=160' });
     }

@@ -1,9 +1,9 @@
 // 视觉回归测试:渲染所有风格 × 关键参数组合,与基线(颜色指纹+布局指标)比对。
-// 用法:
-//   node tools/visual-regression.js            # 比对并退出码 0/1
-//   node tools/visual-regression.js --update   # 重建基线(tests/visual/baseline.json)
-//   node tools/visual-regression.js --presets  # 预设冒烟:70 预设走 __render 真实渲染路径 ---- 并入 run
-//   node tools/visual-regression.js --dev      # 开发模式:渲染到 tests/visual/out/ 不比对
+// 用法(本文件 require('electron'),必须经 run-electron 包装,裸 node 跑会挂在 app.whenReady):
+//   node tools/run-electron.js tools/visual-regression.js            # 比对并退出码 0/1
+//   node tools/run-electron.js tools/visual-regression.js --update   # 重建基线(tests/visual/baseline.json)
+//   node tools/run-electron.js tools/visual-regression.js --presets  # 预设冒烟:70 预设走 __render 真实渲染路径 ---- 并入 run
+//   node tools/run-electron.js tools/visual-regression.js --dev      # 开发模式:渲染到 tests/visual/out/ 不比对
 // 设计:
 //   - 复用 design/regress.html(轻量,只加载 engine.js+engine-styles.js,无整套 app)
 //   - 指纹:画布 32 格分块平均 RGB —— 抓布局/颜色错位

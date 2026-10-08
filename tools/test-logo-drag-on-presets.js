@@ -71,11 +71,26 @@ const PREP = `
 })()
 `;
 
-// 状态 B:拖完松手后,用 app 坐标(基准口径)求新位置,像素扫描仅作旁证
+// 状态 B:拖完松手后,先等模型位置收敛再判定(重预设连拖时渲染/输入管线繁忙,
+// 松手后坐标可能仍在半路;固定 700ms 单次读取会把正常拖动误判成"卡在半途"),
+// 然后用 app 坐标(基准口径)求新位置,像素扫描仅作旁证
 const AFTER = `
 (async () => {
     const A = window.App;
-    await new Promise(r => setTimeout(r, 350));
+    const rd = () => {
+        const el = (A.template.logoElements || [])[0];
+        if (!el) return null;
+        const b = A.logoBaseForOverlay();
+        const pos = A.logoPos(el, b.w, b.h, el.size || 60);
+        return { cx: Math.round(pos.cx), cy: Math.round(pos.cy) };
+    };
+    let prev = null, stable = 0, rounds = 0, cur = null;
+    for (; rounds < 20 && stable < 2; rounds++) {
+        await new Promise(r => setTimeout(r, 200));
+        cur = rd();
+        stable = cur && prev && cur.cx === prev.cx && cur.cy === prev.cy ? stable + 1 : 0;
+        prev = cur;
+    }
     A.scheduleRender(true);
     await new Promise(r => setTimeout(r, 350));
     const el = (A.template.logoElements || [])[0];
