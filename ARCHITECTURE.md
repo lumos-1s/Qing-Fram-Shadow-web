@@ -7,24 +7,23 @@
 
 ## 0. 项目定位与血统
 
-- **Electron 31 + 原生 HTML/CSS/JS + Canvas 2D**，本地优先的照片加框工具，v0.1.6，334 次提交，代码 MIT（`shared/brandlogos`、`shared/textures` 除外）。
+- **Electron 31 + 原生 HTML/CSS/JS + Canvas 2D**，本地优先的照片加框工具，v0.1.7，414 次提交，代码 MIT（`shared/brandlogos`、`shared/textures` 除外）。
 - **它是 JavaFX 桌面版的 Web 重写**：`engine.js:1` 自述「JavaFX BorderEngine 逐行移植」，`index.html:153` 注释「对齐 Java FXML 命名」，函数名 `computeCanvasSize` / `getShadowSpace` / `parseColor` 都保留原版语义，`styleNoise/javaRandom` 是 Java LCG 的复刻（`engine-styles.js:853`）。桌面上还存在同名 Java 版与压测目录。
 
 ## 1. 进程与文件布局
 
 | 层 | 文件 | 职责 |
 |---|---|---|
-| 主进程 | `src/main/index.js`(458) | 单实例锁、窗口、`qflocal://` 协议、~30 个 `ipcMain.handle`、自动更新 |
-| | `src/main/state.js`(38) | `userData/state.json` 读写、`freeFilePath` 的 `_1/_2` 递增命名 |
-| 桥 | `src/main/preload.js`(31) | `contextBridge` 暴露 `window.qingframe` 26 个方法，与 handle 一一对应 |
-| 渲染 | `src/renderer/index.html`(800) | UI 骨架 + **按顺序 `<script>` 加载 17 个文件**（782-798） |
-| | `js/engine.js`(1470) | 通用渲染：图层管线、卡片管线、拼图管线 |
-| | `js/engine-styles.js`(3829) | IIFE，**71 个相框风格** + 分发表 |
+| 主进程 | `src/main/index.js`(589) | 单实例锁、窗口、`qflocal://` 协议、~30 个 `ipcMain.handle`、自动更新 |
+| | `src/main/state.js`(46) | `userData/state.json` 读写、`freeFilePath` 的 `_1/_2` 递增命名 |
+| 桥 | `src/main/preload.js`(51) | `contextBridge` 暴露 `window.qingframe` 26 个方法，与 handle 一一对应 |
+| 渲染 | `src/renderer/index.html`(919) | UI 骨架 + **按顺序 `<script>` 加载 17 个文件**（901-917） |
+| | `js/engine.js`(1602) | 通用渲染：图层管线、卡片管线、拼图管线 |
+| | `js/engine-styles.js`(4526) | IIFE，**76 个相框风格** + 分发表 |
 | | `js/app*.js`(10 个) | 全部 `Object.assign` 混入同一个 `window.App` 单例 |
-| 数据 | `shared/presets/`(78 个 JSON) | 内置模板 |
+| 数据 | `shared/presets/`(80 个 JSON) | 内置模板 |
 | | `shared/textures/`(10 PNG) | 纹理，仅图层管线消费 |
 | | `shared/brandlogos/`(106 文件) | 本机素材，**不入库、不进包** |
-| | `shared/custom-icons.json`(41.8 MB) | 未追踪的内置图标库 |
 
 **安全姿态**：`contextIsolation:true`、`nodeIntegration:false`、`sandbox:false`、CSP 写死在 `index.html:5`（`script-src 'self'`，图片允许 `qflocal:`）。
 
@@ -36,13 +35,13 @@
 
 `engine.js:94 _renderToCanvasInner` 按模板字段分流：
 
-1. `photoFrameStyle` 非 `NONE` → `EngineStyles.renderPhotoFrame`（`engine-styles.js:2827`，71 风格）。
+1. `photoFrameStyle` 非 `NONE` → `EngineStyles.renderPhotoFrame`（`engine-styles.js:2827`，76 风格）。
 2. `photoFrameStyle==='NONE'` → 原图直出（唯一真正读 `app.exportScale`、能上采样的路径）。
 3. `baseMargin.bgBlurEnable===1` → `renderCardStyle`（`engine.js:932`）。
 4. 其余 → `renderTemplateStyle`（`engine.js:192`，通用图层模板）。
 5. 拼图页签独立：`renderPuzzle`（`engine.js:1320`）。
 
-预设到管线的分类由 `tools/validate-presets.js:78 classify()` 判定：78 个预设 = **44 风格 + 2 卡片 + 32 图层**。
+预设到管线的分类由 `tools/validate-presets.js:78 classify()` 判定：80 个预设 = **47 风格 + 2 卡片 + 31 图层**。
 
 ### 2.2 坐标系（最容易被踩的地方）
 
@@ -55,12 +54,12 @@
 
 ### 2.3 相框样式管线
 
-`engine-styles.js:3754` 的 `const draw = {...}[styleName]` 是**唯一分发表（71 键）**，签名两类：
+`engine-styles.js:3754` 的 `const draw = {...}[styleName]` 是**唯一分发表（76 键）**，签名两类：
 
 - `f(img,size,g,iw,ih[,S])` —— 老几何风格
 - `f(img,size,g,iw,ih,S,cwO,chO)` —— 带留白/全出血风格，自行把内容块居中
 
-流程：`buildState`(S：exif/cam/paramFs/globalMargin/sign*/avatar*/brand*) → `styleDims`(63 分支定画布) → 分发表取 draw → 全出血模糊风格按 `effectiveCanvasRatio` 扩画布（`BLUR_FULLBLEED` 名单 3811）→ 临时 canvas 上**劫持 `g.drawImage`** 给照片套 `cornerConfig` 圆角（3836-3856）→ `expandToRatio` 补比例（2788）→ 以 `finalScale = min(1, displayMax/长边)` 贴回可见 canvas（3875）→ `drawUserElements` 画 logo/贴纸/自由文字。异常时 `catch` 回退纯原图（3890）。
+流程：`buildState`(S：exif/cam/paramFs/globalMargin/sign*/avatar*/brand*) → `styleDims`(76 分支定画布) → 分发表取 draw → 全出血模糊风格按 `effectiveCanvasRatio` 扩画布（`BLUR_FULLBLEED` 名单 3811）→ 临时 canvas 上**劫持 `g.drawImage`** 给照片套 `cornerConfig` 圆角（3836-3856）→ `expandToRatio` 补比例（2788）→ 以 `finalScale = min(1, displayMax/长边)` 贴回可见 canvas（3875）→ `drawUserElements` 画 logo/贴纸/自由文字。异常时 `catch` 回退纯原图（3890）。
 
 未注册的风格名落到占位分支，渲染中性底 + 风格名（`stylePlaceholder:2289`）。
 
@@ -114,29 +113,29 @@
 
 **拼图**（`app-puzzle.js`）：12 种布局、`axisVals`、`slots{i:{imageIndex,zoom,offsetX,offsetY,rotate,fillMode}}`、格字幕与间隙字幕、轴线拖动与整格 swap；导出恒 **4000px PNG**，不读导出尺寸档。
 
-**剪贴快捷键**（`app-view.js:56`）：Ctrl+O/Z/Y/A/C/V/E/D/0、Ctrl+Shift+S、Delete/Backspace（先判拼图字幕再判元素）、←/→ 切图，输入框聚焦时屏蔽。
+**剪贴快捷键**（`app-view.js:56`）：Ctrl+O/Z/Y/A/C/V/E/D/0、Ctrl+Shift+S、Delete/Backspace（先判拼图字幕再判元素）、方向键微移选中元素（Shift=10px；无选中时 ←/→ 切图），输入框聚焦时屏蔽。
 
 ## 4. 工程化与质量门
 
-- `npm run check` = ESLint（只覆盖 `src`）+ `validate-presets`（78 预设结构 + 风格白名单，实测 0 错）+ `check:caps`。**实跑通过（exit 0）**。
-- **`style-caps.js` 能力表**是「面板显隐 ↔ 引擎是否真读该参数」的唯一事实来源：`DIMS`（5 个数值维度：pf/cr/gm/isc/bi）用两个极值探针渲染，判据是**单格最大差 ≥2 且变化格数 ≥2**（`gen-style-caps.js:28-58`，注释记录了"全图均差"曾误判 9 个风格的返工）。生成区由基线实测得出（71 键），`npm run gen:caps` 重写、`--check` 过期退出 1。
-- `npm test` = check + 19 个 Electron 用例（含 panel、panel:audit、visual），`&&` 串联，单点失败即断。
-- **视觉回归**：`tests/visual/baseline.json` 20.4 MB / **869 键**（71 `__base` + 10 组参数极值 + 4×22 品牌组合），每键存 32 格分块平均指纹 `{fp:{CW,CH,data}}` 与布局锚点 `m`；容差 `FP_TOL=2.0` / `POS_TOL=2px`。
+- `npm run check` = ESLint（只覆盖 `src`）+ `validate-presets`（80 预设结构 + 风格白名单）+ `check:caps` + `check:marks`（28 SVG 严格比对）+ `test:mainio` + `test:icons` + `test:engine`。**实跑通过（exit 0）**。
+- **`style-caps.js` 能力表**是「面板显隐 ↔ 引擎是否真读该参数」的唯一事实来源：`DIMS`（5 个数值维度：pf/cr/gm/isc/bi）用两个极值探针渲染，判据是**单格最大差 ≥2 且变化格数 ≥2**（`gen-style-caps.js:28-58`，注释记录了"全图均差"曾误判 9 个风格的返工）。生成区由基线实测得出（76 键），`npm run gen:caps` 重写、`--check` 过期退出 1。
+- `npm test` = check + 24 个 Electron 用例（经 `run-electron.js` 统一补 GPU 开关，含 panel、panel:audit、visual），`&&` 串联，单点失败即断。**2026-10-08 起整链 33 阶段实跑 EXIT=0（历史首次）**。
+- **视觉回归**：`tests/visual/baseline.json` 20.7 MB / **924 键**（76 `__base` + 76×10 参数极值 + 4×22 品牌组合），每键存 32 格分块平均指纹 `{fp:{CW,CH,data}}` 与布局锚点 `m`；容差 `FP_TOL=2.0` / `POS_TOL=2px`。
 - 测试三套模板：**A 纯 harness**（`design/regress.html` 只加载引擎，注入 `mulberry32` 固定随机，`__QR.run` 批量渲）；**B/C 真实 app**（注册 `qflocal` 协议 + 打桩 ~25 个 IPC + 注入 preload + 轮询等 `window.App` 就绪）。
-- `npm run release` = `app:dir` → `verify-dist` → 打包；`verify-dist` 退 **0 干净 / 1 泄漏 / 2 无法判定**，并检查产物新鲜度。
+- `npm run release` = `app:dir` → `verify-dist`（未压缩目录 asar）→ 打安装包 → `verify-dist --installers`（即 `verify:pkg`：Setup.exe 体积 + sha512 对照 `latest.yml`）；`verify-dist` 退 **0 干净 / 1 泄漏 / 2 无法判定**，并检查产物新鲜度。
 
 > 环境提示：本会话 `ELECTRON_RUN_AS_NODE=1` 被置位，`require('electron')` 退化为路径字符串，任何 Electron 测试脚本第一行就崩（不是测试失败）。要跑 GUI 用例需先 `$env:ELECTRON_RUN_AS_NODE=$null`。
 
 ## 5. 发现的问题（按严重度）
 
-1. **【高】9 个 Electron 用例恒绿**：`app.quit()`/`process.exit()` 之后再设 `process.exitCode` 会被忽略（工具自己在 `visual-regression.js:28` 写明）。`test-element-drag`、`test-logo-hit-on-presets`、`test-preset-keep-content`、`test-shortcut-delete` 只有 `app.quit()+process.exitCode`；`test-brand-logo`、`test-element-ops`、`test-logo-hint`、`test-element-position`、`test-overlay-consistency` 连 `exitCode` 都没有。→ `npm test` 的"通过"有一半是假的。
-2. **【高】release 链当前是破的**：`dist/win-unpacked/resources/app.asar`（2026-09-22，比源码旧 11511 分钟）内含 **106 个 brandlogos**，`verify-dist` 实跑 **exit 1**；且 `verify-dist.js:114,121` 把预设数硬编码成 70（现 78），数量异常会把结果推到 exit 2「无法判定」——在 `&&` 链上有被当成功放过的风险。修法：清 `dist/` 重建 + 预设数改为动态统计。
+1. **【已解决】9 个 Electron 用例恒绿**：`app.quit()`/`process.exit()` 之后再设 `process.exitCode` 会被忽略，断言失败也返回 0。已全部改为 `finish()` → `app.exit()`（OPTIMIZATIONS #17），24 个 GUI 用例退出码可信；`npm test` 整链 33 阶段实跑 EXIT=0。
+2. **【已解决】release 链是破的**：旧 `dist/` 陈旧且含 106 个 brandlogos、`verify-dist` 实跑 exit 1，预设数还硬编码成 70（会把数量异常推到 exit 2「无法判定」）。现已清空重建（0.1.7 安装包 75.0 MB）、预设/纹理数改为从 `shared/` 实测（OPTIMIZATIONS #18），并新增 `verify:pkg`（`--installers`）对安装包做体积 + sha512 ↔ `latest.yml` 核验，正/负向均验证通过。
 3. **【中】相框样式路径不读 `exportScale`**：`engine-styles.js:3875` 用 `finalScale=min(1, displayMax/长边)` 封顶，只有 NONE 原图路径（2838）能上采样 → 「相框样式 + 4096/8192」拿不到目标尺寸（`app-export.js:210` 已主动提示，`test-export-fidelity` 只 `reportKnown` 不改退出码）。代码注释称受 `AGENTS.md`「边框相关功能保持原样」约束，但**该文件现已不在仓库中**。
 4. **【中】离屏渲染共享单例、不可重入**：缩略图队列、模板库缩略图、导出三条路径都靠「临时改写 `dom.canvas/image/template`」再 `finally` 还原；`queueThumb` 与 `_renderTplThumbs` 并发会互相踩踏（导出因此必须深拷贝模板 + 逐张 flush）。
 5. **【中】依赖与可移植性**：`@electron/asar` 未列入 `package.json`（靠 electron-builder 传递依赖）；`measure-drag.js`/`stress.js` 默认目录写死作者机器绝对路径，CI 不可用。
 6. **【中】8192 导出内存**：`out` + 可见 canvas + `toDataURL` 三份大缓冲并存（8192² RGBA ≈ 268 MB/张），`getImageData` 调用点还会打断 GPU 加速。
-7. **【低】一致性债务**：`syncModelFromUI`/`refreshUI` 两份手工镜像无漏字段保护；`applyGlobalMargin:860` 每次同步从 `refTop` 重算四边、会冲掉单边 margin；undo 栈与 `imageTemplates` 两套历史不联动；`nudgeElement` 的键盘微调**只挂在 Ctrl/Shift+滚轮上，方向键微调并未接线**；localStorage 承载头像/图标/草稿 base64，超配额静默丢弃；`tools/`、`tests/` 不受 lint 保护。
-8. **【低】仓库不干净**：`dist/`（.gitignore 已忽略但仍在盘上）、`s_err.log`、未追踪的 41.8 MB `custom-icons.json` 与一份 `.docx` 说明混在根目录。
+7. **【低】一致性债务**：`syncModelFromUI`/`refreshUI` 两份手工镜像无漏字段保护；`applyGlobalMargin:860` 每次同步从 `refTop` 重算四边、会冲掉单边 margin；undo 栈与 `imageTemplates` 两套历史不联动；localStorage 承载头像/图标/草稿 base64，超配额静默丢弃；`tools/`、`tests/` 不受 lint 保护。
+8. **【低】仓库不干净**：`dist/`（.gitignore 已忽略但仍在盘上）与根目录若干本地日志（`s_err.log`/`debug.log`/`dist-build.log`/`start.log`，均已忽略）混放；原先混入的 `custom-icons.json` 与 `.docx` 已不存在。
 
 ## 6. 关键文件速查
 
@@ -151,4 +150,4 @@
 | 模板库 / 预设应用 | `app-templates.js`（`applyPreset:469` 保留用户元素） |
 | 工程文件 | `app-qfs.js` + `index.js:226` |
 | 预设数据 | `shared/presets/*.json`（须过 `validate-presets`） |
-| 发布校验 | `tools/verify-dist.js` |
+| 发布校验 | `tools/verify-dist.js`（`verify:pkg` = `--installers`，核对安装包 size/sha512 ↔ `latest.yml`） |

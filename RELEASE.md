@@ -21,9 +21,9 @@ GitHub Releases 里没有 `latest.yml` + 新版安装包，旧版就永远查不
 
 2. **自检**（发布前必跑）：
    ```
-   npm run check
+   npm run check   # lint + 预设/标记/能力表校验 + 主进程 I/O、图标、引擎不变量
+   npm test        # 上述 check + 24 个 Electron 用例(面板显隐、视觉回归 924 键等)，33 阶段全绿才可发
    ```
-   含 lint、预设校验、标记校验、主进程 I/O、引擎不变量等全套检查。
 
 3. **打包并发布到 GitHub Releases**（需 GitHub token）：
    ```
@@ -31,7 +31,10 @@ GitHub Releases 里没有 `latest.yml` + 新版安装包，旧版就永远查不
    $env:GH_TOKEN = "你的 Personal Access Token"
    npm run release:publish
    ```
-   `--publish always` 会自动：打包 NSIS 安装版 + portable 版 → 生成 `latest.yml` → 创建/更新 GitHub Release（版本 tag 取 package.json version）→ 上传产物。产物含：
+   链路是 `app:dir` → `verify:dist`（校验未压缩目录 asar：无品牌 Logo、数量与源码一致、产物新鲜）
+   → 打包发布 → `verify:pkg`（核对 Setup.exe 体积与 sha512 是否与 `latest.yml` 一致，不一致退出码 1；
+   此时 Release 已上传，需人工修复重发）。`--publish always` 会自动：打包 NSIS 安装版 + portable 版 →
+   生成 `latest.yml` → 创建/更新 GitHub Release（版本 tag 取 package.json version）→ 上传产物。产物含：
    - `Qingframe-Setup-<version>-x64.exe`（NSIS 安装版，**只有它带 app-update.yml，能自动更新**）
    - `Qingframe-Portable-<version>-x64.exe`（便携单文件版，**不支持在线自动更新**，代码里已跳过）
    - `latest.yml` / `latest-mac.yml`（更新源元数据，必须随 release 一起存在）

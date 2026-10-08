@@ -36,7 +36,7 @@ Copyright (c) 2026 lumos-1s），适用 MIT 许可。
 
 ## 4. 内置模板
 
-`shared/presets/` 目录中的 70 个模板为本项目原创的 JSON 参数描述，适用 MIT 许可。
+`shared/presets/` 目录中的 80 个模板为本项目原创的 JSON 参数描述，适用 MIT 许可。
 （模板中不内嵌任何第三方图形。）
 
 ---
