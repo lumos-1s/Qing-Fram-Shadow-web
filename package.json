@@ -43,9 +43,10 @@
     "check": "npm run lint && npm run validate:presets && npm run check:caps && npm run check:marks && npm run test:mainio && npm run test:icons && npm run test:engine",
     "app:dir": "electron-builder --win --dir",
     "verify:dist": "node tools/verify-dist.js",
-    "release": "electron-builder --win --dir && node tools/verify-dist.js && electron-builder --win",
-    "release:publish": "electron-builder --win --publish always && node tools/verify-dist.js",
-    "dist": "electron-builder --win",
+    "verify:pkg": "node tools/verify-dist.js --installers",
+    "release": "electron-builder --win --dir && node tools/verify-dist.js && electron-builder --win && node tools/verify-dist.js --installers",
+    "release:publish": "electron-builder --win --dir && node tools/verify-dist.js && electron-builder --win --publish always && node tools/verify-dist.js --installers",
+    "dist": "electron-builder --win && node tools/verify-dist.js --installers",
     "dist:portable": "electron-builder --win portable"
   },
   "author": "lumos",
