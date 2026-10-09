@@ -640,7 +640,11 @@
                                 <button class="mini-btn" id="btnExportTemplate">导出 .qfs</button>
                                 <button class="mini-btn" id="btnImportTemplate">导入</button>
                             </div>
-                            <div class="hint-box">保存到统一模板目录，导出/导入支持 .qfs 与 .json。已存模板见下方列表，点条目即可应用。</div>
+                            <div class="btn-row btn-2">
+                                <button class="mini-btn" id="btnExportConfig" title="把当前边框+参数+签名导出为轻量 JSON（不含照片），可备份/分享">导出配置</button>
+                                <button class="mini-btn" id="btnImportConfig" title="读取配置 JSON 还原边框与参数（照片不变）">导入配置</button>
+                            </div>
+                            <div class="hint-box">「导出 .qfs」含照片工程；「导出配置」为轻量 JSON 不含照片，适合备份与分享。</div>
                         </div>
                         <div class="param-group">
                             <div class="pg-title collapsible">已存模板</div>

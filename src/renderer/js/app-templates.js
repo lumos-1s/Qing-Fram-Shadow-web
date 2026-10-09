@@ -246,6 +246,46 @@ window.App = Object.assign(window.App || {}, {
         return this.importQFS();
     },
 
+    // 导出「配置」:当前编辑状态(边框方案 + 右侧栏参数 + 签名/文字 + 相机参数)打包为
+    // 单个轻量 JSON,不含照片 —— 用于备份 / 迁移 / 分享,微信传几 KB 就能给别人套用
+    async exportConfig() {
+        if (!this.template) { this.setStatus('没有可导出的配置'); return; }
+        this.syncModelFromUI();
+        const name = (this.$('tfTemplateName') && this.$('tfTemplateName').value.trim()) || '我的配置';
+        const bundle = {
+            v: 1,
+            kind: 'qfs-config',
+            app: 'qingframe-web',
+            name,
+            exportedAt: new Date().toISOString(),
+            template: this.cloneTemplate()
+        };
+        this.setStatus('正在导出配置…');
+        const r = await window.qingframe.exportTemplate(name, bundle);
+        this.setStatus(r.ok ? `配置已导出为「${name}」` : (r.canceled ? '已取消导出' : '导出失败：' + (r.error || '')));
+    },
+
+    // 导入「配置」:读取上面的配置 JSON(也兼容裸模板 JSON),校验后还原到当前照片的编辑状态
+    async importConfig() {
+        const r = await window.qingframe.importTemplate();
+        if (!r.ok) { this.setStatus(r.canceled ? '已取消' : '导入失败：' + (r.error || '')); return; }
+        let data = r.data;
+        if (!data || typeof data !== 'object') { this.setStatus('导入失败：文件内容无法识别'); return; }
+        // 配置包:取内部 template;裸模板:直接用
+        if (data.kind === 'qfs-config' && data.template && typeof data.template === 'object') data = data.template;
+        if (!data || typeof data !== 'object' || typeof data.photoFrameStyle !== 'string') {
+            this.setStatus('导入失败：不是有效的清框影配置/模板文件');
+            return;
+        }
+        this.onSettingCommit();
+        this.template = JSON.parse(JSON.stringify(data));
+        this.normalizeTemplate();
+        this.saveCurrentTemplate();
+        this.refreshUI();
+        this.scheduleRender(true);
+        this.setStatus(`已导入配置「${r.name}」（照片不变，边框/参数已还原）`);
+    },
+
     applyQuickPreset(kind) {
         if (!this.presets.length) { this.setStatus('预设库未加载'); return; }
         this.onSettingCommit();

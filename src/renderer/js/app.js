@@ -1823,6 +1823,8 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnSaveTemplate', () => this.saveTemplate());
         bindBtn('btnExportTemplate', () => this.exportTemplate());
         bindBtn('btnImportTemplate', () => this.importTemplate());
+        bindBtn('btnExportConfig', () => this.exportConfig());
+        bindBtn('btnImportConfig', () => this.importConfig());
         bindBtn('btnQuickFilm', () => this.applyQuickPreset('film'));
         bindBtn('btnQuickIdCard', () => this.applyQuickPreset('idcard'));
         bindBtn('btnAutoColorBorder', () => this.autoColorBorder());
