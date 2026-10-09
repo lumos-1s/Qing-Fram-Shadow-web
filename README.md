@@ -1,10 +1,17 @@
-# 清框影 · Frame Studio
+# 清框影 QingFramShadow · Frame Studio
 
 > 桌面照片加边框工具 —— 一键为照片添加艺术边框、光影氛围、Logo 水印与个性签名，支持多图拼贴和批量导出。全部渲染在本地完成，照片不上传。
 >
 > A local-first desktop photo framing app —— add artistic frames, light effects, logo watermarks and personal signatures to photos, with collage layouts and batch export. Everything renders locally; your photos never leave your computer.
 
+[![stars](https://img.shields.io/github/stars/lumos-1s/Qing-Fram-Shadow-web?style=flat-square&color=blue)](https://github.com/lumos-1s/Qing-Fram-Shadow-web/stargazers)
+[![license](https://img.shields.io/github/license/lumos-1s/Qing-Fram-Shadow-web?style=flat-square&color=green)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.1.7-orange?style=flat-square)](https://github.com/lumos-1s/Qing-Fram-Shadow-web/releases)
+[![Electron](https://img.shields.io/badge/Electron-31-47848F?style=flat-square)]()
+
 Built with **Electron + Canvas 2D**. Runs fully offline.
+
+> **关键词 Keywords** · 照片加边框 photo frame · 水印 watermark · EXIF 相机参数 · 拼图 collage · 九宫格切图 grid slice · 艺术边框 artistic frames · 桌面工具 desktop app · Electron · Canvas 2D
 
 ---
 
