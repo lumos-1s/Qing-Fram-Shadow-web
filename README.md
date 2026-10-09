@@ -1,6 +1,6 @@
 # 清框影 · Frame Studio
 
-> 桌面照片加框工具 —— 一键为照片添加艺术边框、光影氛围、Logo 水印与个性签名，支持多图拼贴和批量导出。全部渲染在本地完成，照片不上传。
+> 桌面照片加边框工具 —— 一键为照片添加艺术边框、光影氛围、Logo 水印与个性签名，支持多图拼贴和批量导出。全部渲染在本地完成，照片不上传。
 >
 > A local-first desktop photo framing app —— add artistic frames, light effects, logo watermarks and personal signatures to photos, with collage layouts and batch export. Everything renders locally; your photos never leave your computer.
 
@@ -41,7 +41,7 @@ Built with **Electron + Canvas 2D**. Runs fully offline.
   **Export** — PNG / JPEG / WebP with adjustable quality; sizes from original to 8192px; pick a location then render & write; defaults to the original resolution.
 
 - **隐私** —— 全本地处理，无需登录，不上传照片
-  **Privacy** — everything runs locally: no account, no uploads.
+  **隐私** — everything runs locally: no account, no uploads.
 
 ---
 
