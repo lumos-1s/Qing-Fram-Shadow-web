@@ -78,6 +78,48 @@ app.whenReady().then(() => {
 
     // ── 自动更新:仅打包后(app.isPackaged)生效;启动静默检查,事件经 webContents 推给渲染进程做 UI ──
     //    updater 为 null 时(check-for-updates 等 IPC)一律返回"开发模式",避免 dev 下调用报错
+    //    [v0.1.9] 国内网络优化:①检查更新加 20s 超时并推送明确提示;②安装包下载走 GitHub 加速镜像(可经 QINGFRAME_PROXY 环境变量覆盖)
+    const CHECK_TIMEOUT_MS = 20000;
+    const GH_PROXIES = process.env.QINGFRAME_PROXY
+        ? [process.env.QINGFRAME_PROXY]
+        : ['https://ghproxy.net', 'https://ghfast.top', 'https://gh-proxy.com'];
+    const withTimeout = (promise, ms, label) => Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(
+            () => reject(new Error(`${label}超时（${Math.round(ms / 1000)}s），GitHub 连接缓慢或不可达，请稍后重试或开启代理`)),
+            ms
+        ))
+    ]);
+    // 下载环节把 GitHub 文件 URL 换成镜像前缀(镜像仅转发原文件,sha512 不变);patch 一次即可
+    const patchGitHubDownloadProxy = () => {
+        try {
+            const ghMod = require('electron-updater/out/providers/GitHubProvider');
+            const GHProvider = ghMod && ghMod.GitHubProvider;
+            if (!GHProvider || GHProvider.prototype.__qfProxyPatched) return true;
+            const orig = GHProvider.prototype.resolveFiles;
+            GHProvider.prototype.resolveFiles = function (updateInfo) {
+                const files = orig.call(this, updateInfo);
+                const proxy = GH_PROXIES[0];
+                if (proxy && files && files.length) {
+                    for (const f of files) {
+                        // electron-updater 26 里 f.url 是 URL 实例(非字符串),要按 href 判断并重建 URL
+                        const u = f && f.url;
+                        const href = (typeof u === 'string') ? u : (u && u.href);
+                        if (href && href.startsWith('https://github.com/')) {
+                            const proxied = proxy + '/' + href;
+                            f.url = (typeof u === 'string') ? proxied : new URL(proxied);
+                        }
+                    }
+                }
+                return files;
+            };
+            GHProvider.prototype.__qfProxyPatched = true;
+            return true;
+        } catch (e) {
+            console.warn('[updater] 下载镜像 patch 失败:', e && e.message);
+            return false;
+        }
+    };
     let updater = null;
     if (app.isPackaged) {
         // portable 单文件版不生成 app-update.yml,electron-updater 读取时会抛
@@ -90,6 +132,7 @@ app.whenReady().then(() => {
             const { autoUpdater } = require('electron-updater');
             updater = autoUpdater;
             autoUpdater.autoDownload = false; // 发现新版后由用户点按钮再下载
+            patchGitHubDownloadProxy();
             const pushUpdater = (type, payload) => {
                 const w = BrowserWindow.getAllWindows()[0];
                 if (w && !w.isDestroyed()) w.webContents.send('updater:event', Object.assign({ type }, payload || {}));
@@ -99,8 +142,8 @@ app.whenReady().then(() => {
             autoUpdater.on('download-progress', (p) => pushUpdater('progress', { percent: p && p.percent, speed: p && p.bytesPerSecond }));
             autoUpdater.on('update-downloaded', () => pushUpdater('downloaded'));
             autoUpdater.on('error', (err) => { console.warn('[updater]', err && err.message); pushUpdater('error', { message: err && err.message }); });
-            // 启动后延迟静默检查,避免拖慢首屏
-            setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 3000);
+            // 启动后延迟静默检查,避免拖慢首屏;国内网络慢,加超时兜底(失败静默,不打扰首屏)
+            setTimeout(() => { withTimeout(autoUpdater.checkForUpdates(), CHECK_TIMEOUT_MS, '检查更新').catch(() => {}); }, 3000);
         } catch (e) {
             console.warn('[updater] 初始化失败:', e && e.message);
         }
@@ -108,8 +151,18 @@ app.whenReady().then(() => {
     }
     ipcMain.handle('check-for-updates', async () => {
         if (!updater) return { ok: false, message: '当前为便携版,不支持在线自动更新,请到 GitHub Releases 下载新版' };
-        try { await updater.checkForUpdates(); return { ok: true }; }
-        catch (e) { return { ok: false, message: e && e.message }; }
+        try {
+            await withTimeout(updater.checkForUpdates(), CHECK_TIMEOUT_MS, '检查更新');
+            return { ok: true };
+        } catch (e) {
+            const msg = (e && e.message) || '网络异常';
+            // 手动点"检查更新"时,超时/失败也要让更新横幅可见并带"重试"按钮
+            try {
+                const w = BrowserWindow.getAllWindows()[0];
+                if (w && !w.isDestroyed()) w.webContents.send('updater:event', { type: 'error', message: msg });
+            } catch (_) { /* ignore */ }
+            return { ok: false, message: msg };
+        }
     });
     ipcMain.handle('start-update-download', async () => {
         if (!updater) return { ok: false, message: '当前为便携版,不支持在线自动更新,请到 GitHub Releases 下载新版' };
