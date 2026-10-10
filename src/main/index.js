@@ -120,6 +120,33 @@ app.whenReady().then(() => {
             return false;
         }
     };
+    // 检查环节统一走 Provider.httpRequest(atom 源 / releases/latest / latest.yml)。
+    // 直连 GitHub 在国内常被 HTTP/2 重置(net::ERR_HTTP2_PROTOCOL_ERROR),把 github.com 请求也换到镜像;
+    // 镜像服务器在国外访问 GitHub,本地只连镜像,绕开被干扰的链路。
+    const patchUpdateHttpRequests = () => {
+        try {
+            const provMod = require('electron-updater/out/providers/Provider');
+            const ProviderCls = provMod && provMod.Provider;
+            if (!ProviderCls || ProviderCls.prototype.__qfHttpPatched) return true;
+            const origHttp = ProviderCls.prototype.httpRequest;
+            ProviderCls.prototype.httpRequest = function (url, headers, cancellationToken) {
+                const proxy = GH_PROXIES[0];
+                if (proxy && url) {
+                    const href = (typeof url === 'string') ? url : url.href;
+                    if (href && href.startsWith('https://github.com/')) {
+                        const proxied = proxy + '/' + href;
+                        url = (typeof url === 'string') ? proxied : new URL(proxied);
+                    }
+                }
+                return origHttp.call(this, url, headers, cancellationToken);
+            };
+            ProviderCls.prototype.__qfHttpPatched = true;
+            return true;
+        } catch (e) {
+            console.warn('[updater] 检查镜像 patch 失败:', e && e.message);
+            return false;
+        }
+    };
     let updater = null;
     if (app.isPackaged) {
         // portable 单文件版不生成 app-update.yml,electron-updater 读取时会抛
@@ -133,6 +160,7 @@ app.whenReady().then(() => {
             updater = autoUpdater;
             autoUpdater.autoDownload = false; // 发现新版后由用户点按钮再下载
             patchGitHubDownloadProxy();
+            patchUpdateHttpRequests();
             const pushUpdater = (type, payload) => {
                 const w = BrowserWindow.getAllWindows()[0];
                 if (w && !w.isDestroyed()) w.webContents.send('updater:event', Object.assign({ type }, payload || {}));
