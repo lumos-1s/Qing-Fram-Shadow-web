@@ -107,7 +107,7 @@
                     <span class="ico-moon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 9.2A6 6 0 0 1 6.8 2.5a6 6 0 1 0 6.7 6.7Z"/></svg></span>
                 </button>
                 <button id="btnCheckUpdate" class="tbtn icon" title="检查软件更新"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7"/><path d="M4.8 6.5 8 9.7l3.2-3.2"/><path d="M2.5 12.5h11"/></svg></button>
-                <button id="btnExportDiag" class="tbtn icon" title="导出诊断日志（遇到问题时一键打包应用信息与操作记录）"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 2.5h5L13 5v8.5H3V2.5h2.5Z"/><path d="M5.5 2.5v3h-3"/><path d="M6 8h4M6 10.5h4"/></svg></button>
+                <button id="btnAbout" class="tbtn icon" title="关于 清框影（版本信息 / 检查更新 / 诊断日志）"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.2v3.6"/><path d="M8 4.6v.3"/></svg></button>
                 <div class="sep"></div>
                 <div class="account" id="accountArea">
                     <div id="loginStatus" class="status-pill clickable" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 12px 4px 4px;">
@@ -356,6 +356,12 @@
                         <div class="param-group">
                             <div class="pg-title collapsible">相机参数(自动识别)</div>
                             <div class="hint-box">已自动识别照片 EXIF 并显示在下方，可直接修改，画布实时更新；全部清空则走原版随机相机参数。</div>
+                            <div class="param-row"><label>参数库</label><select id="cbCamLib" class="ctl-sel"><option value="">-- 选择已存参数(自动填入) --</option></select></div>
+                            <div class="btn-row btn-3">
+                                <button class="mini-btn" id="btnCamLibSave" title="把当前参数保存到库,下次一键填入">存入库</button>
+                                <button class="mini-btn" id="btnCamLibRename" title="重命名当前选中的库条目" style="display:none">重命名</button>
+                                <button class="mini-btn danger" id="btnCamLibDel" title="删除当前选中的库条目" style="display:none">删除</button>
+                            </div>
                             <div class="param-row"><label>品牌</label><input type="text" id="tfExifBrand" class="ctl-tx" placeholder="SONY" /></div>
                             <div class="param-row"><label>型号</label><input type="text" id="tfExifModel" class="ctl-tx" placeholder="A7 IV" /></div>
                             <div class="param-row"><label>焦距</label><input type="text" id="tfExifFocal" class="ctl-tx" placeholder="50mm" /></div>
@@ -582,6 +588,44 @@
                             </div>
                             <div class="btn-row">
                                 <button class="mini-btn" id="btnAddCustomIcon">+ 添加自定义图标</button>
+                                <button class="mini-btn" id="btnTextToImage" title="把输入的文字渲染成透明PNG,像Logo一样可拖拽/缩放/旋转">文字转图片</button>
+                            </div>
+                            <div class="param-row">
+                                <input type="text" id="tfTextToImage" class="ctl-tx" placeholder="转图片的文字(如: 摄于杭州 · 2026)" />
+                            </div>
+                            <div class="param-row" id="rowT2iStyle" style="display:none">
+                                <label>字体</label>
+                                <select id="cbT2iFont" class="ctl-sel">
+                                    <option value='"Microsoft YaHei","PingFang SC",sans-serif'>雅黑(默认)</option>
+                                    <option value='"SimHei",sans-serif'>黑体</option>
+                                    <option value='"KaiTi","STKaiti",serif'>楷体</option>
+                                    <option value='"SimSun","NSimSun",serif'>宋体</option>
+                                    <option value='"FangSong","STFangsong",serif'>仿宋</option>
+                                    <option value='"STXingkai","KaiTi",cursive'>华文行楷</option>
+                                    <option value='"LiSu","STLiti",serif'>隶书</option>
+                                    <option value='"STXinwei","SimHei",serif'>华文新魏</option>
+                                    <option value='"STCaiyun","SimHei",serif'>华文彩云</option>
+                                    <option value='"STLiti","STXingkai",cursive'>华文隶书</option>
+                                    <option value='"YouYuan","Microsoft YaHei",sans-serif'>幼圆</option>
+                                    <option value='"FZShuTi","STXingkai",cursive'>方正舒体</option>
+                                    <option value='"FZYaoTi","KaiTi",serif'>方正姚体</option>
+                                    <option value='"STHupo","SimHei",serif'>华文琥珀</option>
+                                    <option value='"Comic Sans MS",cursive'>Comic(手写感)</option>
+                                </select>
+                            </div>
+                            <div class="param-row" id="rowT2iColor" style="display:none">
+                                <label>颜色</label>
+                                <input type="color" id="cpT2iColor" class="ctl-cl" value="#000000" />
+                            </div>
+                            <div class="param-row" id="rowT2iEffect" style="display:none">
+                                <label>效果</label>
+                                <select id="cbT2iEffect" class="ctl-sel">
+                                    <option value="none">无</option>
+                                    <option value="stroke">描边</option>
+                                    <option value="shadow">阴影</option>
+                                    <option value="gradient">渐变</option>
+                                    <option value="outline">镂空描边</option>
+                                </select>
                             </div>
                         </div>
 
@@ -814,6 +858,44 @@
         </div>
     </div>
 
+    <!-- ═══ 关于弹窗(版本信息 / 检查更新 / 导出诊断日志) ═══ -->
+    <div id="aboutModal" class="modal-overlay" style="display:none">
+        <div class="modal-card" style="max-width:420px;width:90%;">
+            <div class="modal-header">
+                <span class="modal-title">关于 清框影</span>
+                <button id="aboutClose" class="modal-close" title="关闭">&times;</button>
+            </div>
+            <div class="modal-body" style="line-height:1.9;font-size:13px;color:var(--text);">
+                <div style="font-weight:700;font-size:15px;margin-bottom:2px;">清框影 QingFramShadow</div>
+                <div id="aboutInfo" style="color:var(--text-dim);font-size:12px;">加载中…</div>
+                <div style="margin-top:12px;font-size:12px;color:var(--text-dim);">本地照片加框工具：60+ 相框样式、EXIF 参数识别、拼图与批量导出，全本地渲染，照片与设置不上传。</div>
+                <div class="btn-row" style="margin-top:14px;padding-left:0;padding-right:0;">
+                    <button class="mini-btn" id="btnAboutCheck" title="检查是否有新版本">检查更新</button>
+                    <button class="mini-btn" id="btnAboutIntro" title="重新查看三步上手引导">新手引导</button>
+                    <button class="mini-btn" id="btnExportDiag" title="遇到问题时一键打包应用信息与操作记录">导出诊断日志</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ 新手引导(首次启动, 3 步上手) ═══ -->
+    <div id="introModal" class="modal-overlay" style="display:none">
+        <div class="modal-card" style="max-width:500px;width:90%;">
+            <div class="modal-header">
+                <span class="modal-title">欢迎使用 清框影</span>
+            </div>
+            <div class="modal-body" style="line-height:1.9;font-size:13px;color:var(--text);">
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">三步上手，全程本地处理，照片与设置不上传。</div>
+                <div class="intro-step" style="background:var(--bg-soft,#f2f4f3);border:1px solid var(--border,#dfe4e1);border-radius:10px;padding:12px 14px;margin-bottom:10px;"><b>① 导入照片</b><div style="font-size:12px;color:var(--text-dim);margin-top:2px;">点击左上角「导入照片」，或直接把图片拖进窗口</div></div>
+                <div class="intro-step" style="background:var(--bg-soft,#f2f4f3);border:1px solid var(--border,#dfe4e1);border-radius:10px;padding:12px 14px;margin-bottom:10px;"><b>② 选择边框</b><div style="font-size:12px;color:var(--text-dim);margin-top:2px;">左侧浏览 60+ 相框样式，点一下套用；拼图、九宫格切图也在左侧</div></div>
+                <div class="intro-step" style="background:var(--bg-soft,#f2f4f3);border:1px solid var(--border,#dfe4e1);border-radius:10px;padding:12px 14px;margin-bottom:6px;"><b>③ 调参导出</b><div style="font-size:12px;color:var(--text-dim);margin-top:2px;">右侧调整参数 / 签名 / Logo / 品牌水印，满意后点「保存图片」导出</div></div>
+            </div>
+            <div class="modal-actions">
+                <button id="btnIntroDone" class="ub-btn primary">开始使用</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══ 登录弹窗 ═══ -->
     <div id="loginModal" class="modal-overlay" style="display:none">
         <div class="modal-card">
@@ -919,6 +1001,7 @@
     <script src="js/app-export.js"></script>
     <script src="js/app-draft.js"></script>
     <script src="js/app-qfs.js"></script>
+    <script src="js/app-camlib.js"></script>
     <script src="js/app-splash.js"></script>
 </body>
 </html>

@@ -323,6 +323,7 @@ window.App = Object.assign(window.App || {}, {
         try { this.presets = await window.__loadAllPresets(); }
         catch (e) { this.presets = []; }
         this.buildTree();
+        this.refreshCamLibSelect();
         // 首帧预设选择不在启动路径上执行:先把窗口/预设树渲染出来,选择推迟到
         // init() 末尾的空闲回调(见 app.js),恢复草稿/用户手动选择都不会被覆盖。
         this.splashTick();

@@ -624,6 +624,56 @@ window.App = Object.assign(window.App || {}, {
         this.setZoom(z1);
     },
 
+    // 文字转图片:把输入文字渲染成透明 PNG,作为可拖拽/缩放/旋转的元素加到画布(复用 Logo 管线)
+    async textToImage() {
+        const $ = this.$;
+        const inp = $('tfTextToImage');
+        const text = inp ? String(inp.value).trim() : '';
+        if (!text) { this.setStatus('先输入要转图片的文字'); return; }
+        const fontSel = $('cbT2iFont'), colorInp = $('cpT2iColor'), effSel = $('cbT2iEffect');
+        const fontFamily = fontSel && fontSel.value ? fontSel.value : '"Microsoft YaHei","PingFang SC",sans-serif';
+        const color = colorInp && colorInp.value ? colorInp.value : '#000000';
+        const effect = effSel ? effSel.value : 'none';
+        const c = document.createElement('canvas');
+        const pad = 56, font = '700 120px ' + fontFamily;
+        let ctx = c.getContext('2d');
+        ctx.font = font;
+        const w = Math.max(10, Math.ceil(ctx.measureText(text).width));
+        c.width = w + pad * 2;
+        c.height = 232;
+        ctx = c.getContext('2d');
+        ctx.font = font;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        const tx = pad, ty = c.height / 2;
+        const gradTop = '#ffffff', gradBottom = color;
+        if (effect === 'stroke') {
+            ctx.lineWidth = 10; ctx.lineJoin = 'round'; ctx.strokeStyle = '#ffffff';
+            ctx.strokeText(text, tx, ty);
+            ctx.fillStyle = color; ctx.fillText(text, tx, ty);
+        } else if (effect === 'shadow') {
+            ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 8; ctx.shadowBlur = 18;
+            ctx.fillStyle = color; ctx.fillText(text, tx, ty);
+        } else if (effect === 'gradient') {
+            const g = ctx.createLinearGradient(0, ty - 70, 0, ty + 70);
+            g.addColorStop(0, gradTop); g.addColorStop(1, gradBottom);
+            ctx.fillStyle = g; ctx.fillText(text, tx, ty);
+        } else if (effect === 'outline') {
+            ctx.lineWidth = 8; ctx.lineJoin = 'round'; ctx.strokeStyle = color;
+            ctx.strokeText(text, tx, ty);
+        } else {
+            ctx.fillStyle = color; ctx.fillText(text, tx, ty);
+        }
+        const dataUrl = c.toDataURL('image/png');
+        const logo = { name: text, dataUrl, custom: true };
+        this.logos.push(logo);
+        this.saveCustomIcon(logo);
+        await this.addLogoElement(logo);
+        this.renderLogoPools();
+        if (inp) inp.value = '';
+        this.setStatus('已把文字「' + text + '」转成图片元素:已存入自定义图标池,可直接拖拽/缩放/旋转');
+    },
+
     async addCustomIcon() {
         const res = await window.qingframe.openStickerImage();
         if (!res || !res.data) return;

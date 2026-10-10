@@ -23,6 +23,7 @@
     --text-3: #8B908A;
     --border: #E2DCCE;
     --border-strong: #CBC4B2;
+    --bg-soft: #F4F6F2;
     --thumb-bg: #EBE5D8;
     --shadow-sm: 0 2px 10px rgba(92,80,56,0.08);
     --shadow: 0 12px 32px rgba(92,80,56,0.13);
@@ -54,6 +55,7 @@ html.dark {
     --text-3: #70786F;
     --border: #2C312E;
     --border-strong: #3C433F;
+    --bg-soft: #1C201E;
     --thumb-bg: #2B302D;
     --shadow-sm: 0 2px 10px rgba(0,0,0,0.32);
     --shadow: 0 12px 32px rgba(0,0,0,0.46);
@@ -409,6 +411,9 @@ html.dark #previewCanvas {
     box-shadow: var(--shadow);
 }
 #canvasPane.dragging .drop-overlay { display: flex; }
+
+/* 空状态: 未导入照片时右侧面板整体置灰, 引导用户先导入 */
+#inspector.no-image { opacity: .5; pointer-events: none; transition: opacity .25s ease; }
 
 /* ── 照片导入进度条 ── */
 .import-progress {

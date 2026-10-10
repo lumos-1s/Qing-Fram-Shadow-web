@@ -117,9 +117,14 @@ window.App = {
         const bootTpl = this.template;
         const pickFirst = () => {
             if (this.presets && this.presets.length && this.template === bootTpl) this.selectPreset(this.presets[0]);
+            this.updateEmptyState();
         };
         if (typeof requestIdleCallback === 'function') requestIdleCallback(pickFirst, { timeout: 1500 });
         else setTimeout(pickFirst, 1000);
+        // 新手引导:比首帧预设选择更晚触发,界面就绪后弹出,不抢首帧
+        const showIntro = () => this.showIntroIfNeeded();
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(showIntro, { timeout: 4000 });
+        else setTimeout(showIntro, 3000);
     },
 
     // 恢复上次的界面偏好(导出质量等)
@@ -142,7 +147,7 @@ window.App = {
             btnReset: $('btnReset'), btnRandom: $('btnRandom'), btnFit: $('btnFit'),
             zoomInput: $('zoomInput'), zoomRange: $('zoomRange'), btnTheme: $('btnTheme'),
             presetTree: $('presetTree'), presetSearch: $('presetSearch'),
-            canvas: $('previewCanvas'), canvasPane: $('canvasPane'), placeholder: $('placeholder'),
+            canvas: $('previewCanvas'), canvasPane: $('canvasPane'), placeholder: $('placeholder'), inspector: $('inspector'),
             stage: document.querySelector('.stage'),
             thumbStrip: $('thumbStrip'), dropOverlay: $('dropOverlay'),
             importProgress: $('importProgress'), importProgressFill: $('importProgressFill'), importProgressText: $('importProgressText'),
@@ -981,7 +986,7 @@ window.App = {
 
             // EXIF 输入框回填:手动(manualExif)优先,自动识别(image.exif)兜底
             const manExif = (this.template.manualExif && typeof this.template.manualExif === 'object') ? this.template.manualExif : {};
-            const autoExif = (this.image && this.image.exif) || {};
+            const autoExif = this.camLibMatchExif((this.image && this.image.exif) || {});
             const exifMap = [
                 ['tfExifBrand', 'brand', 'make'], ['tfExifModel', 'model', 'model'],
                 ['tfExifFocal', 'focal', 'focal'], ['tfExifAperture', 'aperture', 'aperture'],
@@ -1203,6 +1208,7 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         if (!this.image) return;
         this.dom.placeholder.style.display = 'none';
         this.dom.canvas.style.display = 'block';
+        this.updateEmptyState();
         const btn = document.getElementById('btnRestoreDraft');
         if (btn) btn.style.display = 'none';
         const saved = this.imageTemplates.get(this.image);
@@ -1802,6 +1808,12 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnBuiltinTexture', () => this.pickBuiltinTexture());
         bindBtn('btnSelectTexture', () => this.pickTexture());
         bindBtn('btnAddCustomIcon', () => this.addCustomIcon());
+        bindBtn('btnTextToImage', () => this.textToImage());
+        const t2iInp = $('tfTextToImage');
+        if (t2iInp) t2iInp.addEventListener('input', () => {
+            const show = String(t2iInp.value).trim().length > 0;
+            ['rowT2iStyle', 'rowT2iColor', 'rowT2iEffect'].forEach(id => { const el = $(id); if (el) el.style.display = show ? '' : 'none'; });
+        });
         bindBtn('btnCopySelectedElement', () => this.copyElement());
         bindBtn('btnPasteClipboardElement', () => this.pasteElement());
         bindBtn('btnDeleteActiveIcon', () => this.deleteElement());
@@ -1825,6 +1837,11 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         bindBtn('btnImportTemplate', () => this.importTemplate());
         bindBtn('btnExportConfig', () => this.exportConfig());
         bindBtn('btnImportConfig', () => this.importConfig());
+        bindBtn('btnCamLibSave', () => this.saveCurrentCamLib());
+        bindBtn('btnCamLibRename', () => this.renameCamLibEntry());
+        bindBtn('btnCamLibDel', () => this.deleteCamLibEntry());
+        const camSel = $('cbCamLib');
+        if (camSel) camSel.addEventListener('change', () => { if (camSel.value) this.applyCamLibEntry(camSel.value); else this.refreshCamLibSelect(); });
         bindBtn('btnQuickFilm', () => this.applyQuickPreset('film'));
         bindBtn('btnQuickIdCard', () => this.applyQuickPreset('idcard'));
         bindBtn('btnAutoColorBorder', () => this.autoColorBorder());
@@ -1877,6 +1894,15 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             gbox.style.display = 'none';
         });
         bindBtn('btnCheckUpdate', () => this.checkUpdates());
+        bindBtn('btnAbout', () => this.openAbout());
+        bindBtn('aboutClose', () => this.closeAbout());
+        bindBtn('btnAboutCheck', () => { this.closeAbout(); this.checkUpdates(); });
+        bindBtn('btnAboutIntro', () => { this.closeAbout(); this.showIntroAgain(); });
+        const aboutModal = $('aboutModal');
+        if (aboutModal) aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) this.closeAbout(); });
+        bindBtn('btnIntroDone', () => this.closeIntro());
+        const introModal = $('introModal');
+        if (introModal) introModal.addEventListener('click', (e) => { if (e.target === introModal) this.closeIntro(); });
         bindBtn('btnUpdateAction', () => this.updateAction());
         bindBtn('btnUpdateClose', () => this.hideUpdateBanner());
         this.initUpdater();
@@ -2216,7 +2242,39 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
                 const img = document.createElement('img');
                 img.src = l.dataUrl;
                 c.appendChild(img);
-                c.addEventListener('click', () => this.armLogoPlacement(l));
+                // 池子图标:拖拽放置。单击(未拖动)不添加,避免误触;拖到画布松手才放到该位置。
+                c.addEventListener('mousedown', (ev) => {
+                    if (ev.button !== 0) return;
+                    ev.preventDefault();
+                    const sx = ev.screenX, sy = ev.screenY;
+                    let dragging = false;
+                    const ghost = document.createElement('img');
+                    ghost.src = l.dataUrl;
+                    ghost.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;opacity:0.85;width:56px;height:56px;object-fit:contain;left:0;top:0;';
+                    const onMove = (me) => {
+                        if (!dragging && Math.abs(me.screenX - sx) + Math.abs(me.screenY - sy) > 5) {
+                            dragging = true;
+                            document.body.appendChild(ghost);
+                        }
+                        if (dragging) { ghost.style.left = (me.clientX - 28) + 'px'; ghost.style.top = (me.clientY - 28) + 'px'; }
+                    };
+                    const onUp = (ue) => {
+                        window.removeEventListener('mousemove', onMove);
+                        window.removeEventListener('mouseup', onUp);
+                        if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+                        if (!dragging) return; // 单击不添加
+                        const canvas = this.dom.canvas;
+                        if (!canvas || !canvas.width) { this.setStatus('画布不可用,已取消放置'); return; }
+                        const rect = canvas.getBoundingClientRect();
+                        const inCanvas = ue.clientX >= rect.left && ue.clientX <= rect.right && ue.clientY >= rect.top && ue.clientY <= rect.bottom;
+                        if (!inCanvas) { this.setStatus('已取消放置(拖到画布外)'); return; }
+                        const pt = this.screenToCanvas(ue);
+                        this.addLogoElement(l, pt.x, pt.y).catch(() => {});
+                        this.setStatus('已放置「' + l.name + '」');
+                    };
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onUp);
+                });
                 // 自定义图标右上角加×删除按钮
                 // 自定义图标双击可重命名
                 if (l.custom) {
@@ -2270,6 +2328,53 @@ bindBtn('btnResetAllSlots', () => this.resetAllSlots());
             const cnt = this.$({ markIconBox: 'markCnt', brandIconBox: 'brandCnt', customIconBox: 'customIconCnt' }[boxId]);
             if (cnt) cnt.textContent = `(${list.length})`;
         });
+    },
+
+    // 打开"关于"弹窗并填充版本信息
+    async openAbout() {
+        const api = window.qingframe;
+        let info = {};
+        try { if (api && api.getAppInfo) info = (await api.getAppInfo()) || {}; } catch (e) {}
+        const el = this.$('aboutInfo');
+        if (el) el.textContent = '版本 ' + (info.version || '?')
+            + ' · Electron ' + (info.electron || '?')
+            + ' · Chrome ' + (info.chrome || '?')
+            + ' · ' + (info.platform || '') + ' ' + (info.arch || '')
+            + (info.packaged ? '' : ' (开发模式)');
+        const m = this.$('aboutModal');
+        if (m) m.style.display = 'flex';
+    },
+    closeAbout() {
+        const m = this.$('aboutModal');
+        if (m) m.style.display = 'none';
+    },
+
+    // 新手引导:首次启动展示 3 步上手,点"开始使用"后记 localStorage,不再弹出
+    showIntroIfNeeded() {
+        try { if (localStorage.getItem('qfs_intro_done') === '1') return; } catch (e) {}
+        const m = this.$('introModal');
+        if (m) m.style.display = 'flex';
+    },
+    closeIntro() {
+        const m = this.$('introModal');
+        if (m) m.style.display = 'none';
+        try { localStorage.setItem('qfs_intro_done', '1'); } catch (e) {}
+    },
+    // 从"关于"重新查看新手引导:先清标记再弹出,下次重启仍按首次逻辑判断
+    showIntroAgain() {
+        try { localStorage.removeItem('qfs_intro_done'); } catch (e) {}
+        const m = this.$('introModal');
+        if (m) m.style.display = 'flex';
+    },
+
+    // 空状态: 没有照片时右侧面板置灰并显示中央提示; 导入照片后恢复
+    // 注意: "继续上次会话"按钮的显隐由 checkDraftRestore 负责,这里不碰它
+    updateEmptyState() {
+        const empty = !this.images || this.images.length === 0;
+        const ins = this.dom.inspector;
+        if (ins) ins.classList.toggle('no-image', empty);
+        if (this.dom.placeholder) this.dom.placeholder.style.display = empty ? 'flex' : 'none';
+        if (this.dom.canvas) this.dom.canvas.style.display = empty ? 'none' : 'block';
     },
 
     /* ══ armLogoPlacement(logo) { … → app-elements.js ══ */
