@@ -3674,7 +3674,9 @@ const w = natW;
         const bottomPad = Math.max(20, Math.round(ih * 0.06));
         let ty = cy + ih - bottomPad;
         if (withBrand && S.cam && !brandHidden(S)) {
-            g.font = 'bold ' + fBrand + 'px sans-serif';
+            // 品牌字体统一为印象毛玻璃同款:Georgia 衬线 + 字间距(仅品牌,参数行不变)
+            g.font = 'bold ' + fBrand + "px Georgia, 'Times New Roman', serif";
+            g.letterSpacing = Math.round(fBrand * 0.15);
             g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 6;
             g.fillStyle = '#ffffff';
             const brand = (S.cam.brand || 'FUJIFILM').toUpperCase();
@@ -3687,6 +3689,7 @@ const w = natW;
             const x0 = Math.round(w / 2 - (onlyLogo ? brandMarkNetW(S, fBrand) : bw + lw) / 2);
             const lwUsed = drawBrandMark(g, S, x0, by, fBrand);
             if (!onlyLogo) g.fillText(brand, x0 + lwUsed, by);
+            g.letterSpacing = 0;
             g.shadowBlur = 0;
             g.textAlign = 'center';
         }
