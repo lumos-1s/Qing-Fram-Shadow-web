@@ -3544,9 +3544,13 @@ const w = natW;
             }
             case 'GALLERY_MAT': {
                 const refG = Math.min(iw, ih);
-                const matG = Math.max(60, Math.round(refG * 0.05));
-                const labelH = Math.max(66, Math.round(matG * 1.1));
-                return { w: iw + matG * 2, h: ih + matG * 2 + labelH };
+                const matG = Math.max(70, Math.round(refG * 0.09));
+                const frameG = Math.max(12, Math.round(refG * 0.018));
+                const filletG = Math.max(2, Math.round(refG * 0.003));
+                const gapG = Math.max(2, Math.round(refG * 0.002));
+                const labelH = Math.max(72, Math.round(matG * 0.8));
+                const innerG = gapG + filletG + frameG;
+                return { w: iw + innerG * 2 + matG * 2, h: ih + innerG * 2 + matG * 2 + labelH };
             }
             case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
@@ -3713,56 +3717,63 @@ const w = natW;
         }
     }
 
-    // ══ 画廊留白:暖米白大衬纸 + 照片轻投影 + 内衬细线 + 底部画廊展签 ══
+    // ══ 画廊留白:一副“挂在画廊白墙上”的作品——深木画框+金色fillet+大留白+白底展签牌 ══
     function styleGalleryMat(img, size, g, iw, ih, S) {
         const ref = Math.min(iw, ih);
-        const mat = Math.max(60, Math.round(ref * 0.05));     // 四周衬纸留白(与原预设 200/220px 同量级)
-        const labelH = Math.max(66, Math.round(mat * 1.1));   // 底部展签带
-        const w = iw + mat * 2, h = ih + mat * 2 + labelH;
-        // 1) 衬纸底:暖米白(画廊纸色,不含蓝调)
-        g.fillStyle = '#f6f4ee';
+        const mat = Math.max(70, Math.round(ref * 0.09));      // 四周墙面大留白
+        const frameW = Math.max(12, Math.round(ref * 0.018));  // 深色木框宽
+        const fillet = Math.max(2, Math.round(ref * 0.003));   // 金色内衬线
+        const gap = Math.max(2, Math.round(ref * 0.002));      // 照片→金线间隙
+        const labelH = Math.max(72, Math.round(mat * 0.8));    // 展签牌区
+        const inner = gap + fillet + frameW;                   // 照片外侧装饰总宽
+        const w = iw + inner * 2 + mat * 2;
+        const h = ih + inner * 2 + mat * 2 + labelH;
+        // 1) 墙面:暖灰白(画廊白墙,略含暖色)
+        g.fillStyle = '#efece5';
         g.fillRect(0, 0, w, h);
-        // 照片实际绘制区(支持右侧栏缩放/偏移)
+        // 照片实际绘制区(支持右侧卡缩放/偏移)
         const sc = (S && S.imgScale) || 1;
         const dw = iw * sc, dh = ih * sc;
-        const dx = mat + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
-        const dy = mat + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
-        // 2) 照片轻投影(浮在衬纸上,画廊装裱感)
+        const px = mat + inner + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
+        const py = mat + inner + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
+        const frameL = px - gap - fillet - frameW;
+        const frameT = py - gap - fillet - frameW;
+        const frameR = px + dw + gap + fillet + frameW;
+        const frameB = py + dh + gap + fillet + frameW;
+        // 2) 整幅挂画投影(框+照片一体浮在墙上)
         g.save();
-        g.shadowColor = 'rgba(60,55,45,0.22)';
-        g.shadowBlur = Math.max(12, Math.round(mat * 0.18));
-        g.shadowOffsetY = Math.max(4, Math.round(mat * 0.08));
-        g.fillStyle = '#f6f4ee';
-        g.fillRect(dx, dy, dw, dh);
+        g.shadowColor = 'rgba(40,35,28,0.30)';
+        g.shadowBlur = Math.max(16, Math.round(ref * 0.02));
+        g.shadowOffsetY = Math.max(6, Math.round(ref * 0.006));
+        g.fillStyle = '#efece5';
+        g.fillRect(frameL, frameT, frameR - frameL, frameB - frameT);
         g.restore();
-        // 3) 照片(圆角由入口劫持 drawImage 自动应用)
-        g.drawImage(img, dx, dy, dw, dh);
-        // 4) 照片四周内衬细线(画廊装裱 fillet)
-        const inset = Math.max(6, Math.round(mat * 0.08));
-        g.strokeStyle = 'rgba(140,132,116,0.5)';
-        g.lineWidth = 1;
-        g.strokeRect(dx - inset, dy - inset, dw + inset * 2, dh + inset * 2);
-        // 5) 底部画廊展签:居中短中线 + 细体小字
-        const labelY = mat + ih + labelH / 2;
-        const fs = Math.max(11, Math.round(mat * 0.16));
-        g.strokeStyle = 'rgba(140,132,116,0.7)';
-        g.lineWidth = 1;
-        const tickW = Math.max(28, Math.round(fs * 3));
-        g.beginPath();
-        g.moveTo(w / 2 - tickW / 2, labelY - fs * 1.1);
-        g.lineTo(w / 2 + tickW / 2, labelY - fs * 1.1);
-        g.stroke();
+        // 3) 深色画框(画廊木框黑)
+        g.fillStyle = '#33302b';
+        g.fillRect(frameL, frameT, frameR - frameL, frameB - frameT);
+        // 4) 金色 fillet 内衬线
+        g.fillStyle = '#b8a06a';
+        g.fillRect(frameL + frameW, frameT + frameW, frameR - frameL - frameW * 2, frameB - frameT - frameW * 2);
+        // 5) 照片(圆角由入口劫持自动应用)
+        g.drawImage(img, px, py, dw, dh);
+        // 6) 画廊展签牌:白底小卡+细边,挂在画框正下方
+        const fs = Math.max(10, Math.round(mat * 0.11));
         const label = 'MOMENTS \u00b7 2026 \u00b7 No.01';
-        g.fillStyle = '#8d8678';
-        g.font = '300 ' + fs + "px Georgia, 'Times New Roman', serif";
-        g.letterSpacing = Math.round(fs * 0.25);
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        g.fillText(label, w / 2, labelY);
-        g.letterSpacing = 0;
-        g.textAlign = 'start';
-        g.textBaseline = 'alphabetic';
+        g.font = '400 ' + fs + "px Georgia, 'Times New Roman', serif";
+        const tw = Math.round(g.measureText(label).width + fs * 2.2);
+        const lw2 = Math.max(88, tw), lh2 = Math.max(34, Math.round(fs * 1.7));
+        const lx = Math.round((w - lw2) / 2);
+        const ly = mat + inner + ih + inner + Math.round((labelH - lh2) / 2);
+        g.fillStyle = '#fffefa';
+        g.strokeStyle = 'rgba(150,140,120,0.6)';
+        g.lineWidth = 1;
+        g.beginPath(); g.rect(lx, ly, lw2, lh2); g.fill(); g.stroke();
+        g.fillStyle = '#5a554b';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(label, lx + lw2 / 2, ly + lh2 / 2 + 1);
+        g.textAlign = 'start'; g.textBaseline = 'alphabetic';
     }
+
 
     // ══ 赛博故障风 ══
     function styleCyberGlitch(img, size, g, iw, ih) {
