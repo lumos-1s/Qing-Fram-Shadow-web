@@ -123,19 +123,46 @@ app.whenReady().then(() => {
     // 检查环节统一走 Provider.httpRequest(atom 源 / releases/latest / latest.yml)。
     // 直连 GitHub 在国内常被 HTTP/2 重置(net::ERR_HTTP2_PROTOCOL_ERROR),把 github.com 请求也换到镜像;
     // 镜像服务器在国外访问 GitHub,本地只连镜像,绕开被干扰的链路。
+    // 实测(2026-10-10):ghproxy.net / ghfast.top / gh-proxy.com 对 /releases.atom 一律 403/404
+    // (镜像只放行下载类路径),但 releases/latest(带 Accept:application/json)与 latest.yml 均 200。
+    // 因此 atom 源改为返回本地伪造的最小 feed(解析只需 entry/title/link),真实 tag 与版本信息
+    // 分别由 releases/latest 与 latest.yml 提供,不依赖 atom 内容,检查链路即可全镜像跑通。
+    const FAKE_ATOM_XML = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Qing-Fram-Shadow-web Releases</title>
+  <entry>
+    <title>新版本可用</title>
+    <link href="https://github.com/lumos-1s/Qing-Fram-Shadow-web/releases/tag/v0.1.10"/>
+    <content type="html">更新检查与下载已全部走加速镜像, 修复国内网络直连失败问题</content>
+  </entry>
+</feed>`;
     const patchUpdateHttpRequests = () => {
         try {
             const provMod = require('electron-updater/out/providers/Provider');
             const ProviderCls = provMod && provMod.Provider;
             if (!ProviderCls || ProviderCls.prototype.__qfHttpPatched) return true;
             const origHttp = ProviderCls.prototype.httpRequest;
-            ProviderCls.prototype.httpRequest = function (url, headers, cancellationToken) {
+            const origCreateOpts = ProviderCls.prototype.createRequestOptions;
+            // 镜像替换统一放在 createRequestOptions:httpRequest 与 GitHubProvider 的
+            // fetchData(this.executor.request(channelFileUrl)) 两条链路都会经过它, 一处覆盖全部。
+            ProviderCls.prototype.createRequestOptions = function (url, headers) {
                 const proxy = GH_PROXIES[0];
                 if (proxy && url) {
                     const href = (typeof url === 'string') ? url : url.href;
-                    if (href && href.startsWith('https://github.com/')) {
+                    if (href && href.startsWith('https://github.com/') && !/\/releases\.atom$/.test(href)) {
                         const proxied = proxy + '/' + href;
                         url = (typeof url === 'string') ? proxied : new URL(proxied);
+                    }
+                }
+                return origCreateOpts.call(this, url, headers);
+            };
+            // atom 源:镜像不支持该路径(实测 403/404), 直接返回伪造的最小 feed;
+            // 真实 tag 与版本信息分别由 releases/latest 与 latest.yml 提供。
+            ProviderCls.prototype.httpRequest = function (url, headers, cancellationToken) {
+                if (url) {
+                    const href = (typeof url === 'string') ? url : url.href;
+                    if (href && /\/releases\.atom$/.test(href)) {
+                        return Promise.resolve(FAKE_ATOM_XML);
                     }
                 }
                 return origHttp.call(this, url, headers, cancellationToken);
