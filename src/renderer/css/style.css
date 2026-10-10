@@ -396,6 +396,10 @@ html.dark #previewCanvas {
     border-radius: 4px; cursor: pointer;
 }
 .ctx-menu button:hover { background: #3d424c; }
+.ctx-sep {
+    height: 1px; margin: 3px 6px;
+    background: #3a3f48; border: none; pointer-events: none;
+}
 
 /* 拖拽遮罩 */
 .drop-overlay {

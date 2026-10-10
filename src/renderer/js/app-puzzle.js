@@ -814,6 +814,13 @@ window.App = Object.assign(window.App || {}, {
         const m = document.createElement('div');
         m.className = 'ctx-menu';
         items.forEach(it => {
+            // 分隔线:第二项为 null/undefined 时渲染为不可点击的分隔条,避免 it[1]() 抛 TypeError
+            if (!it || it[1] === null || it[1] === undefined) {
+                const s = document.createElement('div');
+                s.className = 'ctx-sep';
+                m.appendChild(s);
+                return;
+            }
             const b = document.createElement('button');
             b.type = 'button';
             b.textContent = it[0];

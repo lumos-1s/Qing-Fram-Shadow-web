@@ -663,6 +663,7 @@ window.App = {
                 ['适应窗口', () => this.fitZoom && this.fitZoom()],
                 ['1:1 实际大小', () => this.zoomActual && this.zoomActual()],
                 ['对比原图 (空格按住)', () => this.toggleCompare && this.toggleCompare()],
+                ['旋转 90°', () => this.rotateCurrentPhoto()],
                 ['—', null],
                 ['撤销 (Ctrl+Z)', () => this.undo()],
                 ['重做 (Ctrl+Y)', () => this.redo()],
@@ -1238,6 +1239,33 @@ if ($('cbShadow')) $('cbShadow').checked = (sg.shadowEnable || 0) === 1;
         this.invalidateStyleCaches();
         this.buildThumbnails();
         this.afterImageSelect();
+    },
+
+    // 主照片旋转 90°(顺时针):重新生成位图替换 image.el,渲染/导出/缩略图同步生效
+    async rotateCurrentPhoto() {
+        const im = this.image;
+        if (!im || !im.el) { this.setStatus('请先导入照片'); return; }
+        const img = im.el;
+        const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+        if (!W || !H) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = H;
+        canvas.height = W;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(H / 2, W / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(img, -W / 2, -H / 2);
+        const out = new Image();
+        await new Promise(r => { out.onload = r; out.onerror = r; out.src = canvas.toDataURL('image/jpeg', 0.95); });
+        if (!out.naturalWidth) { this.setStatus('旋转失败'); return; }
+        im.el = out;
+        im.w = canvas.width;
+        im.h = canvas.height;
+        im.rotate = ((im.rotate || 0) + 1) % 4;
+        if (this.invalidateStyleCaches) this.invalidateStyleCaches();
+        if (this.buildThumbnails) this.buildThumbnails();
+        this.scheduleRender(true);
+        this.setStatus('照片已旋转 90°(再次右键可继续旋转)');
     },
 
     /* ══ 照片导入(拖拽/多选共用) ══ */
