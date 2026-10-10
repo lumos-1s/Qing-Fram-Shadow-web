@@ -1562,7 +1562,7 @@ AV_OVERLAY:63,
 AV_OVERLAY_TR:64,
 AV_OVERLAY_BR:65,
 AV_OVERLAY_BC:66,
-AV_OVERLAY_BC2:67 };
+AV_OVERLAY_BC2:67, GALLERY_MAT:68 };
     const MASK48 = 0xffffffffffffn, MULT = 0x5deece66dn, INC = 0xbn;
     function javaRandom(seed64) {
         let s = (BigInt(seed64) ^ MULT) & MASK48;
@@ -3542,6 +3542,12 @@ const w = natW;
                 const p = Math.max(20, Math.round(iw * 0.03));
                 return { w: iw + p * 2, h: ih + p * 2 };
             }
+            case 'GALLERY_MAT': {
+                const refG = Math.min(iw, ih);
+                const matG = Math.max(60, Math.round(refG * 0.05));
+                const labelH = Math.max(66, Math.round(matG * 1.1));
+                return { w: iw + matG * 2, h: ih + matG * 2 + labelH };
+            }
             case 'OVERLAY_PARAM_LEFT':
             case 'OVERLAY_PARAM_RIGHT': {
                 // 与 IMP_FROSTED 印象毛玻璃保持同一套尺寸(lw=max(180,iw*0.35),rp=lw/2,tbp=max(50,size*1.2))
@@ -3705,6 +3711,57 @@ const w = natW;
             g.fillText(line, w / 2, ty);
             g.shadowBlur = 0;
         }
+    }
+
+    // ══ 画廊留白:暖米白大衬纸 + 照片轻投影 + 内衬细线 + 底部画廊展签 ══
+    function styleGalleryMat(img, size, g, iw, ih, S) {
+        const ref = Math.min(iw, ih);
+        const mat = Math.max(60, Math.round(ref * 0.05));     // 四周衬纸留白(与原预设 200/220px 同量级)
+        const labelH = Math.max(66, Math.round(mat * 1.1));   // 底部展签带
+        const w = iw + mat * 2, h = ih + mat * 2 + labelH;
+        // 1) 衬纸底:暖米白(画廊纸色,不含蓝调)
+        g.fillStyle = '#f6f4ee';
+        g.fillRect(0, 0, w, h);
+        // 照片实际绘制区(支持右侧栏缩放/偏移)
+        const sc = (S && S.imgScale) || 1;
+        const dw = iw * sc, dh = ih * sc;
+        const dx = mat + (iw - dw) / 2 + ((S && S.imgOffsetX) || 0);
+        const dy = mat + (ih - dh) / 2 + ((S && S.imgOffsetY) || 0);
+        // 2) 照片轻投影(浮在衬纸上,画廊装裱感)
+        g.save();
+        g.shadowColor = 'rgba(60,55,45,0.22)';
+        g.shadowBlur = Math.max(12, Math.round(mat * 0.18));
+        g.shadowOffsetY = Math.max(4, Math.round(mat * 0.08));
+        g.fillStyle = '#f6f4ee';
+        g.fillRect(dx, dy, dw, dh);
+        g.restore();
+        // 3) 照片(圆角由入口劫持 drawImage 自动应用)
+        g.drawImage(img, dx, dy, dw, dh);
+        // 4) 照片四周内衬细线(画廊装裱 fillet)
+        const inset = Math.max(6, Math.round(mat * 0.08));
+        g.strokeStyle = 'rgba(140,132,116,0.5)';
+        g.lineWidth = 1;
+        g.strokeRect(dx - inset, dy - inset, dw + inset * 2, dh + inset * 2);
+        // 5) 底部画廊展签:居中短中线 + 细体小字
+        const labelY = mat + ih + labelH / 2;
+        const fs = Math.max(11, Math.round(mat * 0.16));
+        g.strokeStyle = 'rgba(140,132,116,0.7)';
+        g.lineWidth = 1;
+        const tickW = Math.max(28, Math.round(fs * 3));
+        g.beginPath();
+        g.moveTo(w / 2 - tickW / 2, labelY - fs * 1.1);
+        g.lineTo(w / 2 + tickW / 2, labelY - fs * 1.1);
+        g.stroke();
+        const label = 'MOMENTS \u00b7 2026 \u00b7 No.01';
+        g.fillStyle = '#8d8678';
+        g.font = '300 ' + fs + "px Georgia, 'Times New Roman', serif";
+        g.letterSpacing = Math.round(fs * 0.25);
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText(label, w / 2, labelY);
+        g.letterSpacing = 0;
+        g.textAlign = 'start';
+        g.textBaseline = 'alphabetic';
     }
 
     // ══ 赛博故障风 ══
@@ -4918,6 +4975,7 @@ const w = natW;
             AV_OVERLAY_BR: styleAvOverlayBR,
             AV_OVERLAY_BC: styleAvOverlayBC,
             AV_OVERLAY_BC2: styleAvOverlayBC2,
+            GALLERY_MAT: styleGalleryMat,
         }[styleName];
         const S = buildState(app, styleName, iw, ih, size);
 
